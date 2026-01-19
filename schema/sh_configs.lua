@@ -12,9 +12,12 @@ hook.Add("InitializedConfig", "WindsweptConfigDefaults", function()
     ix.config.SetDefault("defaultMoney", 100)
 
     -- Character creation settings
-    ix.config.SetDefault("maxCharacters", 3)
+    ix.config.SetDefault("maxCharacters", 1)
 
     -- Inventory settings
     ix.config.SetDefault("inventoryWidth", 6)
     ix.config.SetDefault("inventoryHeight", 4)
+
+    -- Disable intro music (loud and disorienting)
+    ix.config.SetDefault("music", "")
 end)
