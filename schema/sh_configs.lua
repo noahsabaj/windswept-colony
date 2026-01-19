@@ -15,6 +15,6 @@ hook.Add("InitializedConfig", "WindsweptConfigDefaults", function()
     ix.config.SetDefault("maxCharacters", 3)
 
     -- Inventory settings
-    ix.config.SetDefault("invW", 6)
-    ix.config.SetDefault("invH", 4)
+    ix.config.SetDefault("inventoryWidth", 6)
+    ix.config.SetDefault("inventoryHeight", 4)
 end)
