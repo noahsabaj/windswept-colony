@@ -1,0 +1,15 @@
+--[[
+    Vice President - Appointed by Union President
+    Second in command of the Union.
+]]--
+
+CLASS.name = "Vice President"
+CLASS.faction = FACTION_UNION
+CLASS.isDefault = false
+CLASS.description = "Second in command of the Miners Union."
+
+function CLASS:OnCanBe(client)
+    return false, "This position must be appointed by the Union President."
+end
+
+CLASS_VICE_PRESIDENT = CLASS.index

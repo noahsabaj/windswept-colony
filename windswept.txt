@@ -1,0 +1,7 @@
+"windswept"
+{
+    "base"        "helix"
+    "title"       "Windswept Colony RP"
+    "author"      "Noah"
+    "menusystem"  "1"
+}
