@@ -23,6 +23,7 @@ function ENT:SetupDataTables()
     self:NetworkVar("Float", 0, "TimerStart")         -- When knockout started (CurTime)
     self:NetworkVar("Float", 1, "TimerDuration")      -- Total duration
     self:NetworkVar("String", 0, "KnockedModel")      -- Player's model
+    self:NetworkVar("String", 1, "CharacterName")     -- Character name (permanent, survives deletion)
     self:NetworkVar("Bool", 0, "Permadead")           -- Whether character is permanently dead
 end
 

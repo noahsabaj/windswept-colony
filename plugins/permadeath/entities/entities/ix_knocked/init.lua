@@ -10,47 +10,83 @@ AddCSLuaFile("cl_init.lua")
 include("shared.lua")
 
 function ENT:Initialize()
-    self:SetModel("models/props_junk/watermelon01.mdl")  -- Placeholder, will be overridden by player model
-    self:SetSolid(SOLID_VPHYSICS)
-    self:PhysicsInit(SOLID_VPHYSICS)
+    -- This entity is invisible - we use a prop_ragdoll for visuals
+    self:SetNoDraw(true)
+    self:SetSolid(SOLID_NONE)
+    self:SetMoveType(MOVETYPE_NONE)
     self:SetUseType(SIMPLE_USE)
-    self:SetCollisionGroup(COLLISION_GROUP_WEAPON)
-
-    local physObj = self:GetPhysicsObject()
-    if IsValid(physObj) then
-        physObj:EnableMotion(true)
-        physObj:Wake()
-        physObj:SetMass(80)  -- Human-ish mass
-    end
 
     -- Initialize state
     self:SetPermadead(false)
     self:SetCurrentReviver(NULL)
 end
 
--- Set the player model (call after spawn)
-function ENT:SetKnockedModel(model)
-    self:SetModel(model)
-
-    -- Reinitialize physics with new model
-    self:PhysicsInit(SOLID_VPHYSICS)
-    self:SetCollisionGroup(COLLISION_GROUP_WEAPON)
-
-    local physObj = self:GetPhysicsObject()
-    if IsValid(physObj) then
-        physObj:EnableMotion(true)
-        physObj:Wake()
-        physObj:SetMass(80)
+-- Create the ragdoll visual for this knocked entity
+function ENT:CreateRagdoll(model, skin, bodygroups)
+    -- Remove existing ragdoll if any
+    if IsValid(self.ixRagdoll) then
+        self.ixRagdoll:Remove()
     end
 
-    -- Store for networking
-    self:SetNetVar("knockedModel", model)
+    -- Create prop_ragdoll for proper ragdoll physics
+    local ragdoll = ents.Create("prop_ragdoll")
+    ragdoll:SetPos(self:GetPos())
+    ragdoll:SetAngles(self:GetAngles())
+    ragdoll:SetModel(model)
+    ragdoll:SetSkin(skin or 0)
+
+    -- Copy bodygroups
+    if bodygroups then
+        for i, v in pairs(bodygroups) do
+            ragdoll:SetBodygroup(i, v)
+        end
+    end
+
+    ragdoll:Spawn()
+    ragdoll:Activate()
+    ragdoll:SetCollisionGroup(COLLISION_GROUP_WEAPON)
+
+    -- Link ragdoll to this entity (server-side)
+    ragdoll.ixKnockedEntity = self
+    self.ixRagdoll = ragdoll
+
+    -- Network the link to clients using Helix's SetNetVar
+    ragdoll:SetNetVar("ixKnockedEntity", self)
+
+    -- Make ragdoll useable and forward Use to our entity
+    ragdoll:SetUseType(SIMPLE_USE)
+    ragdoll.Use = function(rag, activator, caller)
+        if IsValid(self) then
+            self:Use(activator, caller)
+        end
+    end
+
+    -- Forward GetEntityMenu to our entity for right-click menu
+    ragdoll.GetEntityMenu = function(rag, client)
+        if IsValid(self) then
+            return self:GetEntityMenu(client)
+        end
+        return {}
+    end
+
+    -- Keep our entity position synced with ragdoll
+    self:SetPos(ragdoll:GetPos())
+
+    return ragdoll
 end
 
--- Set the player skin (NetworkVar auto-generates SetKnockedSkin but we need to apply it)
+-- Set the player model and create the ragdoll
+-- Note: NetworkVar "KnockedModel" (String) handles networking via SetupDataTables
+function ENT:SetKnockedModel(model)
+    -- Store in NetworkVar for client access
+    self.dt.KnockedModel = model
+end
+
+-- Set the player skin
+-- Note: NetworkVar "KnockedSkin" (Int) handles networking via SetupDataTables
 function ENT:SetKnockedSkin(skin)
     self:SetSkin(skin)
-    -- Also store in NetworkVar for persistence
+    -- Store in NetworkVar for client access (auto-generated setter from SetupDataTables)
     self.dt.KnockedSkin = skin
 end
 
@@ -66,10 +102,15 @@ function ENT:Think()
     end
 
     -- Check timer expiration
-    if self:GetRemainingTime() <= 0 then
+    local remaining = self:GetRemainingTime()
+    if remaining <= 0 then
+        print("[Permadeath] Entity timer expired! Remaining: " .. remaining)
         local plugin = ix.plugin.Get("permadeath")
         if plugin then
+            print("[Permadeath] Calling OnKnockoutExpired")
             plugin:OnKnockoutExpired(self)
+        else
+            print("[Permadeath] ERROR: Could not get permadeath plugin!")
         end
     end
 
@@ -104,11 +145,21 @@ function ENT:OnTakeDamage(dmgInfo)
     if self:GetPermadead() then return end
 
     local attacker = dmgInfo:GetAttacker()
-    local hitGroup = dmgInfo:GetHitGroup()
-    local isHeadshot = (hitGroup == HITGROUP_HEAD)
-
     local plugin = ix.plugin.Get("permadeath")
     if not plugin then return end
+
+    -- Determine if headshot via damage position relative to head height
+    -- Note: dmgInfo:GetHitGroup() doesn't work for entities, only for players
+    local isHeadshot = false
+    local damagePos = dmgInfo:GetDamagePosition()
+
+    if damagePos and damagePos ~= Vector(0, 0, 0) then
+        -- Calculate head position (approximately 60 units above entity origin for standing models)
+        local headPos = self:GetPos() + Vector(0, 0, 60)
+        local distToHead = damagePos:Distance(headPos)
+        -- Consider it a headshot if damage is within 15 units of head position
+        isHeadshot = distToHead < 15
+    end
 
     if isHeadshot then
         -- 50% instant execution, 50% halve timer
@@ -147,14 +198,14 @@ end
 -- USE / REVIVAL
 -- ============================================================================
 
+-- Note: Primary interaction is now handled via net messages (ixKnockoutLoot/ixKnockoutRevive)
+-- This Use function is kept as a fallback and for compatibility
 function ENT:Use(activator, caller)
     if not IsValid(activator) or not activator:IsPlayer() then return end
 
-    -- Trigger revival attempt through plugin
-    local plugin = ix.plugin.Get("permadeath")
-    if plugin then
-        plugin:AttemptRevival(activator, self)
-    end
+    -- Default Use action is to loot (matches E tap behavior)
+    -- Revival requires holding E (handled via client-side detection)
+    self:OpenInventory(activator)
 end
 
 -- ============================================================================
@@ -186,6 +237,16 @@ end
 -- INVENTORY / LOOTING
 -- ============================================================================
 
+-- Sound effects for looting (rustling through clothes/gear)
+local lootSounds = {
+    "npc/combine_soldier/gear1.wav",
+    "npc/combine_soldier/gear2.wav",
+    "npc/combine_soldier/gear3.wav",
+    "npc/combine_soldier/gear4.wav",
+    "npc/combine_soldier/gear5.wav",
+    "npc/combine_soldier/gear6.wav"
+}
+
 function ENT:OpenInventory(client)
     local invID = self:GetInventoryID()
     if not invID or invID == 0 then
@@ -199,15 +260,25 @@ function ENT:OpenInventory(client)
         return
     end
 
-    -- Get character name for display
-    local charID = self:GetCharacterID()
-    local character = ix.char.loaded[charID]
-    local name = character and character:GetName() or "Unknown"
+    -- Play looting sound (rustling through gear)
+    local ragdoll = self.ixRagdoll
+    local soundPos = IsValid(ragdoll) and ragdoll:GetPos() or self:GetPos()
+    sound.Play(lootSounds[math.random(#lootSounds)], soundPos, 60, 100, 0.8)
+
+    -- Get character name for display (stored permanently on entity)
+    local name = self:GetCharacterName()
+    if not name or name == "" then
+        name = "Unknown"
+    end
 
     -- Use Helix storage system
+    -- IMPORTANT: Pass the ragdoll as the entity, not self (ix_knocked is invisible)
+    -- DoStaredAction traces to check if player is looking at the entity,
+    -- so we need to pass the visible ragdoll they're actually looking at
+    local stareEntity = IsValid(ragdoll) and ragdoll or self
     ix.storage.Open(client, inventory, {
         name = name .. "'s Body",
-        entity = self,
+        entity = stareEntity,
         searchTime = 1,
         bMultipleUsers = true
     })
@@ -218,6 +289,11 @@ end
 -- ============================================================================
 
 function ENT:OnRemove()
+    -- Remove the ragdoll
+    if IsValid(self.ixRagdoll) then
+        self.ixRagdoll:Remove()
+    end
+
     -- Clear any revival in progress
     local reviver = self:GetCurrentReviver()
     if IsValid(reviver) then
@@ -228,5 +304,13 @@ function ENT:OnRemove()
     local owner = self:GetOwningPlayer()
     if IsValid(owner) then
         owner.ixKnockedEntity = nil
+    end
+
+    -- Clean up from plugin tracking table to prevent memory leaks
+    if self.ixSteamID64 then
+        local plugin = ix.plugin.Get("permadeath")
+        if plugin and plugin.knockedEntities then
+            plugin.knockedEntities[self.ixSteamID64] = nil
+        end
     end
 end

@@ -11,52 +11,67 @@ print("[Permadeath] sv_plugin.lua is loading...")
 PLUGIN.knockedEntities = PLUGIN.knockedEntities or {}
 
 -- ============================================================================
--- DAMAGE INTERCEPTION (using Helix PLUGIN: pattern)
+-- DAMAGE INTERCEPTION (using EntityTakeDamage hook)
 -- ============================================================================
 
 -- Track hit groups for headshot detection
--- ScalePlayerDamage is called before DoPlayerDeath and gives us the hit group
+-- ScalePlayerDamage is called before damage is applied and gives us the hit group
 function PLUGIN:ScalePlayerDamage(client, hitGroup, dmgInfo)
     client.ixLastHitGroup = hitGroup
 end
 
--- Intercept player death and convert to knockout
--- This uses the Helix hook cache system - functions defined as PLUGIN:HookName
--- are automatically cached and called by hook.Call
-function PLUGIN:DoPlayerDeath(client, attacker, dmgInfo)
-    print("[Permadeath] DoPlayerDeath hook fired for " .. client:Name())
+-- Intercept lethal damage and convert to knockout
+-- EntityTakeDamage allows us to modify/cancel damage before it's applied
+function PLUGIN:EntityTakeDamage(entity, dmgInfo)
+    -- Only handle player damage
+    if not entity:IsPlayer() then return end
 
+    local client = entity
     local character = client:GetCharacter()
-    if not character then
-        print("[Permadeath] No character found, skipping")
+    if not character then return end
+
+    -- If player is already knocked out, ignore (damage goes to entity instead)
+    if IsValid(client.ixKnockedEntity) then return end
+
+    -- Prevent race condition: if we're already processing lethal damage for this player
+    -- (e.g., multiple bullets in same frame), ignore subsequent damage
+    if client.ixProcessingLethalDamage then return end
+
+    -- Check if this damage would be lethal
+    local currentHealth = client:Health()
+    local damage = dmgInfo:GetDamage()
+
+    if currentHealth - damage > 0 then
+        -- Not lethal, let normal damage through
         return
     end
 
-    print("[Permadeath] Creating knockout for " .. character:GetName())
+    -- This would be lethal - intercept it
+    print("[Permadeath] Lethal damage intercepted for " .. client:Name())
 
-    -- If player is already knocked out (being executed), let damage go to entity
-    if IsValid(client.ixKnockedEntity) then
-        return
-    end
+    -- Set flag to prevent race conditions with multiple damage events
+    client.ixProcessingLethalDamage = true
 
-    -- Check for headshot - 50% chance of instant permadeath
+    -- Scale damage to 0 to prevent death
+    dmgInfo:ScaleDamage(0)
+
+    -- Check for headshot - configurable chance of instant permadeath
     if self:IsHeadshot(client) then
         local headshotChance = ix.config.Get("permadeathHeadshotChance", 50) / 100
         if math.random() < headshotChance then
             -- Lost the coin flip - instant permadeath
             print("[Permadeath] Headshot execution!")
             self:ApplyPermadeath(client, character, "headshot_execution")
-            return true  -- Prevent normal death
+            client.ixProcessingLethalDamage = nil
+            return
         end
-        -- Won the coin flip - proceed to normal knockout (no extra penalty)
+        -- Won the coin flip - proceed to normal knockout
         print("[Permadeath] Survived headshot coin flip")
     end
 
     -- Create knockout state instead of death
     self:CreateKnockout(client, character, dmgInfo)
-
-    -- Prevent normal death processing by returning non-nil
-    return true
+    client.ixProcessingLethalDamage = nil
 end
 
 -- Block normal respawn for knocked players
@@ -94,7 +109,13 @@ function PLUGIN:CreateKnockout(client, character, dmgInfo)
     local model = client:GetModel()
     local skin = client:GetSkin()
 
-    -- Create the ix_knocked entity
+    -- Collect bodygroups
+    local bodygroups = {}
+    for i = 0, client:GetNumBodyGroups() - 1 do
+        bodygroups[i] = client:GetBodygroup(i)
+    end
+
+    -- Create the ix_knocked entity (invisible controller)
     local entity = ents.Create("ix_knocked")
     if not IsValid(entity) then
         ErrorNoHalt("[Permadeath] Failed to create ix_knocked entity!\n")
@@ -106,18 +127,17 @@ function PLUGIN:CreateKnockout(client, character, dmgInfo)
     entity:Spawn()
     entity:Activate()
 
-    -- Configure entity with player data
+    -- Configure entity with player data (NetworkVars)
     entity:SetKnockedModel(model)
     entity:SetKnockedSkin(skin)
     entity:SetOwningPlayer(client)
     entity:SetCharacterID(character:GetID())
+    entity:SetCharacterName(character:GetName())  -- Store name permanently
     entity:SetTimerStart(CurTime())
     entity:SetTimerDuration(duration)
 
-    -- Copy bodygroups
-    for i = 0, client:GetNumBodyGroups() - 1 do
-        entity:SetBodygroup(i, client:GetBodygroup(i))
-    end
+    -- Create the visible ragdoll
+    entity:CreateRagdoll(model, skin, bodygroups)
 
     -- Link to character's inventory for looting
     local inventory = character:GetInventory()
@@ -128,7 +148,8 @@ function PLUGIN:CreateKnockout(client, character, dmgInfo)
     -- Store references
     client.ixKnockedEntity = entity
     entity.ixOwner = client
-    self.knockedEntities[client:SteamID64()] = entity
+    entity.ixSteamID64 = client:SteamID64()
+    self.knockedEntities[entity.ixSteamID64] = entity
 
     -- Hide and freeze the actual player
     client:StripWeapons()
@@ -187,6 +208,7 @@ function PLUGIN:AttemptRevival(reviver, knockedEntity)
     reviver:SetAction("@reviving", duration)
 
     -- Use DoStaredAction for progress-based revival (must look at target)
+    -- Signature: DoStaredAction(entity, callback, time, onCancel, distance)
     reviver:DoStaredAction(knockedEntity, function()
         -- Completed - attempt the revival
         self:CompleteRevivalAttempt(reviver, knockedEntity, hasDefib, defibItem)
@@ -194,9 +216,7 @@ function PLUGIN:AttemptRevival(reviver, knockedEntity)
         -- Cancelled (looked away, moved too far, etc.)
         knockedEntity:SetCurrentReviver(NULL)
         reviver:SetAction()
-    end, function()
-        -- Progress callback (optional)
-    end)
+    end, 96)  -- 96 units max distance for revival
 
     return true
 end
@@ -287,7 +307,9 @@ function PLUGIN:RevivePlayer(knockedEntity, reviver, usedDefib, defibItem)
     reviver:NotifyLocalized("revivalSuccess")
 
     -- Remove the knockout entity
-    self.knockedEntities[character:GetData("steamID") or ""] = nil
+    if knockedEntity.ixSteamID64 then
+        self.knockedEntities[knockedEntity.ixSteamID64] = nil
+    end
     knockedEntity:Remove()
 
     -- Log the revival
@@ -298,7 +320,112 @@ end
 -- PERMADEATH
 -- ============================================================================
 
+-- Delete a character from the database (replicates Helix's deletion logic)
+function PLUGIN:DeleteCharacter(client, character)
+    local id = character:GetID()
+    local steamID = client:SteamID64()
+
+    print("[Permadeath] Deleting character ID: " .. id)
+
+    -- Remove from player's character list
+    for k, v in ipairs(client.ixCharList or {}) do
+        if v == id then
+            table.remove(client.ixCharList, k)
+            break
+        end
+    end
+
+    -- Run pre-delete hook
+    hook.Run("PreCharacterDeleted", client, character)
+
+    -- Remove from loaded characters
+    ix.char.loaded[id] = nil
+
+    -- Notify all clients about the deletion
+    net.Start("ixCharacterDelete")
+        net.WriteUInt(id, 32)
+    net.Broadcast()
+
+    -- Delete character from database
+    local query = mysql:Delete("ix_characters")
+        query:Where("id", id)
+        query:Where("steamid", steamID)
+    query:Execute()
+
+    -- Delete associated inventories and items
+    local invQuery = mysql:Select("ix_inventories")
+        invQuery:Select("inventory_id")
+        invQuery:Where("character_id", id)
+        invQuery:Callback(function(result)
+            if istable(result) then
+                for _, v in ipairs(result) do
+                    -- Delete items in this inventory
+                    local itemQuery = mysql:Delete("ix_items")
+                        itemQuery:Where("inventory_id", v.inventory_id)
+                    itemQuery:Execute()
+
+                    -- Remove from memory
+                    ix.item.inventories[tonumber(v.inventory_id)] = nil
+                end
+            end
+
+            -- Delete the inventories
+            local delInvQuery = mysql:Delete("ix_inventories")
+                delInvQuery:Where("character_id", id)
+            delInvQuery:Execute()
+        end)
+    invQuery:Execute()
+
+    -- Run post-delete hook
+    hook.Run("CharacterDeleted", client, id, true)
+
+    print("[Permadeath] Character deleted successfully")
+end
+
+-- Delete a character when the player is offline (database only)
+function PLUGIN:DeleteCharacterOffline(charID)
+    print("[Permadeath] Deleting offline character ID: " .. charID)
+
+    -- Remove from loaded characters if still there
+    ix.char.loaded[charID] = nil
+
+    -- Notify all clients about the deletion
+    net.Start("ixCharacterDelete")
+        net.WriteUInt(charID, 32)
+    net.Broadcast()
+
+    -- Delete character from database
+    local query = mysql:Delete("ix_characters")
+        query:Where("id", charID)
+    query:Execute()
+
+    -- Delete associated inventories and items
+    local invQuery = mysql:Select("ix_inventories")
+        invQuery:Select("inventory_id")
+        invQuery:Where("character_id", charID)
+        invQuery:Callback(function(result)
+            if istable(result) then
+                for _, v in ipairs(result) do
+                    local itemQuery = mysql:Delete("ix_items")
+                        itemQuery:Where("inventory_id", v.inventory_id)
+                    itemQuery:Execute()
+
+                    ix.item.inventories[tonumber(v.inventory_id)] = nil
+                end
+            end
+
+            local delInvQuery = mysql:Delete("ix_inventories")
+                delInvQuery:Where("character_id", charID)
+            delInvQuery:Execute()
+        end)
+    invQuery:Execute()
+
+    print("[Permadeath] Offline character deleted successfully")
+end
+
 function PLUGIN:ApplyPermadeath(client, character, reason)
+    print("[Permadeath] ApplyPermadeath called for " .. (IsValid(client) and client:Name() or "invalid") .. ", reason: " .. reason)
+
     -- Mark character as permanently dead
     character:SetData("permadead", true)
     character:SetData("permaDeathReason", reason)
@@ -310,21 +437,30 @@ function PLUGIN:ApplyPermadeath(client, character, reason)
 
     -- If there's a knockout entity, mark it as permadead (stays for looting)
     if IsValid(client) and IsValid(client.ixKnockedEntity) then
-        client.ixKnockedEntity:SetPermadead(true)
-        client.ixKnockedEntity.ixOwner = nil
+        local knockedEntity = client.ixKnockedEntity
+        -- Clean up tracking table
+        if knockedEntity.ixSteamID64 then
+            self.knockedEntities[knockedEntity.ixSteamID64] = nil
+        end
+        knockedEntity:SetPermadead(true)
+        knockedEntity.ixOwner = nil
         client.ixKnockedEntity = nil
     end
 
     -- Notify client and kick to character menu
     if IsValid(client) then
+        print("[Permadeath] Sending ixKnockoutEnd to client")
         net.Start("ixKnockoutEnd")
             net.WriteBool(false)  -- Permadead
             net.WriteUInt(0, 8)
         net.Send(client)
 
-        -- Small delay before kicking to character menu
+        -- Small delay before kicking to character menu and deleting
+        print("[Permadeath] Scheduling character:Kick() in 2 seconds")
+        local charID = character:GetID()
         timer.Simple(2, function()
             if IsValid(client) then
+                print("[Permadeath] Timer fired, kicking to character menu")
                 client:SetNoDraw(false)
                 client:SetNotSolid(false)
                 client:Freeze(false)
@@ -333,7 +469,20 @@ function PLUGIN:ApplyPermadeath(client, character, reason)
                 client:KillSilent()
 
                 -- Kick back to character menu
+                print("[Permadeath] Calling character:Kick()")
                 character:Kick()
+
+                -- Delete the character after a short delay to ensure kick completes
+                timer.Simple(0.5, function()
+                    if IsValid(client) then
+                        self:DeleteCharacter(client, character)
+                    end
+                end)
+            else
+                print("[Permadeath] Timer fired but client no longer valid")
+                -- Player disconnected, still delete the character from database
+                -- Need to handle this case without a valid client
+                self:DeleteCharacterOffline(charID)
             end
         end)
     end
@@ -344,28 +493,39 @@ end
 
 -- Called when knockout timer expires
 function PLUGIN:OnKnockoutExpired(knockedEntity)
+    print("[Permadeath] OnKnockoutExpired called")
+
+    -- Immediately set permadead to prevent multiple calls from Think()
+    knockedEntity:SetPermadead(true)
+
     local charID = knockedEntity:GetCharacterID()
     local character = ix.char.loaded[charID]
 
+    print("[Permadeath] CharID: " .. tostring(charID) .. ", Character: " .. tostring(character))
+
+    -- Clean up tracking table
+    if knockedEntity.ixSteamID64 then
+        self.knockedEntities[knockedEntity.ixSteamID64] = nil
+    end
+
     if not character then
-        knockedEntity:SetPermadead(true)
+        print("[Permadeath] No character found, entity already set permadead")
         return
     end
 
     local owner = knockedEntity.ixOwner
+    print("[Permadeath] Owner: " .. tostring(owner) .. ", IsValid: " .. tostring(IsValid(owner)))
 
     if IsValid(owner) then
+        print("[Permadeath] Calling ApplyPermadeath for online player")
         self:ApplyPermadeath(owner, character, "timer_expired")
     else
-        -- Player offline - still apply permadeath
-        character:SetData("permadead", true)
-        character:SetData("permaDeathReason", "timer_expired_offline")
-        character:SetData("permaDeathTime", os.time())
-        character:SetData("knocked", nil)
-        character:SetData("knockoutExpires", nil)
-
-        knockedEntity:SetPermadead(true)
+        -- Player offline - apply permadeath and delete character
+        print("[Permadeath] Player offline, deleting character")
         knockedEntity.ixOwner = nil
+
+        -- Delete the character from database
+        self:DeleteCharacterOffline(charID)
     end
 end
 
@@ -449,12 +609,38 @@ function PLUGIN:RestoreKnockoutState(client, character, remainingTime)
         existingEntity.ixOwner = client
         existingEntity:SetOwningPlayer(client)
 
+        -- Ensure SteamID64 is stored (may be missing from older entities)
+        if not existingEntity.ixSteamID64 then
+            existingEntity.ixSteamID64 = client:SteamID64()
+            self.knockedEntities[existingEntity.ixSteamID64] = existingEntity
+        end
+
+        -- Ensure character name is stored (may be missing from older entities)
+        if not existingEntity:GetCharacterName() or existingEntity:GetCharacterName() == "" then
+            existingEntity:SetCharacterName(character:GetName())
+        end
+
+        -- Ensure ragdoll exists (may have been removed)
+        if not IsValid(existingEntity.ixRagdoll) then
+            local bodygroups = {}
+            for i = 0, client:GetNumBodyGroups() - 1 do
+                bodygroups[i] = client:GetBodygroup(i)
+            end
+            existingEntity:CreateRagdoll(client:GetModel(), client:GetSkin(), bodygroups)
+        end
+
         -- Recalculate timer
         existingEntity:SetTimerStart(CurTime())
         existingEntity:SetTimerDuration(remainingTime)
     else
         -- Entity was removed (server restart?) - recreate it
         local knockoutCount = character:GetData("knockoutCount") or 1
+
+        -- Collect bodygroups
+        local bodygroups = {}
+        for i = 0, client:GetNumBodyGroups() - 1 do
+            bodygroups[i] = client:GetBodygroup(i)
+        end
 
         local entity = ents.Create("ix_knocked")
         entity:SetPos(client:GetPos())
@@ -466,12 +652,12 @@ function PLUGIN:RestoreKnockoutState(client, character, remainingTime)
         entity:SetKnockedSkin(client:GetSkin())
         entity:SetOwningPlayer(client)
         entity:SetCharacterID(character:GetID())
+        entity:SetCharacterName(character:GetName())  -- Store name permanently
         entity:SetTimerStart(CurTime())
         entity:SetTimerDuration(remainingTime)
 
-        for i = 0, client:GetNumBodyGroups() - 1 do
-            entity:SetBodygroup(i, client:GetBodygroup(i))
-        end
+        -- Create the visible ragdoll
+        entity:CreateRagdoll(client:GetModel(), client:GetSkin(), bodygroups)
 
         local inventory = character:GetInventory()
         if inventory then
@@ -480,7 +666,8 @@ function PLUGIN:RestoreKnockoutState(client, character, remainingTime)
 
         client.ixKnockedEntity = entity
         entity.ixOwner = client
-        self.knockedEntities[client:SteamID64()] = entity
+        entity.ixSteamID64 = client:SteamID64()
+        self.knockedEntities[entity.ixSteamID64] = entity
     end
 
     -- Hide and freeze player
@@ -542,23 +729,129 @@ function PLUGIN:InitializedPlugins()
 end
 
 -- ============================================================================
+-- GIVE UP HANDLER
+-- ============================================================================
+
+net.Receive("ixKnockoutGiveUp", function(len, client)
+    print("[Permadeath] Received ixKnockoutGiveUp from " .. (IsValid(client) and client:Name() or "invalid"))
+
+    -- Validate player is actually knocked out
+    if not IsValid(client) then
+        print("[Permadeath] Give up failed: invalid client")
+        return
+    end
+
+    if not IsValid(client.ixKnockedEntity) then
+        print("[Permadeath] Give up failed: no ixKnockedEntity")
+        return
+    end
+
+    local entity = client.ixKnockedEntity
+    if entity:GetPermadead() then
+        print("[Permadeath] Give up failed: already permadead")
+        return
+    end
+
+    -- Get current remaining time
+    local remaining = entity:GetRemainingTime()
+    print("[Permadeath] Give up: remaining time = " .. remaining)
+
+    -- Only reduce if timer is above 10 seconds (don't extend if already lower)
+    if remaining > 10 then
+        entity:SetTimerStart(CurTime())
+        entity:SetTimerDuration(10)
+
+        -- Sync to client
+        net.Start("ixKnockoutTimerSync")
+            net.WriteFloat(10)
+        net.Send(client)
+
+        print("[Permadeath] Give up: timer reduced to 10 seconds")
+
+        -- Log the give up
+        ix.log.Add(client, "knockout_giveup")
+    else
+        print("[Permadeath] Give up: timer already <= 10, not extending")
+    end
+end)
+
+-- ============================================================================
+-- KNOCKED BODY INTERACTION (E tap = Loot, E hold = Revive)
+-- ============================================================================
+
+-- E tap: Search/loot body (works on both knocked and dead)
+net.Receive("ixKnockoutLoot", function(len, client)
+    if not IsValid(client) then return end
+
+    local entity = net.ReadEntity()
+
+    -- Validate entity is a valid ix_knocked
+    if not IsValid(entity) or entity:GetClass() ~= "ix_knocked" then
+        return
+    end
+
+    -- Validate distance
+    local distance = client:GetPos():Distance(entity:GetPos())
+    if distance > 150 then
+        return
+    end
+
+    -- Open inventory for looting
+    entity:OpenInventory(client)
+end)
+
+-- E hold: Attempt revival (only works on knocked, not dead)
+net.Receive("ixKnockoutRevive", function(len, client)
+    if not IsValid(client) then return end
+
+    local entity = net.ReadEntity()
+
+    -- Validate entity is a valid ix_knocked
+    if not IsValid(entity) or entity:GetClass() ~= "ix_knocked" then
+        return
+    end
+
+    -- Validate distance
+    local distance = client:GetPos():Distance(entity:GetPos())
+    if distance > 150 then
+        return
+    end
+
+    -- Can't revive the dead
+    if entity:GetPermadead() then
+        client:NotifyLocalized("knockedAlreadyDead")
+        return
+    end
+
+    -- Attempt revival through plugin
+    local plugin = ix.plugin.Get("permadeath")
+    if plugin then
+        plugin:AttemptRevival(client, entity)
+    end
+end)
+
+-- ============================================================================
 -- LOGGING
 -- ============================================================================
 
 function PLUGIN:InitializedSchema()
-    -- Register log types
+    -- Register log types with appropriate severity flags
     ix.log.AddType("knockout", function(client, knockoutCount, duration)
         return string.format("%s was knocked out (knockout #%d, %s remaining)",
             client:Name(), knockoutCount, duration)
-    end)
+    end, FLAG_WARNING)
 
     ix.log.AddType("revival", function(client, revivedName, health)
         return string.format("%s revived %s with %d HP",
             client:Name(), revivedName, health)
-    end)
+    end, FLAG_SUCCESS)
 
     ix.log.AddType("permadeath", function(client, charName, reason)
         return string.format("%s's character '%s' died permanently (%s)",
             client:Name(), charName, reason)
-    end)
+    end, FLAG_DANGER)
+
+    ix.log.AddType("knockout_giveup", function(client)
+        return string.format("%s gave up while knocked out", client:Name())
+    end, FLAG_WARNING)
 end

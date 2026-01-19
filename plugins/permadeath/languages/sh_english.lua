@@ -3,6 +3,9 @@
 ]]--
 
 LANGUAGE = {
+    -- Config category
+    Permadeath = "Permadeath",
+
     -- Knockout state
     knockedOut = "You have been knocked out!",
     knockedAlreadyDead = "This person is already dead.",
@@ -31,6 +34,12 @@ LANGUAGE = {
     -- Config descriptions
     permadeathBaseTimeDesc = "Base knockout timer in seconds (5 minutes default).",
     permadeathHeadshotChanceDesc = "Percent chance a headshot causes instant permadeath.",
+
+    -- Give Up
+    giveUp = "Give Up",
+    giveUpConfirm = "Are you sure you want to give up?",
+    giveUpYes = "Yes, I accept death",
+    giveUpNo = "No, keep fighting",
 
     -- Misc
     unconscious = "Unconscious",

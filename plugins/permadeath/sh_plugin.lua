@@ -12,26 +12,32 @@ PLUGIN.description = "Knockout and permadeath system with revival mechanics."
 
 -- Configuration defaults
 ix.config.Add("permadeathBaseTime", 300, "Base knockout timer in seconds (5 minutes).", nil, {
+    data = {min = 30, max = 1800},
     category = "Permadeath"
 })
 
 ix.config.Add("permadeathHeadshotChance", 50, "Percent chance a headshot causes instant permadeath.", nil, {
+    data = {min = 0, max = 100},
     category = "Permadeath"
 })
 
 ix.config.Add("permadeathRevivalTimeMin", 3, "Minimum revival progress time in seconds.", nil, {
+    data = {min = 1, max = 30},
     category = "Permadeath"
 })
 
 ix.config.Add("permadeathRevivalTimeMax", 10, "Maximum revival progress time in seconds.", nil, {
+    data = {min = 1, max = 60},
     category = "Permadeath"
 })
 
 ix.config.Add("permadeathPassiveHealRate", 1, "HP gained per minute from passive healing.", nil, {
+    data = {min = 0, max = 10},
     category = "Permadeath"
 })
 
 ix.config.Add("permadeathPassiveHealCap", 80, "Maximum health percentage from passive healing.", nil, {
+    data = {min = 0, max = 100},
     category = "Permadeath"
 })
 
@@ -40,8 +46,14 @@ if SERVER then
     util.AddNetworkString("ixKnockoutStart")
     util.AddNetworkString("ixKnockoutTimerSync")
     util.AddNetworkString("ixKnockoutEnd")
+    util.AddNetworkString("ixKnockoutGiveUp")
+    util.AddNetworkString("ixKnockoutLoot")    -- E tap: search/loot body
+    util.AddNetworkString("ixKnockoutRevive")  -- E hold: attempt revival
     util.AddNetworkString("ixRevivalProgress")
 end
+
+-- Hold E duration to trigger revival (in seconds)
+PLUGIN.reviveHoldTime = 1.5
 
 -- Shared utility functions
 
