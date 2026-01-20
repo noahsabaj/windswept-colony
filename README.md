@@ -74,6 +74,6 @@ Gm_Windswept by Grey The Raptor
 
 ## Credits
 
-- Schema by Noah
+- Schema by kwabaj
 - Map by Grey The Raptor
 - Framework: Helix (NebulousCloud)

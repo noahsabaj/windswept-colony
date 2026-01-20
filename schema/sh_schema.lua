@@ -61,7 +61,7 @@
 ]]--
 
 Schema.name = "Redrock City RP"
-Schema.author = "Noah"
+Schema.author = "kwabaj"
 Schema.description = "A serious roleplay experience on the mining colony of Redrock."
 
 -- Schema Configuration
@@ -81,14 +81,9 @@ Schema.elections = Schema.elections or {}
 Schema.elections.termLength = 3 -- weeks
 Schema.elections.positions = {
     "Governor",
-    "Commissioner", 
+    "Commissioner",
     "Union President"
 }
-
--- Currency: CES Dollar (Confederacy of Earthly Governments Dollar)
--- Colloquially called "kegs" because CEG sounds like "keg"
--- Using empty strings for singular/plural so it just shows "$100"
-ix.currency.Set("$", "", "")
 
 -- Include other schema files
 ix.util.Include("cl_schema.lua")

@@ -2,6 +2,6 @@
 {
     "base"        "helix"
     "title"       "Windswept Colony RP"
-    "author"      "Noah"
+    "author"      "kwabaj"
     "menusystem"  "1"
 }

@@ -1,23 +1,7 @@
 --[[
     Windswept Colony RP - Configuration
-
-    Note: Use ix.config.SetDefault only for configs that are guaranteed to exist.
-    These configs are defined by Helix core, so SetDefault is safe here.
-    The values below override Helix's defaults for this schema.
 ]]--
 
--- Wrap in a hook to ensure Helix configs are loaded first
-hook.Add("InitializedConfig", "WindsweptConfigDefaults", function()
-    -- Starting money for new characters
-    ix.config.SetDefault("defaultMoney", 100)
-
-    -- Character creation settings
-    ix.config.SetDefault("maxCharacters", 1)
-
-    -- Inventory settings
-    ix.config.SetDefault("inventoryWidth", 6)
-    ix.config.SetDefault("inventoryHeight", 4)
-
-    -- Disable intro music (loud and disorienting)
-    ix.config.SetDefault("music", "")
-end)
+ix.currency.symbol = "$"
+ix.currency.singular = "dollar"
+ix.currency.plural = "dollars"

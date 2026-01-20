@@ -12,9 +12,6 @@ LANGUAGE = {
     administrationDesc = "The colonial government.",
     conglomerateDesc = "Corporate representatives of the Conglomerate.",
     
-    -- Currency
-    credits = "Credits",
-    
     -- Custom strings
     windWarning = "WARNING: Surface windstorm approaching!",
     electionAnnouncement = "Elections will be held in %d days.",
