@@ -90,14 +90,30 @@ function ENT:SetKnockedSkin(skin)
     self.dt.KnockedSkin = skin
 end
 
+-- Override SetPermadead to track when body became permadead (for decay timer)
+function ENT:SetPermadead(value)
+    self.dt.Permadead = value
+    if value then
+        self.ixPermadeadTime = CurTime()
+    end
+end
+
 -- ============================================================================
 -- TIMER MANAGEMENT
 -- ============================================================================
 
 function ENT:Think()
-    -- Skip if permadead
+    -- Handle permadead decay timer
     if self:GetPermadead() then
-        self:NextThink(CurTime() + 1)
+        -- Check decay timer (1 hour = 3600 seconds)
+        local decayTime = 3600
+        if self.ixPermadeadTime and (CurTime() - self.ixPermadeadTime) >= decayTime then
+            print("[Permadeath] Body decay timer expired, removing body")
+            self:Remove()  -- OnRemove handles inventory cleanup
+            return
+        end
+
+        self:NextThink(CurTime() + 10)  -- Check every 10 seconds once permadead
         return true
     end
 
@@ -311,6 +327,25 @@ function ENT:OnRemove()
         local plugin = ix.plugin.Get("permadeath")
         if plugin and plugin.knockedEntities then
             plugin.knockedEntities[self.ixSteamID64] = nil
+        end
+    end
+
+    -- Clean up inventory when permadead body is removed (not when revived)
+    if self:GetPermadead() then
+        local invID = self:GetInventoryID()
+        if invID and invID > 0 then
+            -- Remove from memory
+            ix.item.inventories[invID] = nil
+
+            -- Delete items from database
+            local itemQuery = mysql:Delete("ix_items")
+                itemQuery:Where("inventory_id", invID)
+            itemQuery:Execute()
+
+            -- Delete inventory from database
+            local invQuery = mysql:Delete("ix_inventories")
+                invQuery:Where("inventory_id", invID)
+            invQuery:Execute()
         end
     end
 end

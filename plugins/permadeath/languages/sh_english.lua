@@ -10,6 +10,7 @@ LANGUAGE = {
     knockedOut = "You have been knocked out!",
     knockedAlreadyDead = "This person is already dead.",
     knockedAlreadyBeingRevived = "Someone is already attempting to revive this person.",
+    knockedPlayerDisconnected = "This person has disconnected and cannot be revived.",
 
     -- Revival
     reviving = "Reviving...",

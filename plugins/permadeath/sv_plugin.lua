@@ -211,6 +211,12 @@ function PLUGIN:AttemptRevival(reviver, knockedEntity)
         return false
     end
 
+    -- Check if owner is online (can't revive disconnected players)
+    if not IsValid(knockedEntity.ixOwner) then
+        reviver:NotifyLocalized("knockedPlayerDisconnected")
+        return false
+    end
+
     -- Check if someone else is already reviving
     local currentReviver = knockedEntity:GetCurrentReviver()
     if IsValid(currentReviver) and currentReviver ~= reviver then
@@ -375,29 +381,9 @@ function PLUGIN:DeleteCharacter(client, character)
         query:Where("steamid", steamID)
     query:Execute()
 
-    -- Delete associated inventories and items
-    local invQuery = mysql:Select("ix_inventories")
-        invQuery:Select("inventory_id")
-        invQuery:Where("character_id", id)
-        invQuery:Callback(function(result)
-            if istable(result) then
-                for _, v in ipairs(result) do
-                    -- Delete items in this inventory
-                    local itemQuery = mysql:Delete("ix_items")
-                        itemQuery:Where("inventory_id", v.inventory_id)
-                    itemQuery:Execute()
-
-                    -- Remove from memory
-                    ix.item.inventories[tonumber(v.inventory_id)] = nil
-                end
-            end
-
-            -- Delete the inventories
-            local delInvQuery = mysql:Delete("ix_inventories")
-                delInvQuery:Where("character_id", id)
-            delInvQuery:Execute()
-        end)
-    invQuery:Execute()
+    -- NOTE: We intentionally do NOT delete the inventory here!
+    -- The dead body (ix_knocked entity) needs the inventory for looting.
+    -- The inventory will be cleaned up when the body is removed.
 
     -- Run post-delete hook
     hook.Run("CharacterDeleted", client, id, true)
@@ -422,26 +408,9 @@ function PLUGIN:DeleteCharacterOffline(charID)
         query:Where("id", charID)
     query:Execute()
 
-    -- Delete associated inventories and items
-    local invQuery = mysql:Select("ix_inventories")
-        invQuery:Select("inventory_id")
-        invQuery:Where("character_id", charID)
-        invQuery:Callback(function(result)
-            if istable(result) then
-                for _, v in ipairs(result) do
-                    local itemQuery = mysql:Delete("ix_items")
-                        itemQuery:Where("inventory_id", v.inventory_id)
-                    itemQuery:Execute()
-
-                    ix.item.inventories[tonumber(v.inventory_id)] = nil
-                end
-            end
-
-            local delInvQuery = mysql:Delete("ix_inventories")
-                delInvQuery:Where("character_id", charID)
-            delInvQuery:Execute()
-        end)
-    invQuery:Execute()
+    -- NOTE: We intentionally do NOT delete the inventory here!
+    -- The dead body (ix_knocked entity) needs the inventory for looting.
+    -- The inventory will be cleaned up when the body is removed.
 
     print("[Permadeath] Offline character deleted successfully")
 end
