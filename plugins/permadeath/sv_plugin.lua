@@ -11,6 +11,29 @@ print("[Permadeath] sv_plugin.lua is loading...")
 PLUGIN.knockedEntities = PLUGIN.knockedEntities or {}
 
 -- ============================================================================
+-- LOG TYPE REGISTRATION (must happen before any logging calls)
+-- ============================================================================
+
+ix.log.AddType("knockout", function(client, knockoutCount, duration)
+    return string.format("%s was knocked out (knockout #%d, %s remaining)",
+        client:Name(), knockoutCount, duration)
+end, FLAG_WARNING)
+
+ix.log.AddType("revival", function(client, revivedName, health)
+    return string.format("%s revived %s with %d HP",
+        client:Name(), revivedName, health)
+end, FLAG_SUCCESS)
+
+ix.log.AddType("permadeath", function(client, charName, reason)
+    return string.format("%s's character '%s' died permanently (%s)",
+        client:Name(), charName, reason)
+end, FLAG_DANGER)
+
+ix.log.AddType("knockout_giveup", function(client)
+    return string.format("%s gave up while knocked out", client:Name())
+end, FLAG_WARNING)
+
+-- ============================================================================
 -- DAMAGE INTERCEPTION (using EntityTakeDamage hook)
 -- ============================================================================
 
@@ -831,27 +854,5 @@ net.Receive("ixKnockoutRevive", function(len, client)
 end)
 
 -- ============================================================================
--- LOGGING
+-- LOGGING (log types registered at top of file)
 -- ============================================================================
-
-function PLUGIN:InitializedSchema()
-    -- Register log types with appropriate severity flags
-    ix.log.AddType("knockout", function(client, knockoutCount, duration)
-        return string.format("%s was knocked out (knockout #%d, %s remaining)",
-            client:Name(), knockoutCount, duration)
-    end, FLAG_WARNING)
-
-    ix.log.AddType("revival", function(client, revivedName, health)
-        return string.format("%s revived %s with %d HP",
-            client:Name(), revivedName, health)
-    end, FLAG_SUCCESS)
-
-    ix.log.AddType("permadeath", function(client, charName, reason)
-        return string.format("%s's character '%s' died permanently (%s)",
-            client:Name(), charName, reason)
-    end, FLAG_DANGER)
-
-    ix.log.AddType("knockout_giveup", function(client)
-        return string.format("%s gave up while knocked out", client:Name())
-    end, FLAG_WARNING)
-end
