@@ -16,8 +16,8 @@ ITEM.noBusiness = true -- Cannot be purchased, given on character creation
 
 function ITEM:GetDescription()
     local id = self:GetData("id", "00000")
-    local name = self:GetData("name", "Unknown")
-    return string.format(self.description, id, name)
+    local ownerName = self:GetData("ownerName", "Unknown")
+    return string.format(self.description, id, ownerName)
 end
 
 -- Show the ID to a specific player or nearby players
@@ -32,8 +32,8 @@ ITEM.functions.Show = {
     OnRun = function(itemTable, data)
         local client = itemTable.player
         local id = itemTable:GetData("id", "00000")
-        local name = itemTable:GetData("name", "Unknown")
-        local message = string.format("%s shows their ID: %s (#%s)", client:Name(), name, id)
+        local ownerName = itemTable:GetData("ownerName", "Unknown")
+        local message = string.format("%s shows their ID: %s (#%s)", client:Name(), ownerName, id)
 
         if (data and data.mode == "single") then
             -- Trace to find player in front

@@ -51,7 +51,7 @@ function FACTION:OnCharacterCreated(client, character)
 
     -- Give them their Personal ID card
     inventory:Add("personal_id", 1, {
-        name = character:GetName(),
+        ownerName = character:GetName(),
         id = id
     })
 end
