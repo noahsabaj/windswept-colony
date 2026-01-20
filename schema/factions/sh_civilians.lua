@@ -1,5 +1,7 @@
 --[[
     CIVILIANS
+
+    All the workers and residents and inhabitants of Redrock City.
     
     The backbone of the colony. Every colonist starts here.
     Civilians perform the labor that keeps Zephyrus running - mining,
@@ -16,7 +18,7 @@
 
 FACTION.name = "Civilians"
 FACTION.description = "The residents of Redrock City, Zephyrus. "
-FACTION.color = Color(180, 150, 100)
+FACTION.color = Color(200, 200, 200) -- Light gray
 FACTION.isDefault = true
 
 -- Default models for workers
@@ -40,7 +42,18 @@ FACTION.models = {
 
 -- Called when a player creates a character in this faction
 function FACTION:OnCharacterCreated(client, character)
-    -- Starting equipment or actions can go here
+    -- Generate a unique 5-digit ID number
+    local id = string.format("%05d", math.random(1, 99999))
+    local inventory = character:GetInventory()
+
+    -- Store the ID on the character for reference
+    character:SetData("personalID", id)
+
+    -- Give them their Personal ID card
+    inventory:Add("personal_id", 1, {
+        name = character:GetName(),
+        id = id
+    })
 end
 
 -- Store the faction index globally

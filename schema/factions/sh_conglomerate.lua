@@ -1,5 +1,7 @@
 --[[
     CONGLOMERATE FACTION
+
+    Eagle Extraction Conglomerate (EEC)
     
     Representatives of the mining corporation that holds the license to Zephyrus.
     
@@ -24,7 +26,7 @@
 
 FACTION.name = "Conglomerate"
 FACTION.description = "Corporate representatives. You serve the mining company. You're not elected. You answer only to the Confederation."
-FACTION.color = Color(47, 79, 79) -- Dark slate gray, corporate cold
+FACTION.color = Color(200, 200, 200) -- Light gray
 FACTION.isDefault = false
 
 -- Conglomerate models (corporate appearance)

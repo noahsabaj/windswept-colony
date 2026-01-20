@@ -18,7 +18,7 @@
 
 FACTION.name = "Administration"
 FACTION.description = "The colonial government. You manage, legislate, and administrate. Your Governor is elected by the people."
-FACTION.color = Color(178, 134, 34) -- Goldenrod, bureaucratic
+FACTION.color = Color(200, 200, 200) -- Light gray
 FACTION.isDefault = false
 
 -- Administration models (more formal appearance)

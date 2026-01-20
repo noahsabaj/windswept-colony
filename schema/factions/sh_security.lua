@@ -18,7 +18,7 @@
 
 FACTION.name = "Security"
 FACTION.description = "Colonial Security. You keep the peace. Your Chief is elected. Your loyalty is... complicated."
-FACTION.color = Color(70, 130, 180) -- Steel blue
+FACTION.color = Color(200, 200, 200) -- Light gray
 FACTION.isDefault = false
 
 -- Security models (more uniformed appearance)

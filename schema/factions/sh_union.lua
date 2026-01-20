@@ -23,7 +23,7 @@
 
 FACTION.name = "Miners Union"
 FACTION.description = "United we bargain, divided we beg. The voice of the workers."
-FACTION.color = Color(200, 150, 50)
+FACTION.color = Color(200, 200, 200) -- Light gray
 FACTION.isDefault = false
 
 FACTION.models = {
