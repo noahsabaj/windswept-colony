@@ -1,21 +1,23 @@
 --[[
-    Defibrillator
+    Flashlight
 
-    Medical device that significantly improves revival chances.
-    Has 4 battery slots - each shock consumes 1 entire battery.
-    ONLY accepts fully charged batteries (100up).
+    A portable flashlight with a single battery slot.
+    Accepts batteries of any charge level (0-100up).
+    Drains ~0.167up per second when on (~10 minutes per full battery).
+
+    Batteries not included when purchased.
 ]]--
 
-ITEM.name = "Defibrillator"
-ITEM.description = "A portable automated external defibrillator (AED)."
-ITEM.model = "models/props_lab/reciever01a.mdl"
-ITEM.width = 2
-ITEM.height = 1
-ITEM.category = "Medical"
+ITEM.name = "Flashlight"
+ITEM.description = "A portable flashlight. Can be used as a makeshift weapon."
+ITEM.model = "models/shaky/weapons/flashlight/w_flashlight.mdl"
+ITEM.width = 1
+ITEM.height = 2
+ITEM.category = "Equipment"
 ITEM.noBusiness = true
 
 -- Battery slot configuration
-ITEM.maxBatteries = 4
+ITEM.maxBatteries = 1
 
 -- ============================================================================
 -- HELPER FUNCTIONS
@@ -40,27 +42,37 @@ end
 function ITEM:HasUsableCharge()
     local batteries = self:GetBatteries()
     for _, charge in ipairs(batteries) do
-        if charge == 100 then  -- Defib requires fully charged batteries
+        if charge > 0 then
             return true
         end
     end
     return false
 end
 
--- Find fully charged batteries in inventory (defib ONLY accepts 100up)
-function ITEM:FindFullBatteryInInventory(inventory)
+function ITEM:GetFirstBatteryCharge()
+    local batteries = self:GetBatteries()
+    return batteries[1] or 0
+end
+
+-- Find the highest charged battery in inventory (any charge level for flashlight)
+function ITEM:FindBestBatteryInInventory(inventory)
+    local bestBattery = nil
+    local bestCharge = -1
+
     for _, invItem in pairs(inventory:GetItems()) do
         if invItem.uniqueID == "battery" then
             local charge = invItem:GetData("charge", 100)
-            if charge == 100 then
-                return invItem
+            if charge > bestCharge then
+                bestCharge = charge
+                bestBattery = invItem
             end
         end
     end
-    return nil
+
+    return bestBattery, bestCharge
 end
 
--- Auto-eject depleted battery if enabled
+-- Auto-eject depleted batteries if enabled
 function ITEM:AutoEjectDepleted(client)
     if not ix.option.Get(client, "batteryAutoEject", true) then
         return false
@@ -95,7 +107,7 @@ function ITEM:AutoEjectDepleted(client)
     return ejected
 end
 
--- Auto-load battery from inventory if enabled (only 100up batteries)
+-- Auto-load battery from inventory if enabled
 function ITEM:AutoLoadFromInventory(client)
     if not ix.option.Get(client, "batteryAutoLoad", true) then
         return false
@@ -112,43 +124,28 @@ function ITEM:AutoLoadFromInventory(client)
     local inventory = character:GetInventory()
     if not inventory then return false end
 
-    local fullBattery = self:FindFullBatteryInInventory(inventory)
-    if not fullBattery then
+    local bestBattery, bestCharge = self:FindBestBatteryInInventory(inventory)
+    if not bestBattery or bestCharge <= 0 then
         return false
     end
 
     -- Load the battery
-    table.insert(batteries, 100)
+    table.insert(batteries, bestCharge)
     self:SetBatteries(batteries)
-    fullBattery:Remove()
+    bestBattery:Remove()
 
-    client:NotifyLocalized("defibAutoLoaded")
+    client:NotifyLocalized("flashlightAutoLoaded", bestCharge)
     return true
 end
 
--- Migration: Convert old charges to new battery system
-function ITEM:OnSendData()
-    local oldCharges = self:GetData("charges")
-    if oldCharges ~= nil and self:GetData("batteries") == nil then
-        -- Convert: 4 charges -> {100,100,100,100}, 3 -> {100,100,100}, etc.
-        local batteries = {}
-        for i = 1, oldCharges do
-            table.insert(batteries, 100)
-        end
-        self:SetData("batteries", batteries)
-        self:SetData("charges", nil)
-    end
-end
 
 -- ============================================================================
--- CLIENT RENDERING
+-- CLIENT VISUALS
 -- ============================================================================
 
 if CLIENT then
-    -- Draw battery slots on item icon (4 bars)
     function ITEM:PaintOver(item, w, h)
         local batteries = item:GetData("batteries", {})
-        local maxBatteries = item.maxBatteries
         local isEquipped = item:GetData("equipped")
 
         -- Draw equipped indicator (green dot)
@@ -157,86 +154,72 @@ if CLIENT then
             surface.DrawRect(w - 14, h - 14, 8, 8)
         end
 
-        -- Draw bar background
-        surface.SetDrawColor(30, 30, 30, 200)
-        surface.DrawRect(4, h - 12, w - 8, 8)
+        -- Draw battery bar if battery present
+        if #batteries > 0 then
+            local charge = batteries[1]
 
-        -- Draw each slot based on charge level
-        local slotWidth = (w - 8) / maxBatteries
-        for i = 1, maxBatteries do
-            local charge = batteries[i]
-            if charge then
-                -- Battery present - color based on charge
-                if charge == 100 then
-                    surface.SetDrawColor(50, 200, 50)   -- GREEN = full (usable)
-                elseif charge > 0 then
-                    surface.SetDrawColor(200, 200, 50)  -- YELLOW = partial (unusable)
-                else
-                    surface.SetDrawColor(200, 50, 50)   -- RED = depleted
-                end
-                surface.DrawRect(4 + slotWidth * (i - 1), h - 12, slotWidth, 8)
+            -- Background bar
+            surface.SetDrawColor(30, 30, 30, 200)
+            surface.DrawRect(4, h - 12, w - 8, 8)
+
+            -- Charge fill with granular colors
+            local chargeWidth = ((w - 8) / 100) * charge
+            local color
+
+            if charge >= 50 then
+                color = Color(50, 200, 50)      -- GREEN
+            elseif charge >= 25 then
+                color = Color(200, 200, 50)     -- YELLOW
+            elseif charge >= 10 then
+                color = Color(255, 150, 50)     -- ORANGE
+            elseif charge >= 1 then
+                color = Color(200, 50, 50)      -- RED
+            else
+                color = Color(30, 30, 30)       -- BLACK (0up - depleted)
             end
-            -- nil = empty slot, stays black (background)
-        end
 
-        -- Draw separators between slots
-        surface.SetDrawColor(0, 0, 0, 255)
-        for i = 1, maxBatteries - 1 do
-            local x = 4 + slotWidth * i
-            surface.DrawRect(x - 1, h - 12, 2, 8)
+            surface.SetDrawColor(color)
+            surface.DrawRect(4, h - 12, chargeWidth, 8)
         end
     end
 
-    -- Add battery info to tooltip
     function ITEM:PopulateTooltip(tooltip)
         local batteries = self:GetData("batteries", {})
-        local maxBatteries = self.maxBatteries
 
-        -- Count by charge state
-        local fullCount, partialCount, depletedCount = 0, 0, 0
-        for _, charge in ipairs(batteries) do
-            if charge == 100 then fullCount = fullCount + 1
-            elseif charge > 0 then partialCount = partialCount + 1
-            else depletedCount = depletedCount + 1 end
-        end
-
-        local batteryRow = tooltip:AddRow("batteries")
+        local batteryRow = tooltip:AddRow("battery")
 
         if #batteries == 0 then
-            batteryRow:SetText("No batteries inserted.")
+            batteryRow:SetText("No battery inserted.")
             batteryRow:SetBackgroundColor(Color(100, 100, 100))
         else
-            local text = string.format("Batteries: %d full, %d partial, %d depleted (%d shocks)",
-                fullCount, partialCount, depletedCount, fullCount)
-            batteryRow:SetText(text)
+            local charge = batteries[1]
+            batteryRow:SetText(string.format("Battery: %dup / 100up", charge))
 
-            if fullCount == 0 then
-                batteryRow:SetBackgroundColor(Color(150, 50, 50))  -- No usable batteries
-            elseif fullCount <= 1 then
-                batteryRow:SetBackgroundColor(Color(150, 100, 50))  -- Low
+            if charge >= 50 then
+                batteryRow:SetBackgroundColor(Color(50, 100, 50))      -- Good
+            elseif charge >= 25 then
+                batteryRow:SetBackgroundColor(Color(100, 100, 50))     -- Moderate
+            elseif charge >= 10 then
+                batteryRow:SetBackgroundColor(Color(150, 100, 50))     -- Low
+            elseif charge >= 1 then
+                batteryRow:SetBackgroundColor(Color(150, 50, 50))      -- Critical
             else
-                batteryRow:SetBackgroundColor(Color(50, 100, 50))  -- Good
+                batteryRow:SetBackgroundColor(Color(60, 60, 60))       -- Depleted
             end
         end
 
         batteryRow:SizeToContents()
-
-        -- Add requirement note
-        local reqRow = tooltip:AddRow("requirement")
-        reqRow:SetText("Requires fully charged batteries (100up)")
-        reqRow:SetBackgroundColor(Color(75, 75, 100))
-        reqRow:SizeToContents()
     end
 end
 
 -- ============================================================================
--- FUNCTIONS
+-- ITEM FUNCTIONS
 -- ============================================================================
 
--- Load Battery: Dropdown of FULL batteries only
+-- Load Battery: Dropdown of batteries in inventory
 ITEM.functions.LoadBattery = {
     name = "Load Battery",
-    tip = "Insert a fully charged battery into the defibrillator.",
+    tip = "Insert a battery into the flashlight.",
     icon = "icon16/lightning_add.png",
     isMulti = true,
     multiOptions = function(item, client)
@@ -247,18 +230,26 @@ ITEM.functions.LoadBattery = {
         local inventory = character:GetInventory()
         if not inventory then return options end
 
+        local filterEmpty = ix.option.Get(client, "batteryFilterEmpty", true)
+
         for _, invItem in pairs(inventory:GetItems()) do
             if invItem.uniqueID == "battery" then
                 local charge = invItem:GetData("charge", 100)
-                -- ONLY show full batteries
-                if charge == 100 then
+
+                -- Filter out 0up batteries if setting enabled
+                if not filterEmpty or charge > 0 then
                     table.insert(options, {
-                        name = "Battery (100up - Full)",
+                        name = string.format("Battery (%dup)", charge),
                         data = {batteryID = invItem:GetID()}
                     })
                 end
             end
         end
+
+        -- Sort by charge (highest first)
+        table.sort(options, function(a, b)
+            return tonumber(string.match(a.name, "%((%d+)up%)")) > tonumber(string.match(b.name, "%((%d+)up%)"))
+        end)
 
         return options
     end,
@@ -273,27 +264,21 @@ ITEM.functions.LoadBattery = {
             return false
         end
 
-        -- Verify battery is fully charged
-        local charge = batteryItem:GetData("charge", 100)
-        if charge ~= 100 then
-            client:NotifyLocalized("defibRequiresFull")
-            return false
-        end
-
         local batteries = item:GetBatteries()
         if #batteries >= item.maxBatteries then
-            client:Notify("The defibrillator is already fully loaded.")
+            client:NotifyLocalized("flashlightSlotFull")
             return false
         end
 
         -- Load the battery
-        table.insert(batteries, 100)
+        local charge = batteryItem:GetData("charge", 100)
+        table.insert(batteries, charge)
         item:SetBatteries(batteries)
 
         -- Remove the battery item
         batteryItem:Remove()
 
-        client:NotifyLocalized("flashlightBatteryLoaded", 100)
+        client:NotifyLocalized("flashlightBatteryLoaded", charge)
         client:EmitSound("items/battery_pickup.wav", 50)
 
         return false
@@ -304,7 +289,7 @@ ITEM.functions.LoadBattery = {
         -- Can't load if on ground
         if IsValid(item.entity) then return false end
 
-        -- Check if player has any FULL batteries
+        -- Check if player has any batteries
         local client = item.player
         if not IsValid(client) then return false end
 
@@ -316,10 +301,7 @@ ITEM.functions.LoadBattery = {
 
         for _, invItem in pairs(inventory:GetItems()) do
             if invItem.uniqueID == "battery" then
-                local charge = invItem:GetData("charge", 100)
-                if charge == 100 then
-                    return true
-                end
+                return true
             end
         end
 
@@ -330,7 +312,7 @@ ITEM.functions.LoadBattery = {
 -- Eject Battery
 ITEM.functions.EjectBattery = {
     name = "Eject Battery",
-    tip = "Remove a battery from the defibrillator.",
+    tip = "Remove the battery from the flashlight.",
     icon = "icon16/lightning_delete.png",
     OnRun = function(item)
         local client = item.player
@@ -340,20 +322,19 @@ ITEM.functions.EjectBattery = {
             return false
         end
 
-        -- Priority: eject non-full batteries first (lowest charge first)
-        local ejectIndex = 1
-        local lowestCharge = batteries[1]
-        for i, charge in ipairs(batteries) do
-            if charge < lowestCharge then
-                lowestCharge = charge
-                ejectIndex = i
+        -- If equipped and light is on, turn it off first
+        if item:GetData("equipped") then
+            local weapon = client:GetWeapon("ix_flashlight")
+            if IsValid(weapon) and weapon.GetFlashlightOn and weapon:GetFlashlightOn() then
+                weapon:SetLight(false)
             end
         end
 
-        local charge = table.remove(batteries, ejectIndex)
+        -- Eject the first battery
+        local charge = table.remove(batteries, 1)
         item:SetBatteries(batteries)
 
-        -- Create battery item with ejected charge
+        -- Create battery item with current charge
         local character = client:GetCharacter()
         local inventory = character:GetInventory()
         inventory:Add("battery", 1, {charge = charge})
@@ -376,33 +357,33 @@ ITEM.functions.EjectBattery = {
 -- Equip: Give SWEP
 ITEM.functions.Equip = {
     name = "Equip",
-    tip = "Hold the defibrillator in your hands.",
+    tip = "Hold the flashlight in your hands.",
     icon = "icon16/tick.png",
     OnRun = function(item)
         local client = item.player
 
-        -- Unequip any existing defib from this player
-        if client.ixDefibItem and client.ixDefibItem ~= item then
-            local oldItem = client.ixDefibItem
+        -- Unequip any existing flashlight from this player
+        if client.ixFlashlightItem and client.ixFlashlightItem ~= item then
+            local oldItem = client.ixFlashlightItem
             oldItem:SetData("equipped", nil)
         end
 
-        -- Strip existing defib SWEP if any
-        if client:HasWeapon("ix_defibrillator") then
-            client:StripWeapon("ix_defibrillator")
+        -- Strip existing flashlight SWEP if any
+        if client:HasWeapon("ix_flashlight") then
+            client:StripWeapon("ix_flashlight")
         end
 
         -- Give the SWEP
-        local weapon = client:Give("ix_defibrillator")
+        local weapon = client:Give("ix_flashlight")
         if IsValid(weapon) then
             weapon.ixItem = item
-            client:SelectWeapon("ix_defibrillator")
+            client:SelectWeapon("ix_flashlight")
         end
 
-        client.ixDefibItem = item
+        client.ixFlashlightItem = item
         item:SetData("equipped", true)
 
-        client:EmitSound("defibl/deploy.wav", 50)
+        client:EmitSound("items/flashlight1.wav", 50)
 
         return false
     end,
@@ -419,21 +400,25 @@ ITEM.functions.Equip = {
 -- Unequip: Remove SWEP
 ITEM.functions.Unequip = {
     name = "Unequip",
-    tip = "Put the defibrillator away.",
+    tip = "Put the flashlight away.",
     icon = "icon16/cross.png",
     OnRun = function(item)
         local client = item.player
 
         -- Remove SWEP
-        local weapon = client:GetWeapon("ix_defibrillator")
+        local weapon = client:GetWeapon("ix_flashlight")
         if IsValid(weapon) then
-            client:StripWeapon("ix_defibrillator")
+            -- Turn off light first
+            if weapon.SetLight then
+                weapon:SetLight(false)
+            end
+            client:StripWeapon("ix_flashlight")
         end
 
-        client.ixDefibItem = nil
+        client.ixFlashlightItem = nil
         item:SetData("equipped", nil)
 
-        client:Notify("You put the defibrillator away.")
+        client:EmitSound("items/flashlight1.wav", 50, 90)
 
         return false
     end,
@@ -442,48 +427,23 @@ ITEM.functions.Unequip = {
     end
 }
 
--- Check Battery Status
-ITEM.functions.CheckCharge = {
-    name = "Check Batteries",
-    tip = "Check the defibrillator's battery status.",
-    icon = "icon16/lightning.png",
-    OnRun = function(item)
-        local client = item.player
-        local batteries = item:GetBatteries()
-
-        if #batteries == 0 then
-            client:Notify("The defibrillator has no batteries loaded.")
-        else
-            -- Count by charge state
-            local fullCount, partialCount, depletedCount = 0, 0, 0
-            for _, charge in ipairs(batteries) do
-                if charge == 100 then fullCount = fullCount + 1
-                elseif charge > 0 then partialCount = partialCount + 1
-                else depletedCount = depletedCount + 1 end
-            end
-
-            client:Notify(string.format("Batteries: %d full, %d partial, %d depleted (%d shocks available).",
-                fullCount, partialCount, depletedCount, fullCount))
-        end
-
-        return false
-    end
-}
-
 -- ============================================================================
 -- HOOKS
 -- ============================================================================
 
--- Strip SWEP and unequip on drop
+-- Turn off and unequip when dropped
 function ITEM.postHooks.drop(item, result)
     if item:GetData("equipped") then
         local client = item:GetOwner()
         if IsValid(client) then
-            local weapon = client:GetWeapon("ix_defibrillator")
+            local weapon = client:GetWeapon("ix_flashlight")
             if IsValid(weapon) then
-                client:StripWeapon("ix_defibrillator")
+                if weapon.SetLight then
+                    weapon:SetLight(false)
+                end
+                client:StripWeapon("ix_flashlight")
             end
-            client.ixDefibItem = nil
+            client.ixFlashlightItem = nil
         end
         item:SetData("equipped", nil)
     end
@@ -494,11 +454,14 @@ function ITEM:OnTransferred(oldInventory, newInventory)
     if self:GetData("equipped") then
         local oldOwner = oldInventory and oldInventory.GetOwner and oldInventory:GetOwner()
         if IsValid(oldOwner) then
-            local weapon = oldOwner:GetWeapon("ix_defibrillator")
+            local weapon = oldOwner:GetWeapon("ix_flashlight")
             if IsValid(weapon) then
-                oldOwner:StripWeapon("ix_defibrillator")
+                if weapon.SetLight then
+                    weapon:SetLight(false)
+                end
+                oldOwner:StripWeapon("ix_flashlight")
             end
-            oldOwner.ixDefibItem = nil
+            oldOwner.ixFlashlightItem = nil
         end
         self:SetData("equipped", nil)
     end
@@ -509,7 +472,7 @@ function ITEM:CanTransfer(oldInventory, newInventory)
     if newInventory and self:GetData("equipped") then
         local owner = self:GetOwner()
         if IsValid(owner) then
-            owner:Notify("Unequip the defibrillator first.")
+            owner:NotifyLocalized("flashlightEquipped")
         end
         return false
     end
@@ -522,10 +485,15 @@ function ITEM:OnLoadout()
         local client = self.player
         if not IsValid(client) then return end
 
-        local weapon = client:Give("ix_defibrillator", true)
+        local weapon = client:Give("ix_flashlight", true)
         if IsValid(weapon) then
             weapon.ixItem = self
-            client.ixDefibItem = self
+            client.ixFlashlightItem = self
+
+            -- Ensure light is off on loadout (prevents battery drain from previous session)
+            if weapon.SetLight then
+                weapon:SetLight(false)
+            end
         end
     end
 end

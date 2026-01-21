@@ -33,6 +33,11 @@ ix.log.AddType("knockout_giveup", function(client)
     return string.format("%s gave up while knocked out", client:Name())
 end, FLAG_WARNING)
 
+ix.log.AddType("defibKnockout", function(client, victimName)
+    return string.format("%s shocked %s with a defibrillator, knocking them out",
+        client:Name(), victimName)
+end, FLAG_WARNING)
+
 -- ============================================================================
 -- DAMAGE INTERCEPTION (using EntityTakeDamage hook)
 -- ============================================================================
@@ -224,13 +229,11 @@ function PLUGIN:AttemptRevival(reviver, knockedEntity)
         return false
     end
 
-    -- Check for defibrillator
-    local hasDefib, defibItem = self:PlayerHasDefibReady(reviver)
-
     -- Lock the entity to this reviver
     knockedEntity:SetCurrentReviver(reviver)
 
     -- Random progress duration (3-10 seconds by default)
+    -- This is equipmentless CPR-style revival (no defib)
     local duration = self:GetRevivalDuration()
 
     -- Start the revival progress
@@ -239,8 +242,8 @@ function PLUGIN:AttemptRevival(reviver, knockedEntity)
     -- Use DoStaredAction for progress-based revival (must look at target)
     -- Signature: DoStaredAction(entity, callback, time, onCancel, distance)
     reviver:DoStaredAction(knockedEntity, function()
-        -- Completed - attempt the revival
-        self:CompleteRevivalAttempt(reviver, knockedEntity, hasDefib, defibItem)
+        -- Completed - attempt the revival (equipmentless, no defib)
+        self:CompleteRevivalAttempt(reviver, knockedEntity, false, nil)
     end, duration, function()
         -- Cancelled (looked away, moved too far, etc.)
         knockedEntity:SetCurrentReviver(NULL)
@@ -255,6 +258,7 @@ function PLUGIN:CompleteRevivalAttempt(reviver, knockedEntity, hasDefib, defibIt
     knockedEntity:SetCurrentReviver(NULL)
 
     -- Calculate success using probabilistic squared
+    -- hasDefib is false for hold-E revival (CPR-style, low chance)
     local success, actualChance = self:CalculateRevivalChance(hasDefib)
 
     if success then
@@ -263,11 +267,6 @@ function PLUGIN:CompleteRevivalAttempt(reviver, knockedEntity, hasDefib, defibIt
     else
         -- Revival failed - can retry
         reviver:NotifyLocalized("revivalFailed")
-
-        -- If used defib, still consume a charge on failure
-        if hasDefib and IsValid(defibItem) then
-            self:ConsumeDefibCharge(defibItem, reviver)
-        end
     end
 end
 
@@ -526,26 +525,71 @@ end
 -- ============================================================================
 
 function PLUGIN:PlayerHasDefibReady(client)
-    -- Check if player has a charged defibrillator equipped/ready
-    if client.ixDefibReady and IsValid(client.ixDefibItem) then
+    -- Check if player has a defibrillator equipped/ready with batteries
+    if client.ixDefibReady and client.ixDefibItem then
         local item = client.ixDefibItem
-        if item:GetData("charges", item.maxCharges or 4) > 0 then
-            return true, item
+        local batteries = item:GetData("batteries", {})
+        for _, charge in ipairs(batteries) do
+            if charge > 0 then return true, item end
         end
     end
-
     return false, nil
 end
 
 function PLUGIN:ConsumeDefibCharge(item, client)
-    local charges = item:GetData("charges", item.maxCharges or 4)
-    charges = math.max(0, charges - 1)
-    item:SetData("charges", charges)
+    local batteries = item:GetData("batteries", {})
+    if #batteries == 0 then return end
 
-    if charges <= 0 then
-        client:NotifyLocalized("defibDepleted")
-        client.ixDefibReady = nil
-        client.ixDefibItem = nil
+    -- Find first FULL battery (100up) and deplete it
+    for i, charge in ipairs(batteries) do
+        if charge == 100 then
+            batteries[i] = 0  -- Deplete, don't remove
+            break
+        end
+    end
+
+    local character = client:GetCharacter()
+    local inventory = character and character:GetInventory()
+
+    -- Auto-eject: remove non-full batteries if enabled (0up and partial)
+    if inventory and ix.option.Get(client, "batteryAutoEject", true) then
+        for i = #batteries, 1, -1 do
+            if batteries[i] < 100 then  -- Eject anything that's not full
+                if inventory:FindEmptySlot(1, 1) then
+                    inventory:Add("battery", 1, {charge = batteries[i]})
+                    table.remove(batteries, i)
+                    client:NotifyLocalized("flashlightBatteryEjected")
+                end
+            end
+        end
+    end
+
+    -- Auto-load: fill empty slots with 100up batteries
+    if inventory and ix.option.Get(client, "batteryAutoLoad", true) then
+        while #batteries < 4 do
+            local fullBattery = item:FindFullBatteryInInventory(inventory)
+            if fullBattery then
+                table.insert(batteries, 100)
+                fullBattery:Remove()
+                client:NotifyLocalized("defibAutoLoaded")
+            else
+                break
+            end
+        end
+    end
+
+    item:SetData("batteries", batteries)
+
+    -- Count usable (100up) batteries for notification
+    local usableCount = 0
+    for _, charge in ipairs(batteries) do
+        if charge == 100 then usableCount = usableCount + 1 end
+    end
+    client:NotifyLocalized("defibBatteryUsed", usableCount)
+
+    -- Warn if no usable batteries left
+    if usableCount == 0 then
+        client:NotifyLocalized("defibNoBattery")
     end
 end
 

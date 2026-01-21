@@ -4,6 +4,8 @@
 
 -- Workshop content that clients must download
 resource.AddWorkshop("3582530445")  -- Prisoner Playermodels
+resource.AddWorkshop("2868046966")  -- Defibrillator Models/Sounds
+resource.AddWorkshop("2947598424")  -- Shaky Flashlight Models/Sounds
 
 -- Disable faction whitelist requirements
 -- All factions are open for transfer without needing /PlyWhitelist first

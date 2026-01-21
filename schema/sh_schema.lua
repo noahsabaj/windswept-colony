@@ -96,6 +96,7 @@ ix.util.Include("cl_hooks.lua")
 ix.util.Include("sv_hooks.lua")
 ix.util.Include("sh_configs.lua")
 ix.util.Include("sh_commands.lua")
+ix.util.Include("sh_options.lua")
 
 -- ============================================================================
 -- RADIO CHAT CLASSES

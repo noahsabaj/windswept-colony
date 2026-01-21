@@ -34,4 +34,8 @@
       "D:/SteamLibrary/steamapps/workshop/content/4000/3582530445/gmpublisher.gma" -out
       "D:/SteamLibrary/steamapps/workshop/content/4000/3582530445/extracted"))
 
-- 
+- For the battery system, "up" stands for "units of power", so a 100up battery has 100 units of power. A flashlight can hold 1 battery, and consumes about ~0.167up per second when on (~10 minutes per full battery). This should give you a relatively good idea how that system works. Batteries are universal, so all devices that take batteries (defibrillator, flashlight, camera, etc. use the same batteries and units of power measuring system).
+
+- Fog of War principle. Because this is SeriousRP, nothing is free. Here's an example that will tell you a lot. The defibrillator has a 45-95% chance of successfully reviving someone that has been knocked and is actively dying. The player DOES NOT KNOW of the 45-95% chance at all, the player only knows (from experience, from seeing others, from being told, from intuition) that it has decent odds but can fail just as easily. The backend knows its between 45-95% chance (we call it probability^2, it's not guaranteed that the defib will pass or fail, AND the chance itself is also not guaranteed, it can be anywhere from a 45% odds of succeeding to a 95% odds of succeeding, but never 100%).
+
+- Nothing is 100% certain, ever. This is another principle of good SeriousRP.
