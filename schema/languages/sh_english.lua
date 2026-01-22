@@ -50,6 +50,33 @@ LANGUAGE = {
     defibShockedAlive = "You shocked %s - they are now unconscious!",
     defibCantShockSelf = "You cannot shock yourself.",
 
+    -- Camera
+    cameraNoBattery = "No battery inserted.",
+    cameraNoCharge = "Not enough battery charge.",
+    cameraNoFilm = "No film loaded.",
+    cameraBatteryLoaded = "Battery loaded (%dup).",
+    cameraBatteryEjected = "Battery ejected.",
+    cameraSlotFull = "The camera already has a battery loaded.",
+    cameraFilmLoaded = "Film loaded (%d shots).",
+    cameraFilmSlotFull = "The camera already has film loaded.",
+    cameraFilmEmpty = "Film pack exhausted.",
+    cameraPhotoTaken = "Photo captured!",
+    cameraInventoryFull = "Inventory full - photo dropped.",
+    cameraFlashOn = "Flash enabled.",
+    cameraFlashOff = "Flash disabled.",
+    cameraEquipped = "Unequip the camera first.",
+    cameraAutoLoaded = "Auto-loaded battery (%dup).",
+
+    -- Photo
+    photoRenamed = "Photo named: %s",
+    photoAlreadyNamed = "This photo has already been named.",
+    photoDestroyed = "Photo destroyed.",
+    photoDestroyConfirm = "Destroy this photo? This cannot be undone.",
+
+    -- Photo Album
+    albumRenamed = "Album renamed: %s",
+    albumOnlyPhotos = "Only photos can be stored in albums.",
+
     -- Options
     optBatteryAutoEject = "Auto-eject depleted batteries",
     optdBatteryAutoEject = "Automatically eject batteries when fully depleted.",
@@ -58,4 +85,41 @@ LANGUAGE = {
     optBatteryFilterEmpty = "Filter empty batteries",
     optdBatteryFilterEmpty = "Hide depleted (0up) batteries from Load Battery dropdown.",
     inventory = "Inventory",
+
+    -- Physical Description
+    physAge = "AGE",
+    physHeight = "HEIGHT",
+    physWeight = "WEIGHT",
+    physSkinTone = "SKIN TONE",
+    physHairColor = "HAIR COLOR",
+    physHairType = "HAIR TYPE",
+    physHairLength = "HAIR LENGTH",
+    physEyeColor = "EYE COLOR",
+    physFacialHair = "FACIAL HAIR",
+    physBuild = "BUILD",
+
+    -- Physical Description Validation
+    invalidAge = "Age must be between 18 and 128.",
+    invalidHeight = "Height must be between 147cm and 198cm.",
+    invalidWeight = "Weight must be between 90lbs and 350lbs.",
+    invalidSkinTone = "Please select a valid skin tone.",
+    invalidHairColor = "Please select a valid hair color.",
+    invalidHairType = "Please select a valid hair type.",
+    invalidHairLength = "Please select a valid hair length.",
+    invalidEyeColor = "Please select a valid eye color.",
+    invalidFacialHair = "Please select a valid facial hair option.",
+
+    -- Birth Date/Location
+    physBirthMonth = "BIRTH DATE",
+    physBirthLocation = "BIRTH LOCATION",
+    invalidBirthMonth = "Please select a valid birth month.",
+    invalidBirthDay = "Invalid day for selected month.",
+    invalidBirthLocation = "Please select a valid birth location.",
+
+    -- Personal ID Card
+    idCardShown = "You showed your ID to %s.",
+    idCardNotValid = "No valid player in front of you.",
+
+    -- Description Editing
+    descEditDisabled = "Physical descriptions cannot be manually edited.",
 }
