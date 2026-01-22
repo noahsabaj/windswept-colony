@@ -10,29 +10,42 @@
 
 print("[Prisoner] cl_plugin.lua is loading...")
 
--- Blindness effect when gagged
+-- Blindness effect when gagged (like a bag over the head)
+-- Knockout screen takes priority - gag persists but blindness yields to knockout UI
 function PLUGIN:RenderScreenspaceEffects()
-    if LocalPlayer():GetNetVar("gagged") then
-        DrawColorModify({
-            ["$pp_colour_addr"] = 0,
-            ["$pp_colour_addg"] = 0,
-            ["$pp_colour_addb"] = 0,
-            ["$pp_colour_brightness"] = -1,
-            ["$pp_colour_contrast"] = 0,
-            ["$pp_colour_colour"] = 0,
-            ["$pp_colour_mulr"] = 0,
-            ["$pp_colour_mulg"] = 0,
-            ["$pp_colour_mulb"] = 0
-        })
+    if not LocalPlayer():GetNetVar("gagged") then return end
+
+    -- Check if knocked out - knockout screen takes priority
+    local permadeath = ix.plugin.list["permadeath"]
+    if permadeath and permadeath.IsLocalPlayerKnockedOut and permadeath:IsLocalPlayerKnockedOut() then
+        return
     end
+
+    DrawColorModify({
+        ["$pp_colour_addr"] = 0,
+        ["$pp_colour_addg"] = 0,
+        ["$pp_colour_addb"] = 0,
+        ["$pp_colour_brightness"] = -1,
+        ["$pp_colour_contrast"] = 0,
+        ["$pp_colour_colour"] = 0,
+        ["$pp_colour_mulr"] = 0,
+        ["$pp_colour_mulg"] = 0,
+        ["$pp_colour_mulb"] = 0
+    })
 end
 
--- Block HUD when gagged
+-- Block HUD when gagged (knockout screen takes priority)
 function PLUGIN:HUDShouldDraw(name)
-    if LocalPlayer():GetNetVar("gagged") then
-        if name ~= "CHudGMod" then
-            return false
-        end
+    if not LocalPlayer():GetNetVar("gagged") then return end
+
+    -- Check if knocked out - knockout handles its own HUD blocking
+    local permadeath = ix.plugin.list["permadeath"]
+    if permadeath and permadeath.IsLocalPlayerKnockedOut and permadeath:IsLocalPlayerKnockedOut() then
+        return
+    end
+
+    if name ~= "CHudGMod" then
+        return false
     end
 end
 
