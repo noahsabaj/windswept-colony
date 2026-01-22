@@ -4,7 +4,7 @@ A serious roleplay experience set on the mining colony of Zephyrus.
 
 ## Setting
 
-The year is 2134. The Confederation of Earthly Governments (CEG) licenses uninhabited
+The year is 2200. The Confederation of Earthly Governments (CEG) licenses uninhabited
 planets to mining corporations. Zephyrus is one such planet - hostile, dangerous, but
 rich in resources.
 
