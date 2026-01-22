@@ -1,14 +1,14 @@
 --[[
     ADMINISTRATION FACTION
     
-    The colonial government of Zephyrus.
+    The city government of Zephyrus.
     
-    The Governor is ELECTED by the workers every 3 weeks.
-    The Governor then APPOINTS all administrative positions:
-    - Deputy Governor
-    - Colonial Judge
+    The Mayor is ELECTED by the workers every 3 weeks.
+    The Mayor then APPOINTS all administrative positions:
+    - Deputy Mayor
+    - Judge
     - Quartermaster
-    - Medical Director
+    - Medical Officer
     - Communications Officer
     - Etc.
     
@@ -17,7 +17,7 @@
 ]]--
 
 FACTION.name = "Administration"
-FACTION.description = "The colonial government. You manage, legislate, and administrate. Your Governor is elected by the people."
+FACTION.description = "The city government. You manage, legislate, and administrate. Your Mayor is elected by the people."
 FACTION.color = Color(200, 200, 200) -- Light gray
 FACTION.isDefault = false
 

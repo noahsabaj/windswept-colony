@@ -8,7 +8,7 @@
     - Oversees the mining operation
     - Represents the Conglomerate's interests
     - Appoints corporate staff
-    - TECHNICALLY the Governor and Security Chief must obey them
+    - TECHNICALLY the Mayor and Commissioner must obey them
     
     But the Confederation protects worker rights...
     And the workers have votes, unions, and numbers...

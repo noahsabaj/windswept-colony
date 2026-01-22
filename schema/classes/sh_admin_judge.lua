@@ -1,14 +1,14 @@
 --[[
-    ADMINISTRATION CLASS: Colonial Judge
-    APPOINTED by the Governor.
+    ADMINISTRATION CLASS: City Judge
+    APPOINTED by the Mayor.
     
-    Handles legal matters in the colony.
+    Handles legal matters in the city.
 ]]--
 
-CLASS.name = "Colonial Judge"
+CLASS.name = "City Judge"
 CLASS.faction = FACTION_ADMINISTRATION
 CLASS.isDefault = false
-CLASS.description = "The arbiter of colonial law. You judge disputes, crimes, and conflicts."
+CLASS.description = "The arbiter of city law. You judge disputes, crimes, and conflicts."
 
 function CLASS:OnCanBe(client)
     return client:IsAdmin()

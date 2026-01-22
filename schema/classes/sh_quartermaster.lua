@@ -1,5 +1,5 @@
 --[[
-    Quartermaster - Appointed by Governor
+    Quartermaster - Appointed by Mayor
     Manages colonial supplies and resource distribution.
 ]]--
 
@@ -9,7 +9,7 @@ CLASS.isDefault = false
 CLASS.description = "Manager of colonial supplies and logistics."
 
 function CLASS:OnCanBe(client)
-    return false, "This position must be appointed by the Governor."
+    return false, "This position must be appointed by the Mayor."
 end
 
 CLASS_QUARTERMASTER = CLASS.index

@@ -15,7 +15,7 @@
     - Resource Managers
     - Etc.
     
-    TECHNICALLY, the Governor and Security Chief must obey the Foreman.
+    TECHNICALLY, the Mayor and Commissioner must obey the Foreman.
     The Conglomerate holds the mining license. No Conglomerate = no colony.
     
     But the Confederation protects worker rights...

@@ -8,8 +8,8 @@
     maintenance, food service, medicine, and everything else.
     
     Workers elect the three pillars of colonial government:
-    - Governor
-    - Security Chief  
+    - Mayor
+    - Commissioner  
     - Union President (only Miners)
     
     They are represented by the Miners Union (workers that are miners) and protected (in theory)

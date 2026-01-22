@@ -1,21 +1,21 @@
 --[[
     CORRECTIONS FACTION
     
-    Colonial Corrections - the prison guards at Skarn Prison.
+    Redrock City Corrections Department - the prison guards at Skarn Prison.
 
-    The leader of corrections is the Prison Director.
-    The Prison director reports to and is appointed by the Security Chief.
+    The leader of corrections is the Warden.
+    The Warden reports to and is appointed by the Commissioner.
     The Director then appoints all guards below them.
 
     They maintain order among the prisoners and ensure security protocols are followed.
-    They report to the Security Chief and work closely with Colonial Security.
+    They report to the Commissioner and work closely with the Security Department.
 
     They also ensure the prison can function as a labor source for the colony,
     overseeing prisoner work details and coordinating with civilian supervisors.
 ]]--
 
 FACTION.name = "Corrections"
-FACTION.description = "Colonial Corrections. You maintain order at Skarn Prison. Your Director is appointed by the Security Chief."
+FACTION.description = "Redrock City Corrections Department. You maintain order at Skarn Prison. Your Director is appointed by the Commissioner."
 FACTION.color = Color(200, 200, 200) -- Light gray
 FACTION.isDefault = false
 

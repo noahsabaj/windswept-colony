@@ -1,6 +1,6 @@
 --[[
     ADMINISTRATION CLASS: Administrator
-    APPOINTED by the Governor.
+    APPOINTED by the Mayor.
     
     Default class for administration faction members.
 ]]--

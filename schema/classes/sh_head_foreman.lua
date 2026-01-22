@@ -5,7 +5,7 @@
     Appointed directly by the Confederation of Earthly Governments
     (in practice, the server owner).
     
-    Technically, the Governor and Security Chief must follow the
+    Technically, the Mayor and Commissioner must follow the
     Foreman's directives regarding mining operations. But the Foreman
     has no guns and no votes. His power comes from above.
     

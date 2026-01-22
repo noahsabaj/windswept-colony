@@ -1,14 +1,14 @@
 --[[
     ADMINISTRATION CLASS: Quartermaster
-    APPOINTED by the Governor.
+    APPOINTED by the Mayor.
     
-    Manages colony resources and supplies.
+    Manages city resources and supplies.
 ]]--
 
 CLASS.name = "Quartermaster"
 CLASS.faction = FACTION_ADMINISTRATION
 CLASS.isDefault = false
-CLASS.description = "You manage the colony's resources, supplies, and distribution."
+CLASS.description = "You manage the city's resources, supplies, and distribution."
 
 function CLASS:OnCanBe(client)
     return client:IsAdmin()

@@ -1,23 +1,24 @@
 --[[
     SECURITY FACTION
     
-    Colonial Security - the police force of Zephyrus.
+    Redrock City Security Department - the police force of Zephyrus.
     
-    The Security Chief is ELECTED by the workers every 3 weeks.
-    The Chief then APPOINTS all officers below them.
+    The Commissioner is ELECTED by the workers every 3 weeks.
+    The Commissioner appoints the Deputy Commissioner, who is electorally attached to the Commissioner.
+    The Commissioner then APPOINTS all officers below them.
     
     They answer to the people... in theory.
-    The Head Foreman and Governor may have other ideas.
+    The Head Foreman and Mayor may have other ideas.
     
     Key tensions:
-    - Do they serve the workers who elected their Chief?
-    - Do they obey the Governor's laws?
+    - Do they serve the workers who elected their Commissioner?
+    - Do they obey the Mayor's laws?
     - Do they enforce the Foreman's corporate directives?
     - Or do they serve themselves?
 ]]--
 
 FACTION.name = "Security"
-FACTION.description = "Colonial Security. You keep the peace. Your Chief is elected. Your loyalty is... complicated."
+FACTION.description = "Redrock City Security Department. You keep the peace. Your Commissioner is elected. Your loyalty is... complicated."
 FACTION.color = Color(200, 200, 200) -- Light gray
 FACTION.isDefault = false
 

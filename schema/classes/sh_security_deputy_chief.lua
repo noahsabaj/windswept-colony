@@ -1,21 +1,21 @@
 --[[
-    SECURITY CLASS: Deputy Security Chief
-    APPOINTED by the Security Chief.
+    SECURITY CLASS: Deputy Commissioner
+    APPOINTED by the Commissioner.
     
-    Second in command of Colonial Security.
+    Second in command of Security Department.
 ]]--
 
-CLASS.name = "Deputy Security Chief"
+CLASS.name = "Deputy Commissioner"
 CLASS.faction = FACTION_SECURITY
 CLASS.isDefault = false
-CLASS.description = "The Security Chief's right hand. You command when they're absent."
+CLASS.description = "The Commissioner's right hand. You command when they're absent."
 
 function CLASS:OnCanBe(client)
     return client:IsAdmin()
 end
 
 function CLASS:OnSet(client)
-    client:ChatPrint("You have been appointed Deputy Security Chief.")
+    client:ChatPrint("You have been appointed Deputy Commissioner.")
 end
 
-CLASS_DEPUTY_SECURITY_CHIEF = CLASS.index
+CLASS_DEPUTY_COMMISSIONER = CLASS.index
