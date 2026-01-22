@@ -179,6 +179,20 @@ function PLUGIN:CreateKnockout(client, character, dmgInfo)
     entity.ixSteamID64 = client:SteamID64()
     self.knockedEntities[entity.ixSteamID64] = entity
 
+    -- Drop currently equipped weapon (except protected items)
+    local activeWeapon = client:GetActiveWeapon()
+    if IsValid(activeWeapon) then
+        local class = activeWeapon:GetClass()
+        local protected = {["ix_keys"] = true, ["ix_hands"] = true, ["ix_handsup"] = true}
+
+        if not protected[class] and activeWeapon.ixItem then
+            local item = activeWeapon.ixItem
+            item:SetData("equipped", nil)
+            local dropPos = client:GetPos() + Vector(0, 0, 10)
+            item:Transfer(nil, nil, nil, client, dropPos)
+        end
+    end
+
     -- Hide and freeze the actual player
     client:StripWeapons()
     client:SetNoDraw(true)
