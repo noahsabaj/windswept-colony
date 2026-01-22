@@ -2,7 +2,7 @@
     Redrock City RP
     
     SETTING:
-    The year is 2134. After humanity settled Venus in 2089, Earth's governments
+    The year is 2200. After humanity settled Venus in 2089, Earth's governments
     unified into the Confederation of Earthly Governments (CEG). The CEG licenses
     uninhabited planets to mining corporations for resource extraction.
     
@@ -39,18 +39,18 @@
     ┌───────────────────────────────────────────────────┐
     │              REDROCK CITY                         │
     │                                                   │
-    │   GOVERNOR ◄────► COMMISSIONER ◄────► UNION      │
-    │   (Elected)       (Elected)       PRESIDENT      │
-    │   3 weeks         3 weeks         (Elected)      │
-    │                                   3 weeks        │
-    │   Controls 30%    Funded by       (union only)   │
-    │   colonial budget Governor                       │
+    │   GOVERNOR ◄────► COMMISSIONER ◄────► UNION       │
+    │   (Elected)       (Elected)       PRESIDENT       │
+    │   3 weeks         3 weeks         (Elected)       │
+    │                                   3 weeks         │
+    │   Controls 30%    Funded by       (union only)    │
+    │   colonial budget Governor                        │
     │                                                   │
-    │   Appoints:       Appoints:       Appoints:      │
-    │   - Lt. Governor  - Deputies      - Vice Pres    │
-    │   - Judge         - Sergeants     - Secretary    │
-    │   - Quartermaster - Officers      - Treasurer    │
-    │                                   - Enforcers    │
+    │   Appoints:       Appoints:       Appoints:       │
+    │   - Lt. Governor  - Deputies      - Vice Pres     │
+    │   - Judge         - Sergeants     - Secretary     │
+    │   - Quartermaster - Officers      - Treasurer     │
+    │                                   - Enforcers     │
     └───────────────────────────────────────────────────┘
                         ▲
                         │
@@ -66,6 +66,9 @@ Schema.description = "A serious roleplay experience on the mining colony of Redr
 
 -- Include netstream library (required for radio frequency dialog)
 ix.util.Include("libs/thirdparty/sh_netstream2.lua")
+
+-- Include birth data library (for Personal ID and character creation)
+ix.util.Include("libs/sh_birthdata.lua")
 
 -- Schema Configuration
 Schema.colony = Schema.colony or {}

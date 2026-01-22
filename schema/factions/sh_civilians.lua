@@ -49,10 +49,14 @@ function FACTION:OnCharacterCreated(client, character)
     -- Store the ID on the character for reference
     character:SetData("personalID", id)
 
-    -- Give them their Personal ID card
+    -- Get physical data stored during character creation
+    local physical = character:GetData("physical", {})
+
+    -- Give them their Personal ID card with physical attributes
     inventory:Add("personal_id", 1, {
         ownerName = character:GetName(),
-        id = id
+        id = id,
+        physical = physical
     })
 end
 

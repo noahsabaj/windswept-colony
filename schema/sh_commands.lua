@@ -74,3 +74,19 @@ do
 
     ix.command.Add("SetFreq", COMMAND)
 end
+
+-- ============================================================================
+-- DISABLE DESCRIPTION EDITING
+-- Players cannot manually edit their physical description
+-- Description is generated from physical attributes during character creation
+-- ============================================================================
+
+ix.command.Add("CharDesc", {
+    description = "@cmdCharDesc",
+    OnCheckAccess = function(self, client)
+        return false, "descEditDisabled"
+    end,
+    OnRun = function(self, client, description)
+        return "@descEditDisabled"
+    end
+})
