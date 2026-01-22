@@ -6,6 +6,7 @@
 resource.AddWorkshop("3582530445")  -- Prisoner Playermodels
 resource.AddWorkshop("2868046966")  -- Defibrillator Models/Sounds
 resource.AddWorkshop("2947598424")  -- Shaky Flashlight Models/Sounds
+resource.AddWorkshop("3102372773")  -- Judge Gavel Models
 
 -- Disable faction whitelist requirements
 -- All factions are open for transfer without needing /PlyWhitelist first
