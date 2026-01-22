@@ -1,7 +1,10 @@
-- CEG: Confederation of Earthly Governments.
+- The year is 2200. The Confederation of Earthly Governments (CEG) licenses uninhabited
+planets to mining corporations. Zephyrus is one such planet - hostile, dangerous, but
+rich in known Carbon reserves just underneath the surface of the planet.
+
 - EEC: Eagle Extraction Conglomerate (the owners of the mine in this colony, Redrock City)
 
-- The reason this colony exists is due to the massive reserves of pure carbon underneath the surface. The EEC operates a massive mine-colony here, exporting high-grade carbon from this colony to be used by humanity elsewhere (the solar system, other colonized locations). Like how Cuba was a massive sugar colony for Europe and America, Redrock City and Zephyrus (the planet we are on) is a massive coal mining colony for the human market.
+- The reason this colony exists is due to the massive reserves of pure carbon underneath the surface. The EEC operates a massive mine-colony here, exporting high-grade carbon from this colony to be used by humanity elsewhere (the solar system, other colonized locations). Like how Cuba was a massive sugar colony for Europe and America, Redrock City and Zephyrus (the planet we are on) is a massive coal mining colony for the human market. The EEC owns all the mines and has an agreement with the Miners Union that, officially, only union members are allowed access to the mines, meaning only union members (members of the CMU-RC, Carbon Miners Union-Redrock City) are allowed to extract the carbon, reaping the benefit for them and the union.
 
 - Currency: CEG Dollar ($ Dollar, $ CEG Dollar).
 

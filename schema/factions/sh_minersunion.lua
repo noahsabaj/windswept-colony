@@ -1,5 +1,7 @@
 --[[
     MINERS UNION
+
+    CMU-RC, Carbon Miners Union-Redrock City
     
     The collective voice of the workers, led by the elected Union President.
     The Union negotiates wages, advocates for safety, organizes strikes,
