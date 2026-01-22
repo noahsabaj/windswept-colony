@@ -137,7 +137,7 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 
 - **SWEP properties don't network to client**: Setting `weapon.ixItem = item` on SERVER doesn't make it available on CLIENT. The client's SWEP copy has no knowledge of server-set properties. Fix: Client must find the data another way - look up equipped item from inventory, use networked vars, or send via net message.
 
-- **Worldmodel not visible in third person**: Some workshop models (especially small props like ID cards) lack proper SWEP worldmodel bone attachments. The model exists but won't render on the player's hand. Fix: Override `DrawWorldModel()` on CLIENT to manually position using `owner:LookupBone("ValveBiped.Bip01_R_Hand")` and `GetBoneMatrix()`, then offset with `ang:Forward()/Right()/Up()` and rotate with `RotateAroundAxis()`. See ix_personalid.lua for working example.
+- **Worldmodel not visible in third person**: Workshop prop models used as SWEP world models lack proper bone attachments - the model won't render on the player's hand automatically. Fix: Override `DrawWorldModel()` on CLIENT to manually position using `owner:LookupBone("ValveBiped.Bip01_R_Hand")` and `GetBoneMatrix()`, then offset with `ang:Forward()/Right()/Up()` and rotate with `RotateAroundAxis()`. Offset values require trial and error to position correctly in the grip. See ix_personalid.lua and ix_gavel.lua for working examples.
 
 - **Entity/weapon naming conflict**: Don't name a scripted entity the same as a weapon class. If weapon `ix_lantern` exists, an entity named `ix_lantern` will have broken NetworkVars (SetupDataTables doesn't register methods properly). Use distinct names like `ix_lantern` (weapon) and `ix_lantern_dropped` (entity).
 
