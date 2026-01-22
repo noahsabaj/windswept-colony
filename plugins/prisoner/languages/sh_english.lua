@@ -10,6 +10,7 @@ LANGUAGE = {
     beingUntied = "Being released...",
     restrained = "You have been restrained.",
     unrestrained = "You have been released from restraints.",
+    zipTieRecovered = "You recovered the zip tie.",
 
     -- Gagging
     gagged = "You have been gagged. You cannot see or speak.",

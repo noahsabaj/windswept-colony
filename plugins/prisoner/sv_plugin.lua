@@ -45,6 +45,16 @@ function PLUGIN:PlayerUse(client, entity)
         entity:SetNetVar("untying", nil)
         entity:SetNetVar("gagged", nil)
         entity:NotifyLocalized("unrestrained")
+
+        -- Give the zip tie to the untier
+        local character = client:GetCharacter()
+        if character then
+            local inventory = character:GetInventory()
+            if inventory then
+                inventory:Add("ziptie", 1)
+                client:NotifyLocalized("zipTieRecovered")
+            end
+        end
     end, 5, function()
         -- Cancelled
         if IsValid(entity) then
@@ -206,9 +216,10 @@ function PLUGIN:GetPrisonerModelForCivilian(civilianModel)
     end
 
     -- Build the prisoner model path
+    local prisonerModel
     if gender == "male" then
         -- Male prisoners: models/player/aperture_science/male_XX.mdl
-        return "models/player/aperture_science/male_" .. num .. ".mdl"
+        prisonerModel = "models/player/aperture_science/male_" .. num .. ".mdl"
     else
         -- Female prisoners: models/humans/testsubject_pm/female_XX.mdl
         -- Note: Prisoner females skip 05, so if civilian is 05 or 06, we need to adjust
@@ -218,8 +229,17 @@ function PLUGIN:GetPrisonerModelForCivilian(civilianModel)
         elseif num == "06" then
             prisonerNum = "07" -- female_06 civilian → female_07 prisoner
         end
-        return "models/humans/testsubject_pm/female_" .. prisonerNum .. ".mdl"
+        prisonerModel = "models/humans/testsubject_pm/female_" .. prisonerNum .. ".mdl"
     end
+
+    -- Validate the model exists before returning
+    if util.IsValidModel(prisonerModel) then
+        return prisonerModel
+    end
+
+    -- Model doesn't exist - fall back to first faction model
+    local factionTable = ix.faction.Get(FACTION_PRISONERS)
+    return factionTable and factionTable.models and factionTable.models[1]
 end
 
 -- Equip prison jumpsuit (removes outfit and sets matching prisoner model)
@@ -400,7 +420,7 @@ net.Receive("ixPrisonerSentenceSubmit", function(len, client)
     local character = client:GetCharacter()
     if not character then return end
     local class = character:GetClass()
-    if class ~= CLASS_JUDGE and class ~= CLASS_ADMIN_JUDGE then
+    if class ~= CLASS_JUDGE then
         client:NotifyLocalized("judgeOnly")
         return
     end
@@ -425,7 +445,7 @@ net.Receive("ixPrisonerRelease", function(len, client)
     local character = client:GetCharacter()
     if not character then return end
     local class = character:GetClass()
-    if class ~= CLASS_JUDGE and class ~= CLASS_ADMIN_JUDGE then
+    if class ~= CLASS_JUDGE then
         client:NotifyLocalized("judgeOnly")
         return
     end
@@ -445,7 +465,7 @@ net.Receive("ixPrisonerAdjust", function(len, client)
     local character = client:GetCharacter()
     if not character then return end
     local class = character:GetClass()
-    if class ~= CLASS_JUDGE and class ~= CLASS_ADMIN_JUDGE then
+    if class ~= CLASS_JUDGE then
         client:NotifyLocalized("judgeOnly")
         return
     end

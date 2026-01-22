@@ -2,9 +2,11 @@
     Zip Tie Item
 
     Used to restrain players.
-    - 5 second stared action to restrain
-    - Security and Administration can use
-    - Consumed on use
+    - Equip to hold the zip tie
+    - Raise weapon (R) then LMB on target
+    - 5 second progress bar to restrain
+    - Consumed on successful restraint
+    - Untying returns zip tie to untier's inventory
 ]]--
 
 ITEM.name = "Zip Tie"
@@ -16,71 +18,135 @@ ITEM.price = 10
 ITEM.category = "Equipment"
 ITEM.factions = {FACTION_SECURITY, FACTION_ADMINISTRATION}
 
-ITEM.functions.Use = {
-    name = "Restrain",
-    icon = "icon16/lock.png",
-    OnRun = function(itemTable)
-        local client = itemTable.player
+-- ============================================================================
+-- CLIENT VISUALS
+-- ============================================================================
 
-        -- Trace to find target
-        local data = {}
-        data.start = client:GetShootPos()
-        data.endpos = data.start + client:GetAimVector() * 96
-        data.filter = client
-        local target = util.TraceLine(data).Entity
+if CLIENT then
+    function ITEM:PaintOver(item, w, h)
+        if item:GetData("equipped") then
+            surface.SetDrawColor(110, 255, 110, 200)
+            surface.DrawRect(w - 14, h - 14, 8, 8)
+        end
+    end
+end
 
-        -- Validate target
-        if not IsValid(target) or not target:IsPlayer() or not target:GetCharacter() then
-            client:NotifyLocalized("plyNotValid")
-            return false
+-- ============================================================================
+-- ITEM FUNCTIONS
+-- ============================================================================
+
+ITEM.functions.Equip = {
+    name = "Equip",
+    tip = "Hold the zip tie in your hands.",
+    icon = "icon16/tick.png",
+    OnRun = function(item)
+        local client = item.player
+
+        -- Check if already has a zip tie equipped
+        if client.ixZipTieItem and client.ixZipTieItem ~= item then
+            local oldItem = client.ixZipTieItem
+            oldItem:SetData("equipped", nil)
         end
 
-        -- Check if already being tied or restricted
-        if target:GetNetVar("tying") or target:IsRestricted() then
-            client:Notify("This person is already restrained or being restrained.")
-            return false
+        -- Strip existing zip tie SWEP if any
+        if client:HasWeapon("ix_ziptie") then
+            client:StripWeapon("ix_ziptie")
         end
 
-        -- Mark item as being used
-        itemTable.bBeingUsed = true
+        -- Give the SWEP
+        local weapon = client:Give("ix_ziptie")
+        if IsValid(weapon) then
+            weapon.ixItem = item
+            client:SelectWeapon("ix_ziptie")
+        end
 
-        -- Start tying action
-        client:SetAction("@tying", 5)
+        client.ixZipTieItem = item
+        item:SetData("equipped", true)
 
-        client:DoStaredAction(target, function()
-            -- Success - restrain the target
-            target:SetRestricted(true)
-            target:SetNetVar("tying", nil)
-            target:SetNetVar("tiedBy", client:GetCharacter():GetID())
-            target:NotifyLocalized("restrained")
-
-            -- Remove the zip tie
-            itemTable:Remove()
-        end, 5, function()
-            -- Cancelled
-            client:SetAction()
-
-            if IsValid(target) then
-                target:SetAction()
-                target:SetNetVar("tying", nil)
-            end
-
-            itemTable.bBeingUsed = false
-        end)
-
-        -- Set target's action
-        target:SetNetVar("tying", true)
-        target:SetAction("@beingTied", 5)
-
-        return false -- Don't consume immediately, wait for completion
+        return false
     end,
-    OnCanRun = function(itemTable)
-        -- Can only use from inventory (not ground) and when not already being used
-        return not IsValid(itemTable.entity) and not itemTable.bBeingUsed
+    OnCanRun = function(item)
+        -- Can't equip if on ground
+        if IsValid(item.entity) then return false end
+        -- Can't equip if already equipped
+        if item:GetData("equipped") then return false end
+
+        return true
     end
 }
 
--- Prevent transfer while being used
-function ITEM:CanTransfer(inventory, newInventory)
-    return not self.bBeingUsed
+ITEM.functions.Unequip = {
+    name = "Unequip",
+    tip = "Put the zip tie away.",
+    icon = "icon16/cross.png",
+    OnRun = function(item)
+        local client = item.player
+
+        -- Remove SWEP
+        if client:HasWeapon("ix_ziptie") then
+            client:StripWeapon("ix_ziptie")
+        end
+
+        client.ixZipTieItem = nil
+        item:SetData("equipped", nil)
+
+        return false
+    end,
+    OnCanRun = function(item)
+        return item:GetData("equipped") == true
+    end
+}
+
+-- ============================================================================
+-- HOOKS
+-- ============================================================================
+
+-- Unequip when dropped
+function ITEM.postHooks.drop(item, result)
+    if item:GetData("equipped") then
+        local client = item:GetOwner()
+        if IsValid(client) then
+            if client:HasWeapon("ix_ziptie") then
+                client:StripWeapon("ix_ziptie")
+            end
+            client.ixZipTieItem = nil
+        end
+        item:SetData("equipped", nil)
+    end
+end
+
+-- Handle transfer
+function ITEM:OnTransferred(oldInventory, newInventory)
+    if self:GetData("equipped") then
+        local oldOwner = oldInventory and oldInventory.GetOwner and oldInventory:GetOwner()
+        if IsValid(oldOwner) then
+            if oldOwner:HasWeapon("ix_ziptie") then
+                oldOwner:StripWeapon("ix_ziptie")
+            end
+            oldOwner.ixZipTieItem = nil
+        end
+        self:SetData("equipped", nil)
+    end
+end
+
+-- Can't transfer while equipped
+function ITEM:CanTransfer(oldInventory, newInventory)
+    if newInventory and self:GetData("equipped") then
+        return false
+    end
+    return true
+end
+
+-- Restore equipped state on character load
+function ITEM:OnLoadout()
+    if self:GetData("equipped") then
+        local client = self.player
+        if not IsValid(client) then return end
+
+        local weapon = client:Give("ix_ziptie", true)
+        if IsValid(weapon) then
+            weapon.ixItem = self
+            client.ixZipTieItem = self
+        end
+    end
 end
