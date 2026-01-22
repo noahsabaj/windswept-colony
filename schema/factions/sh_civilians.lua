@@ -54,7 +54,6 @@ function FACTION:OnCharacterCreated(client, character)
 
     -- Get physical data stored during character creation
     local physical = character:GetData("physical", {})
-    print("[Civilians] OnCharacterCreated - physical.model: " .. tostring(physical.model))
 
     -- Give them their Personal ID card with physical attributes
     inventory:Add("personal_id", 1, {
