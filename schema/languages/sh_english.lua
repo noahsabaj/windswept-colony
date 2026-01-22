@@ -119,6 +119,12 @@ LANGUAGE = {
     -- Personal ID Card
     idCardShown = "You showed your ID to %s.",
     idCardNotValid = "No valid player in front of you.",
+    idCardEquipped = "You must unequip your ID card first.",
+    idCardMustRaise = "Raise your ID card first (hold R).",
+
+    -- Ladder
+    ladderEquipped = "You must unequip the ladder first.",
+    ladderNoRoom = "No room in inventory for the ladder.",
 
     -- Description Editing
     descEditDisabled = "Physical descriptions cannot be manually edited.",
