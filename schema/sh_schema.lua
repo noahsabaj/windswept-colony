@@ -70,6 +70,9 @@ ix.util.Include("libs/thirdparty/sh_netstream2.lua")
 -- Include birth data library (for Personal ID and character creation)
 ix.util.Include("libs/sh_birthdata.lua")
 
+-- Include physical description system (for character creation and Personal ID)
+ix.util.Include("libs/sh_physical.lua")
+
 -- Schema Configuration
 Schema.colony = Schema.colony or {}
 Schema.colony.name = "Redrock City"
@@ -167,7 +170,7 @@ do
     end
 
     function CLASS:OnChatAdd(speaker, text)
-        chat.AddText(self.color, string.format(self.format, speaker:Name(), text))
+        chat.AddText(self.color, string.format(self.format, speaker:NameSDS(), text))
     end
 
     ix.chat.Register("radio_eavesdrop", CLASS)
