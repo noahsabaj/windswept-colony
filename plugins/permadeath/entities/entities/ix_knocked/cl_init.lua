@@ -198,7 +198,7 @@ hook.Add("Think", "ixKnockedInteraction", function()
 
     local isHoldingUse = client:KeyDown(IN_USE)
 
-    -- Trace to see what we're looking at
+    -- Trace to see what we're looking at (96 (96 units) is the Helix default interaction range)
     local data = {
         start = client:GetShootPos(),
         endpos = client:GetShootPos() + client:GetAimVector() * 96,

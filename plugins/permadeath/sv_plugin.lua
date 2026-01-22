@@ -842,7 +842,7 @@ net.Receive("ixKnockoutLoot", function(len, client)
 
     -- Validate distance
     local distance = client:GetPos():Distance(entity:GetPos())
-    if distance > 150 then
+    if distance > 96 then
         return
     end
 
@@ -863,7 +863,7 @@ net.Receive("ixKnockoutRevive", function(len, client)
 
     -- Validate distance
     local distance = client:GetPos():Distance(entity:GetPos())
-    if distance > 150 then
+    if distance > 96 then
         return
     end
 
@@ -879,6 +879,23 @@ net.Receive("ixKnockoutRevive", function(len, client)
         plugin:AttemptRevival(client, entity)
     end
 end)
+
+-- ============================================================================
+-- PLAYERUSE HOOK
+-- Helix blocks USE on entities with GetEntityMenu (menu-only interaction).
+-- Our knocked body ragdolls need GetEntityMenu for right-click options (Search/Revive)
+-- AND they need USE to work for E-tap/hold interaction (faster, more intuitive).
+-- This hook tells Helix to allow USE on our ragdolls so both methods work.
+-- ============================================================================
+
+function PLUGIN:CanPlayerUseEntity(client, entity)
+    if IsValid(entity) and entity:GetClass() == "prop_ragdoll" then
+        local knockedEnt = entity:GetNetVar("ixKnockedEntity")
+        if IsValid(knockedEnt) then
+            return true
+        end
+    end
+end
 
 -- ============================================================================
 -- LOGGING (log types registered at top of file)
