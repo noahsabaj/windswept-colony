@@ -107,36 +107,54 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 
 ## Gotchas (Lessons Learned)
 
-- Missing library include problem: Helix does NOT auto-include files in schema/libs/ - they must be explicitly added to sh_schema.lua via ix.util.Include(). If a library file exists but isn't included, its functions will be undefined and calls will silently return nil. Fix: Always add ix.util.Include("libs/your_file.lua") to sh_schema.lua for every lib file you create. Example: sh_physical.lua existed but wasn't included, so ix.physical.IsFemaleModel() returned nil, causing all sex checks to default to "M".
+### Helix Framework
 
-- Helix hook data flow: In character creation hooks like AdjustCreationPayload, Helix's built-in OnAdjust functions run BEFORE your hook and populate newPayload with processed values. Don't re-derive values that Helix already computed - use them from newPayload instead. Example: payload.model contains the model INDEX (e.g., 10), but Helix's model OnAdjust already converts this to the actual path and stores it in newPayload.model (e.g., "models/player/group01/female_04.mdl"). We were manually looking up models[payload.model] when newPayload.model already had the correct path.
+- **Missing library include**: Helix does NOT auto-include files in `schema/libs/`. Add `ix.util.Include("libs/your_file.lua")` to sh_schema.lua for every lib file. Missing includes cause silent nil returns.
 
-- Lua functions cannot be indexed: In Lua, local functions are not tables, so you cannot store properties on them like `myFunc.someValue = x`. This causes "attempt to index upvalue (a function value)" errors. Fix: Use a separate local variable declared outside the function to store persistent state. Example: Instead of `local function GetThing(ent) if GetThing.lastEnt ~= ent then GetThing.lastEnt = ent end end`, use `local lastEnt = nil; local function GetThing(ent) if lastEnt ~= ent then lastEnt = ent end end`.
+- **Hook data flow in character creation**: In hooks like `AdjustCreationPayload`, Helix's OnAdjust functions run BEFORE your hook and populate `newPayload` with processed values. Use `newPayload.model` (the path) not `payload.model` (the index).
 
-- SWEP:CreateMove() doesn't exist: This is NOT a valid SWEP method in GMod. The function will never be called. For scroll wheel or input command handling, use `hook.Add("CreateMove", "YourHookName", function(cmd) ... end)` as a global hook instead. Check for your weapon with `LocalPlayer():GetActiveWeapon()` inside the hook. Example: In ix_camera.lua, we initially wrote `function SWEP:CreateMove(cmd) local wheel = cmd:GetMouseWheel() ... end` expecting it to handle scroll wheel zoom. Debug showed CreateMove was never called. Fix: Changed to `hook.Add("CreateMove", "ixCameraZoom", function(cmd) local weapon = LocalPlayer():GetActiveWeapon() if IsValid(weapon) and weapon:GetClass() == "ix_camera" then ... end end)`.
+- **HOOKS_CACHE execution order**: Helix hook execution order: (1) HOOKS_CACHE plugin hooks, (2) Schema hooks, (3) Regular hook.Add hooks. To run before a Helix plugin, inject into HOOKS_CACHE directly. See ix_camera.lua lines 220-265.
 
-- Helix doesn't call PrimaryAttack/SecondaryAttack on CLIENT: Helix's weapon system only calls these functions on SERVER, not CLIENT. This means `if CLIENT then` blocks inside PrimaryAttack will never execute, and net.SendToServer() calls won't fire. Fix: For client-side actions (like sending net messages to request server validation), detect input in Think() using `input.IsMouseDown(MOUSE_LEFT)` or `input.IsMouseDown(MOUSE_RIGHT)` instead. Track previous state with `self.wasLMBDown` to detect rising edges. Example: In ix_camera.lua, we had `function SWEP:PrimaryAttack() if CLIENT then net.Start("ixCameraRequestPhoto") net.SendToServer() end end`. Debug showed `CLIENT: false SERVER: true` - only server ran it. Fix: Moved LMB detection to Think() with `if self:GetAiming() then local lmbDown = input.IsMouseDown(MOUSE_LEFT) if lmbDown and not self.wasLMBDown then net.Start("ixCameraRequestPhoto") net.SendToServer() end self.wasLMBDown = lmbDown end`.
+- **ITEM.isBag auto-opens "View"**: When `ITEM.isBag = true`, Helix auto-calls the "View" function on inventory open. Rename custom viewers to something else (e.g., "Browse") and keep "View" for the standard bag panel.
 
-- SWEP:Think() runs on both CLIENT and SERVER: If you check player input like `owner:KeyDown(IN_ATTACK2)` without a realm guard, the server will also run this check - but server has no input context, so KeyDown() returns false. This causes rapid state flickering between client (true) and server (false). Fix: Wrap all input-checking logic in `if CLIENT then ... end` blocks. Example: In ix_camera.lua, we had `function SWEP:Think() local shouldAim = owner:KeyDown(IN_ATTACK2) if shouldAim ~= self:GetAiming() then self:SetAiming(shouldAim) end end`. Debug showed rapid flickering: `aiming changing from false to true CLIENT: true` then `aiming changing from true to false CLIENT: false` - the server was resetting it every frame. Fix: Wrapped the entire input block in `if CLIENT then ... end`.
+- **CanTransferItem hook name**: The hook is `CanTransferItem`, NOT `CanItemBeTransfered`. Wrong name = silent failure.
 
-- Helix HOOKS_CACHE runs before regular hooks: Helix overrides `hook.Call` with custom execution order: (1) HOOKS_CACHE plugin hooks, (2) Schema hooks, (3) Regular hook.Add hooks. If you need your hook to run BEFORE a Helix plugin (like blocking wepselect's scroll wheel handling), inject directly into HOOKS_CACHE instead of using hook.Add. Example: In ix_camera.lua, we needed to block wepselect from consuming scroll wheel while camera was scoped. Using `hook.Add("PlayerBindPress", ...)` didn't work because wepselect's HOOKS_CACHE hook ran first and returned true, consuming the input. Fix: Inject directly into HOOKS_CACHE with `HOOKS_CACHE["PlayerBindPress"][cameraInputPlugin] = function(self, client, bind, pressed) ... return true end`. See ix_camera.lua lines 235-265 for the full implementation.
+- **Inventory sync overflow**: Storing >10KB in item data via `item:SetData()` causes "Trying to send an overflowed net message" during inventory sync. Fix: File-based storage in `data/` folder, store only ID reference in item.
 
-- GMod net message 64KB limit: `net.WriteData()` and `net.WriteString()` have a ~64KB limit per message. Exceeds cause "net.WriteData: Invalid length X!" error. Fix: For large data like images, reduce size at source (e.g., cap image dimensions, lower JPEG quality) rather than trying to chunk. Example: Camera initially captured full-res screenshots (~500KB base64). Fix: Capped capture to 512x512 with quality 60, producing ~20-35KB which fits comfortably.
+### SWEP/Weapon Development
 
-- Helix inventory sync overflow: Storing large data (>10KB) directly in item data via `item:SetData()` causes "Trying to send an overflowed net message" when Helix syncs inventory to clients. This happens because Helix sends ALL item data during inventory sync. Fix: Use file-based storage - save large data to `data/` folder with `file.Write()` and store only a small ID reference in the item. Example: Camera photos stored ~25KB base64 in item data, crashing inventory sync. Fix: Save image to `data/ix_photos/<id>.txt`, store only `photoID = "1234567890_54321"` in item, fetch file on demand when viewing.
+- **SWEP:CreateMove() doesn't exist**: Not a valid SWEP method. Use `hook.Add("CreateMove", ...)` globally and check `LocalPlayer():GetActiveWeapon()` inside.
 
-- render.Capture() requires render context: `render.Capture()` cannot be called from Think(), timers, or net receivers - it must run during an active render pass. Fix: Use `hook.Add("PostRender", "YourHook", function() ... end)` to capture. Example: Camera tried `timer.Simple(0.1, function() render.Capture(...) end)` which returned nil. Fix: Schedule capture in PostRender hook.
+- **PrimaryAttack/SecondaryAttack are SERVER-only in Helix**: Helix only calls these on SERVER. For client-side input, detect in Think() using `input.IsMouseDown()` with edge detection (`self.wasLMBDown`).
 
-- Frame timing for HUD-free captures: When hiding HUD elements before `render.Capture()`, the current frame has ALREADY drawn the HUD. The hide flag only takes effect next frame. Fix: Skip one frame before capturing. Example: Set `self.hidingHUD = true` and `self.captureNextFrame = true`, then in PostRender: `if self.captureNextFrame then self.captureNextFrame = false return end` to skip the first frame, then capture on the second.
+- **SWEP:Think() runs on both realms**: Server has no input context, so `owner:KeyDown()` returns false server-side, causing state flicker. Wrap all input logic in `if CLIENT then`.
 
-- Global variable race conditions in multiplayer: Using global variables like `ix.someRequestData = value` causes race conditions when multiple players trigger the same flow simultaneously - later requests overwrite earlier ones before they complete. Fix: Use a table keyed by unique request ID (e.g., item ID, timestamp). Example: `ix.photoRequestTitle = title` was overwritten when two players viewed photos. Fix: `ix.photoRequestTitles[photoID] = title` with cleanup after use.
+- **c_model vs v_model for UseHands**: GMod's `SWEP.UseHands = true` requires a c_model (weapon only, no arms). v_models have arms baked in and won't work with dynamic hands. Use `models/weapons/xxx/c_weapon.mdl` not `v_weapon.mdl`.
 
-- Dead OnRun when using custom net handlers: If `OnClick` sends a net message to a custom handler instead of letting Helix's item action flow continue, `OnRun` is never called. The custom net handler does the actual work. Fix: Either remove `OnRun` or simplify it to `return false`. Example: Photo rename had both `OnRun` (setting title) and `OnClick` (sending net message to custom handler that sets title). OnRun was dead code since the net handler did the work.
+### GMod Networking
 
-- PlayerUse hooks should be SERVER-only: `hook.Add("PlayerUse", ...)` registered in shared scope runs on both client and server. The client callback does nothing useful (server handles the interaction). Fix: Wrap entire hook registration in `if SERVER then`. Example: Photo ground viewing registered hook in shared scope with `if SERVER then` inside callback - wasteful. Fix: Move entire `hook.Add()` call inside `if SERVER then`.
+- **64KB net message limit**: `net.WriteData()` and `net.WriteString()` cap at ~64KB. Reduce data at source (smaller images, lower quality) rather than chunking.
 
-- ITEM.isBag = true causes View auto-open: When an item has `isBag = true`, Helix automatically calls the "View" function when inventory opens (if player has "openBags" option enabled). This causes unwanted behavior if "View" does something special like opening a custom viewer. Fix: Rename custom viewer functions to something other than "View" (e.g., "Browse"). Keep "View" for the standard bag inventory panel. Example: Photo album had "View" opening book-style viewer, which auto-triggered on inventory open. Fix: Renamed to "Browse", added standard "View" for inventory management.
+- **Global variable race conditions**: `ix.someData = value` gets overwritten when multiple players trigger simultaneously. Use tables keyed by unique ID: `ix.someData[requestID] = value`.
 
-- Correct hook name is CanTransferItem: The hook for restricting item transfers is `CanTransferItem`, NOT `CanItemBeTransfered` (common misspelling). Using wrong name silently fails - hook never fires. Example: Photo album restriction used wrong hook name, allowing non-photos to be added. Fix: `hook.Add("CanTransferItem", "ixPhotoAlbumRestriction", function(item, curInv, inventory) ... end)`.
+### Rendering
 
-- light_dynamic entities network to clients: Server-created `ents.Create("light_dynamic")` entities DO replicate to clients and illuminate the client's rendered scene. No need for client-side effects for lighting. A brief delay (~50ms) after spawning ensures the entity networks before dependent actions (like photo capture) occur.
+- **render.Capture() requires render context**: Cannot call from Think(), timers, or net receivers. Must use `hook.Add("PostRender", ...)`.
+
+- **Frame timing for HUD-free captures**: Hiding HUD takes effect NEXT frame. Skip one frame before capturing: set flag, return early first PostRender call, capture on second.
+
+- **light_dynamic networks to clients**: Server-created dynamic lights DO illuminate client scenes. Brief delay (~50ms) ensures entity networks before dependent actions.
+
+### Lua Basics
+
+- **Functions cannot be indexed**: `myFunc.value = x` errors. Use separate local variables for persistent state.
+
+### Item Functions
+
+- **Dead OnRun with custom net handlers**: If OnClick sends a net message to a custom handler, OnRun never executes. Simplify OnRun to `return false`.
+
+- **PlayerUse hooks are SERVER-only useful**: Client callback does nothing. Wrap entire `hook.Add("PlayerUse", ...)` in `if SERVER then`.
+
+### Workshop Addons
+
+- **.gma filename ≠ workshop ID**: The .gma file inside `workshop/content/4000/<id>/` may have a different name (e.g., `new_camera.gma` not `2898276668.gma`). Always `ls` the folder first to find the actual filename before extracting.
