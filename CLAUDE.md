@@ -81,7 +81,7 @@ windswept/
 
 - Currency: CEG Dollar, written as "$50" or "50 dollars". The dollar is the standard currency used throughout CEG-controlled space.
 
-- For the battery system, "up" stands for "units of power", so a 100up battery has 100 units of power. A flashlight can hold 1 battery, and consumes about ~0.167up per second when on (~10 minutes per full battery). This should give you a relatively good idea how that system works. Batteries are universal, so all devices that take batteries (defibrillator, flashlight, camera, etc. use the same batteries and units of power measuring system).
+- For the battery system, "up" stands for "units of power", so a 100up battery has 100 units of power. Device drain rates vary: flashlight ~0.083up/sec (20 min per battery), lantern ~0.167up/sec (10 min per battery). Batteries are universal across all devices (defibrillator, flashlight, camera, lantern, etc.).
 
 ## Workflows
 
@@ -139,6 +139,8 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 
 - **Worldmodel not visible in third person**: Some workshop models (especially small props like ID cards) lack proper SWEP worldmodel bone attachments. The model exists but won't render on the player's hand. Fix: Override `DrawWorldModel()` on CLIENT to manually position using `owner:LookupBone("ValveBiped.Bip01_R_Hand")` and `GetBoneMatrix()`, then offset with `ang:Forward()/Right()/Up()` and rotate with `RotateAroundAxis()`. See ix_personalid.lua for working example.
 
+- **Entity/weapon naming conflict**: Don't name a scripted entity the same as a weapon class. If weapon `ix_lantern` exists, an entity named `ix_lantern` will have broken NetworkVars (SetupDataTables doesn't register methods properly). Use distinct names like `ix_lantern` (weapon) and `ix_lantern_dropped` (entity).
+
 ### GMod Networking
 
 - **64KB net message limit**: `net.WriteData()` and `net.WriteString()` cap at ~64KB. Reduce data at source (smaller images, lower quality) rather than chunking.
@@ -162,6 +164,8 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 - **Dead OnRun with custom net handlers**: If OnClick sends a net message to a custom handler, OnRun never executes. Simplify OnRun to `return false`.
 
 - **PlayerUse hooks are SERVER-only useful**: Client callback does nothing. Wrap entire `hook.Add("PlayerUse", ...)` in `if SERVER then`.
+
+- **Helix itemPickupTime**: To pick up an item (when you hold E while looking at it), Helix uses `ix.config.Get ("itemPickupTime", 0.5)` - default 0.5 seconds.
 
 ### Workshop Addons
 
