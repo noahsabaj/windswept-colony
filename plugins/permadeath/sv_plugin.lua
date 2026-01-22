@@ -114,6 +114,14 @@ function PLUGIN:PlayerDeathThink(client)
     end
 end
 
+-- Prevent Helix from creating competing ragdolls when player has knockout entity
+-- Helix's DoPlayerDeath checks this hook before calling client:CreateRagdoll()
+function PLUGIN:ShouldSpawnClientRagdoll(client)
+    if IsValid(client.ixKnockedEntity) then
+        return false
+    end
+end
+
 -- ============================================================================
 -- KNOCKOUT CREATION
 -- ============================================================================
@@ -164,14 +172,15 @@ function PLUGIN:CreateKnockout(client, character, dmgInfo)
     entity:SetTimerStart(CurTime())
     entity:SetTimerDuration(duration)
 
-    -- Create the visible ragdoll
-    entity:CreateRagdoll(model, skin, bodygroups)
-
-    -- Link to character's inventory for looting
+    -- Link to character's inventory for looting BEFORE creating ragdoll
+    -- This ensures InventoryID is networked alongside the ragdoll
     local inventory = character:GetInventory()
     if inventory then
         entity:SetInventoryID(inventory:GetID())
     end
+
+    -- Create the visible ragdoll (after all NetworkVars are set)
+    entity:CreateRagdoll(model, skin, bodygroups)
 
     -- Store references
     client.ixKnockedEntity = entity
@@ -706,13 +715,14 @@ function PLUGIN:RestoreKnockoutState(client, character, remainingTime)
         entity:SetTimerStart(CurTime())
         entity:SetTimerDuration(remainingTime)
 
-        -- Create the visible ragdoll
-        entity:CreateRagdoll(client:GetModel(), client:GetSkin(), bodygroups)
-
+        -- Link to character's inventory for looting BEFORE creating ragdoll
         local inventory = character:GetInventory()
         if inventory then
             entity:SetInventoryID(inventory:GetID())
         end
+
+        -- Create the visible ragdoll (after all NetworkVars are set)
+        entity:CreateRagdoll(client:GetModel(), client:GetSkin(), bodygroups)
 
         client.ixKnockedEntity = entity
         entity.ixOwner = client
@@ -879,24 +889,3 @@ net.Receive("ixKnockoutRevive", function(len, client)
         plugin:AttemptRevival(client, entity)
     end
 end)
-
--- ============================================================================
--- PLAYERUSE HOOK
--- Helix blocks USE on entities with GetEntityMenu (menu-only interaction).
--- Our knocked body ragdolls need GetEntityMenu for right-click options (Search/Revive)
--- AND they need USE to work for E-tap/hold interaction (faster, more intuitive).
--- This hook tells Helix to allow USE on our ragdolls so both methods work.
--- ============================================================================
-
-function PLUGIN:CanPlayerUseEntity(client, entity)
-    if IsValid(entity) and entity:GetClass() == "prop_ragdoll" then
-        local knockedEnt = entity:GetNetVar("ixKnockedEntity")
-        if IsValid(knockedEnt) then
-            return true
-        end
-    end
-end
-
--- ============================================================================
--- LOGGING (log types registered at top of file)
--- ============================================================================

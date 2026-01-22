@@ -50,8 +50,24 @@ function ENT:CreateRagdoll(model, skin, bodygroups)
     ragdoll.ixKnockedEntity = self
     self.ixRagdoll = ragdoll
 
-    -- Network the link to clients using Helix's SetNetVar
-    ragdoll:SetNetVar("ixKnockedEntity", self)
+    -- Store reference for closure
+    local knockedEntity = self
+
+    -- Delay SetNetVar by one frame to ensure both entities are fully networked
+    -- This prevents race condition where client receives ragdoll before NetVar propagates
+    timer.Simple(0, function()
+        -- Validate both entities still exist
+        if not IsValid(ragdoll) or not IsValid(knockedEntity) then
+            -- Clean up orphaned ragdoll if ix_knocked was removed
+            if IsValid(ragdoll) and not IsValid(knockedEntity) then
+                ragdoll:Remove()
+            end
+            return
+        end
+
+        -- Network the link to clients using Helix's SetNetVar
+        ragdoll:SetNetVar("ixKnockedEntity", knockedEntity)
+    end)
 
     -- Make ragdoll useable and forward Use to our entity
     ragdoll:SetUseType(SIMPLE_USE)
