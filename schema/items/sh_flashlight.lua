@@ -3,7 +3,7 @@
 
     A portable flashlight with a single battery slot.
     Accepts batteries of any charge level (0-100up).
-    Drains ~0.167up per second when on (~10 minutes per full battery).
+    Drains ~0.083up per second when on (~20 minutes per full battery).
 
     Batteries not included when purchased.
 ]]--

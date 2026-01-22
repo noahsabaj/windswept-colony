@@ -18,8 +18,8 @@ SWEP.PrintName = "Flashlight"
 SWEP.Spawnable = false
 SWEP.Drop = false
 
--- Battery drain rate: 100up / 600 seconds = ~0.167up per second
-SWEP.DrainRate = 100 / 600
+-- Battery drain rate: 100up / 1200 seconds = ~0.083up per second (20 minutes per full battery)
+SWEP.DrainRate = 100 / 1200
 
 -- Register our net string for server-authoritative control
 if SERVER then

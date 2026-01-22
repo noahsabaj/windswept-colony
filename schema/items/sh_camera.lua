@@ -12,7 +12,7 @@
 ITEM.name = "Camera"
 ITEM.description = "A camera for taking photographs. Requires battery and film."
 ITEM.model = "models/weapons/infra/w_camera.mdl"
-ITEM.width = 1
+ITEM.width = 2
 ITEM.height = 2
 ITEM.category = "Equipment"
 ITEM.noBusiness = true
