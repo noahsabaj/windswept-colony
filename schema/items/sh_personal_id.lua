@@ -10,16 +10,17 @@
 ]]--
 
 ITEM.name = "Personal ID"
-ITEM.model = Model("models/props_c17/paper01.mdl")
+ITEM.model = Model("models/weapons/helios/id_cards/w_idcard.mdl")
 ITEM.description = "A colonial identification card."
 ITEM.width = 1
 ITEM.height = 1
 ITEM.category = "Documents"
 ITEM.noBusiness = true -- Cannot be purchased, given on character creation
 
--- Register network string for showing ID to other players
+-- ID Card models: https://steamcommunity.com/sharedfiles/filedetails/?id=2179653848
 if SERVER then
     util.AddNetworkString("ixShowPersonalID")
+    resource.AddWorkshop("2179653848")
 end
 
 -- Build the data table for the ID card UI
@@ -144,100 +145,138 @@ function ITEM:GetDescription()
     return table.concat(lines, "\n")
 end
 
--- View your own ID card
-ITEM.functions.View = {
-    name = "View",
-    icon = "icon16/magnifier.png",
-    OnRun = function(itemTable)
-        -- This runs on server, we need to tell client to open UI
-        return false -- Don't consume
-    end,
-    OnClick = function(itemTable)
-        -- Client-side: open the ID card UI
-        local data = itemTable:GetIDCardData()
+-- ============================================================================
+-- CLIENT VISUALS
+-- ============================================================================
 
-        -- Remove any existing self-view ID card
-        if IsValid(ix.gui.selfIDCard) then
-            ix.gui.selfIDCard:Remove()
+if CLIENT then
+    function ITEM:PaintOver(item, w, h)
+        local isEquipped = item:GetData("equipped")
+
+        -- Draw equipped indicator (green dot)
+        if isEquipped then
+            surface.SetDrawColor(110, 255, 110, 200)
+            surface.DrawRect(w - 14, h - 14, 8, 8)
+        end
+    end
+end
+
+-- ============================================================================
+-- ITEM FUNCTIONS - EQUIP/UNEQUIP
+-- ============================================================================
+
+ITEM.functions.Equip = {
+    name = "Equip",
+    tip = "Hold the ID card in your hand.",
+    icon = "icon16/vcard.png",
+    OnRun = function(item)
+        local client = item.player
+
+        -- Unequip any existing ID card from this player
+        if client.ixPersonalIDItem and client.ixPersonalIDItem ~= item then
+            local oldItem = client.ixPersonalIDItem
+            oldItem:SetData("equipped", nil)
         end
 
-        local card = vgui.Create("ixPersonalIDCard")
-        card:SetData(data)
-        card:SetSelfViewMode()
+        -- Strip existing ID SWEP if any
+        if client:HasWeapon("ix_personalid") then
+            client:StripWeapon("ix_personalid")
+        end
 
-        ix.gui.selfIDCard = card
+        -- Give the SWEP
+        local weapon = client:Give("ix_personalid")
+        if IsValid(weapon) then
+            weapon.ixItem = item
+            client:SelectWeapon("ix_personalid")
+        end
 
-        return false -- Don't send to server
+        client.ixPersonalIDItem = item
+        item:SetData("equipped", true)
+
+        client:EmitSound("physics/cardboard/cardboard_box_impact_soft1.wav", 50)
+
+        return false
     end,
-    OnCanRun = function(itemTable)
-        return !IsValid(itemTable.entity) -- Only from inventory
+    OnCanRun = function(item)
+        if IsValid(item.entity) then return false end
+        if item:GetData("equipped") then return false end
+        return true
     end
 }
 
--- Show ID to player in front of you
-ITEM.functions.ShowForward = {
-    name = "Show Forward",
-    icon = "icon16/user.png",
-    OnRun = function(itemTable)
-        local client = itemTable.player
-        local physical = itemTable:GetData("physical", {})
+ITEM.functions.Unequip = {
+    name = "Unequip",
+    tip = "Put the ID card away.",
+    icon = "icon16/cross.png",
+    OnRun = function(item)
+        local client = item.player
 
-        -- Trace to find player in front
-        local traceData = {
-            start = client:GetShootPos(),
-            endpos = client:GetShootPos() + client:GetAimVector() * 128,
-            filter = client
-        }
-        local target = util.TraceLine(traceData).Entity
-
-        if IsValid(target) and target:IsPlayer() then
-            -- Determine sex from model
-            local sex = "M"
-            if physical.model and ix.physical.IsFemaleModel(physical.model) then
-                sex = "F"
-            end
-
-            -- Format date of birth
-            local dob = "Unknown"
-            if physical.birthMonth and physical.birthDay and physical.age then
-                dob = ix.birthdata.FormatDate(physical.birthMonth, physical.birthDay, physical.age)
-            end
-
-            -- Build data table for network
-            local data = {
-                ownerName = itemTable:GetData("ownerName", "Unknown"),
-                id = itemTable:GetData("id", "00000"),
-                model = physical.model,
-                skin = physical.skin or 0,
-                bodygroups = physical.bodygroups,
-                sex = sex,
-                dob = dob,
-                birthLocation = physical.birthLocation or "Unspecified",
-                age = physical.age,
-                height = physical.height,
-                weight = physical.weight,
-                build = physical.build,
-                eyeColor = physical.eyeColor,
-                hairColor = physical.hairColor,
-                hairType = physical.hairType,
-                hairLength = physical.hairLength,
-                skinTone = physical.skinTone
-            }
-
-            -- Send to target player
-            net.Start("ixShowPersonalID")
-                net.WriteTable(data)
-            net.Send(target)
-
-            -- Notify the player who showed the ID
-            client:NotifyLocalized("idCardShown", target:Name())
-        else
-            client:NotifyLocalized("idCardNotValid")
+        if client:HasWeapon("ix_personalid") then
+            client:StripWeapon("ix_personalid")
         end
 
-        return false -- Don't consume the item
+        client.ixPersonalIDItem = nil
+        item:SetData("equipped", nil)
+
+        client:EmitSound("physics/cardboard/cardboard_box_impact_soft1.wav", 50, 90)
+
+        return false
     end,
-    OnCanRun = function(itemTable)
-        return !IsValid(itemTable.entity) -- Only from inventory
+    OnCanRun = function(item)
+        return item:GetData("equipped") == true
     end
 }
+
+-- ============================================================================
+-- HOOKS
+-- ============================================================================
+
+function ITEM.postHooks.drop(item, result)
+    if item:GetData("equipped") then
+        local client = item:GetOwner()
+        if IsValid(client) then
+            if client:HasWeapon("ix_personalid") then
+                client:StripWeapon("ix_personalid")
+            end
+            client.ixPersonalIDItem = nil
+        end
+        item:SetData("equipped", nil)
+    end
+end
+
+function ITEM:OnTransferred(oldInventory, newInventory)
+    if self:GetData("equipped") then
+        local oldOwner = oldInventory and oldInventory.GetOwner and oldInventory:GetOwner()
+        if IsValid(oldOwner) then
+            if oldOwner:HasWeapon("ix_personalid") then
+                oldOwner:StripWeapon("ix_personalid")
+            end
+            oldOwner.ixPersonalIDItem = nil
+        end
+        self:SetData("equipped", nil)
+    end
+end
+
+function ITEM:CanTransfer(oldInventory, newInventory)
+    if newInventory and self:GetData("equipped") then
+        local owner = self:GetOwner()
+        if IsValid(owner) then
+            owner:NotifyLocalized("idCardEquipped")
+        end
+        return false
+    end
+    return true
+end
+
+function ITEM:OnLoadout()
+    if self:GetData("equipped") then
+        local client = self.player
+        if not IsValid(client) then return end
+
+        local weapon = client:Give("ix_personalid", true)
+        if IsValid(weapon) then
+            weapon.ixItem = self
+            client.ixPersonalIDItem = self
+        end
+    end
+end
