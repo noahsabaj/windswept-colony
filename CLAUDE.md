@@ -1,4 +1,7 @@
 - CEG: Confederation of Earthly Governments.
+- EEC: Eagle Extraction Conglomerate (the owners of the mine in this colony, Redrock City)
+
+- The reason this colony exists is due to the massive reserves of pure carbon underneath the surface. The EEC operates a massive mine-colony here, exporting high-grade carbon from this colony to be used by humanity elsewhere (the solar system, other colonized locations). Like how Cuba was a massive sugar colony for Europe and America, Redrock City and Zephyrus (the planet we are on) is a massive coal mining colony for the human market.
 
 - Currency: CEG Dollar ($ Dollar, $ CEG Dollar).
 
@@ -41,3 +44,5 @@
 - Nothing is 100% certain, ever. This is another principle of good SeriousRP.
 
 - Always be Helix-idiomatic. Before implementing any feature, check if Helix already provides it or has an established pattern for it. Read the framework source code in helix/gamemode/core/ to understand how things are done. For example, when we created custom character creation panels, we initially added our own labels and height logic, but Helix already auto-creates labels above OnDisplay panels and uses font-based height sizing (see ixTextEntry and ixNumSlider in cl_generic.lua). Following existing patterns avoids bugs and keeps code consistent.
+
+- All characters are created as Civilians (the default faction). Personal IDs are given only during Civilian character creation because every character starts there. Players join other factions (Medical, Security, Corrections, etc.) through in-game faction transfers after their character exists - no one is created directly into a non-Civilian faction.
