@@ -1,0 +1,391 @@
+--[[
+    Lantern SWEP
+
+    Controls:
+    - LMB: Toggle light on/off
+    - RMB: Place lantern on ground (creates world entity)
+
+    Battery drain: ~0.167up per second (10 minutes per full battery)
+
+    Model: https://steamcommunity.com/sharedfiles/filedetails/?id=3354246770
+]]--
+
+AddCSLuaFile()
+
+SWEP.PrintName = "Lantern"
+SWEP.Author = "Windswept"
+SWEP.Purpose = "Portable ambient light source."
+SWEP.Instructions = "LMB: Toggle light | RMB: Place on ground"
+
+SWEP.Spawnable = false
+SWEP.Drop = false
+
+SWEP.ViewModelFOV = 85
+SWEP.ViewModel = "models/weapons/cof/v_lantern.mdl"
+SWEP.WorldModel = "models/weapons/cof/w_lantern.mdl"
+SWEP.UseHands = false -- This viewmodel has arms baked in
+SWEP.HoldType = "pistol"
+
+SWEP.Primary.ClipSize = -1
+SWEP.Primary.DefaultClip = -1
+SWEP.Primary.Automatic = false
+SWEP.Primary.Ammo = ""
+
+SWEP.Secondary.ClipSize = -1
+SWEP.Secondary.DefaultClip = -1
+SWEP.Secondary.Automatic = false
+SWEP.Secondary.Ammo = ""
+
+SWEP.DrawAmmo = false
+SWEP.DrawCrosshair = false
+
+-- Battery drain rate: 100up / 600 seconds = ~0.167up per second
+SWEP.DrainRate = 100 / 600
+
+-- Light properties (bluish-white like the original addon)
+SWEP.LightColor = Color(170, 240, 250)
+SWEP.LightBrightness = 0.05
+SWEP.LightSize = 430
+SWEP.LightStyle = 12 -- Flickering style
+
+-- Worldmodel positioning (from original addon)
+SWEP.Offset = {
+    Pos = {
+        Right = 1,
+        Forward = -1,
+        Up = -16,
+    },
+    Ang = {
+        Right = 0,
+        Forward = -5,
+        Up = 78,
+    },
+}
+
+-- ============================================================================
+-- NETWORKING
+-- ============================================================================
+
+if SERVER then
+    util.AddNetworkString("ixLanternSetLight")
+    util.AddNetworkString("ixLanternPlace")
+end
+
+-- ============================================================================
+-- DATA TABLES
+-- ============================================================================
+
+function SWEP:SetupDataTables()
+    self:NetworkVar("Bool", 0, "LanternOn")
+    self:SetLanternOn(false)
+end
+
+-- ============================================================================
+-- INITIALIZATION
+-- ============================================================================
+
+function SWEP:Initialize()
+    self:SetHoldType(self.HoldType)
+end
+
+function SWEP:Deploy()
+    self:SetHoldType(self.HoldType)
+    self:SendWeaponAnim(ACT_VM_DRAW)
+    self:EmitSound("weapons/cof/sleeve_generic" .. math.random(1, 3) .. ".wav")
+
+    return true
+end
+
+function SWEP:Holster()
+    if SERVER then
+        self:SetLanternOn(false)
+    end
+
+    return true
+end
+
+function SWEP:OnRemove()
+    -- Light cleanup handled automatically by DynamicLight DieTime
+end
+
+-- ============================================================================
+-- LIGHT MANAGEMENT (CLIENT)
+-- ============================================================================
+
+if CLIENT then
+    function SWEP:UpdateLight()
+        if not self:GetLanternOn() then return end
+
+        local owner = self:GetOwner()
+        if not IsValid(owner) then return end
+
+        local bone = owner:LookupBone("ValveBiped.Bip01_Spine4")
+        if not bone then return end
+
+        local pos = owner:GetBonePosition(bone)
+
+        local dlight = DynamicLight(self:EntIndex())
+        if dlight then
+            dlight.Pos = pos
+            dlight.r = self.LightColor.r
+            dlight.g = self.LightColor.g
+            dlight.b = self.LightColor.b
+            dlight.Brightness = self.LightBrightness
+            dlight.Size = self.LightSize
+            dlight.DieTime = CurTime() + 0.1
+            dlight.Style = self.LightStyle
+            dlight.nomodel = true
+        end
+    end
+end
+
+-- ============================================================================
+-- TOGGLE LIGHT
+-- ============================================================================
+
+function SWEP:SetLight(value)
+    if CLIENT then
+        -- Request server
+        net.Start("ixLanternSetLight")
+        net.WriteBool(value)
+        net.SendToServer()
+        return
+    end
+
+    -- SERVER
+    if value then
+        -- Check battery
+        local item = self.ixItem
+        if not item then
+            self:GetOwner():NotifyLocalized("lanternNoBattery")
+            return
+        end
+
+        local batteries = item:GetData("batteries", {})
+        if #batteries == 0 then
+            self:GetOwner():NotifyLocalized("lanternNoBattery")
+            return
+        end
+
+        if batteries[1] <= 0 then
+            self:GetOwner():NotifyLocalized("lanternNoCharge")
+            return
+        end
+    end
+
+    self:SetLanternOn(value)
+    self:GetOwner():EmitSound(value and "buttons/lightswitch2.wav" or "buttons/lightswitch2.wav", 50, value and 100 or 90)
+end
+
+if SERVER then
+    net.Receive("ixLanternSetLight", function(len, ply)
+        local weapon = ply:GetWeapon("ix_lantern")
+        if not IsValid(weapon) then return end
+        if weapon.ratelimit and weapon.ratelimit > CurTime() then return end
+
+        local value = net.ReadBool()
+        weapon:SetLight(value)
+        weapon.ratelimit = CurTime() + 0.2
+    end)
+end
+
+-- ============================================================================
+-- PRIMARY ATTACK - Toggle Light (Click)
+-- ============================================================================
+
+function SWEP:PrimaryAttack()
+    self:SetNextPrimaryFire(CurTime() + 0.3)
+
+    -- PrimaryAttack only runs on SERVER in Helix
+    if SERVER then
+        self:SetLight(not self:GetLanternOn())
+    end
+end
+
+-- ============================================================================
+-- SECONDARY ATTACK - Place Lantern (Hold RMB for 0.5s)
+-- ============================================================================
+
+function SWEP:SecondaryAttack()
+    -- Handled in Think() for hold detection
+end
+
+if SERVER then
+    net.Receive("ixLanternPlace", function(len, ply)
+        local weapon = ply:GetWeapon("ix_lantern")
+        if not IsValid(weapon) then return end
+
+        weapon:PlaceLantern()
+    end)
+
+    function SWEP:PlaceLantern()
+        local owner = self:GetOwner()
+        if not IsValid(owner) then return end
+
+        -- Trace to find placement position
+        local tr = util.TraceLine({
+            start = owner:GetShootPos(),
+            endpos = owner:GetShootPos() + owner:GetAimVector() * 100,
+            filter = owner
+        })
+
+        if not tr.Hit then
+            owner:NotifyLocalized("lanternCantPlace")
+            return
+        end
+
+        -- Get item data
+        local item = self.ixItem
+        if not item then return end
+
+        local batteries = item:GetData("batteries", {})
+        local charge = batteries[1] or 0
+        local wasOn = self:GetLanternOn()
+
+        -- Create world entity (using distinct name to avoid conflict with weapon class)
+        local ent = ents.Create("ix_lantern_dropped")
+        if not IsValid(ent) then return end
+
+        ent:SetPos(tr.HitPos + tr.HitNormal * 2)
+        ent:SetAngles(Angle(0, owner:EyeAngles().y, 0))
+        ent:Spawn()
+        ent:Activate()
+
+        -- Transfer state
+        ent:SetBatteryCharge(charge)
+        ent:SetLanternOn(wasOn)
+        ent.OwnerPlayer = owner
+
+        -- Remove item from inventory
+        local character = owner:GetCharacter()
+        if character then
+            local inventory = character:GetInventory()
+            if inventory then
+                inventory:Remove(item:GetID())
+            end
+        end
+
+        -- Strip weapon
+        owner:StripWeapon("ix_lantern")
+        owner.ixLanternItem = nil
+
+        owner:EmitSound("weapons/slam/throw.wav", 60)
+    end
+end
+
+-- ============================================================================
+-- THINK - Battery Drain, Light Update & RMB Hold Detection
+-- ============================================================================
+
+function SWEP:Think()
+    if CLIENT then
+        self:UpdateLight()
+
+        -- RMB hold detection for placement
+        local owner = self:GetOwner()
+        if IsValid(owner) then
+            local rmbDown = input.IsMouseDown(MOUSE_RIGHT)
+
+            if rmbDown then
+                if not self.rmbStartTime then
+                    self.rmbStartTime = CurTime()
+                elseif CurTime() - self.rmbStartTime >= 0.5 then
+                    -- Held for 0.5 seconds - place lantern
+                    self.rmbStartTime = nil
+                    net.Start("ixLanternPlace")
+                    net.SendToServer()
+                end
+            else
+                self.rmbStartTime = nil
+            end
+        end
+
+        return
+    end
+
+    -- SERVER: Battery drain
+    if not self:GetLanternOn() then return end
+
+    self.drainAccumulator = (self.drainAccumulator or 0) + FrameTime()
+    if self.drainAccumulator < 1 then return end
+    self.drainAccumulator = self.drainAccumulator - 1
+
+    local item = self.ixItem
+    if not item then
+        self:SetLanternOn(false)
+        return
+    end
+
+    local batteries = item:GetData("batteries", {})
+    if #batteries == 0 then
+        self:SetLanternOn(false)
+        return
+    end
+
+    batteries[1] = batteries[1] - self.DrainRate
+    if batteries[1] <= 0 then
+        batteries[1] = 0
+        item:SetData("batteries", batteries)
+        self:SetLanternOn(false)
+        self:GetOwner():NotifyLocalized("lanternBatteryDead")
+
+        local owner = self:GetOwner()
+        if ix.option.Get(owner, "batteryAutoEject", true) then
+            item:AutoEjectDepleted(owner)
+        end
+        if ix.option.Get(owner, "batteryAutoLoad", true) then
+            item:AutoLoadFromInventory(owner)
+        end
+    else
+        item:SetData("batteries", batteries)
+    end
+end
+
+-- ============================================================================
+-- WORLD MODEL RENDERING (adapted from original addon)
+-- ============================================================================
+
+function SWEP:DrawWorldModel()
+    if not IsValid(self.Owner) then
+        return self:DrawModel()
+    end
+
+    self.Hand2 = self.Hand2 or self.Owner:LookupAttachment("anim_attachment_rh")
+
+    local hand = self.Owner:GetAttachment(self.Hand2)
+
+    if not hand then
+        return self:DrawModel()
+    end
+
+    local offset = hand.Ang:Right() * self.Offset.Pos.Right +
+                   hand.Ang:Forward() * self.Offset.Pos.Forward +
+                   hand.Ang:Up() * self.Offset.Pos.Up
+
+    hand.Ang:RotateAroundAxis(hand.Ang:Right(), self.Offset.Ang.Right)
+    hand.Ang:RotateAroundAxis(hand.Ang:Forward(), self.Offset.Ang.Forward)
+    hand.Ang:RotateAroundAxis(hand.Ang:Up(), self.Offset.Ang.Up)
+
+    self:SetRenderOrigin(hand.Pos + offset)
+    self:SetRenderAngles(hand.Ang)
+
+    self:DrawModel()
+end
+
+-- ============================================================================
+-- HOOKS - Turn Off Light on Death/Knockout
+-- ============================================================================
+
+hook.Add("PlayerDeath", "ixLanternDeath", function(client)
+    local weapon = client:GetWeapon("ix_lantern")
+    if IsValid(weapon) and weapon.SetLight then
+        weapon:SetLight(false)
+    end
+end)
+
+hook.Add("ixPlayerKnockedOut", "ixLanternKnockout", function(client)
+    local weapon = client:GetWeapon("ix_lantern")
+    if IsValid(weapon) and weapon.SetLight then
+        weapon:SetLight(false)
+    end
+end)

@@ -126,6 +126,18 @@ LANGUAGE = {
     ladderEquipped = "You must unequip the ladder first.",
     ladderNoRoom = "No room in inventory for the ladder.",
 
+    -- Lantern
+    lanternEquipped = "You must unequip the lantern first.",
+    lanternNoRoom = "No room in inventory for the lantern.",
+    lanternNoBattery = "No battery inserted.",
+    lanternNoCharge = "Battery has no charge.",
+    lanternBatteryDead = "Battery depleted.",
+    lanternBatteryLoaded = "Battery loaded (%dup).",
+    lanternBatteryEjected = "Battery ejected.",
+    lanternAutoLoaded = "Auto-loaded battery (%dup).",
+    lanternSlotFull = "The lantern already has a battery loaded.",
+    lanternCantPlace = "Can't place lantern here.",
+
     -- Description Editing
     descEditDisabled = "Physical descriptions cannot be manually edited.",
 }
