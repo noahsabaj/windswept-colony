@@ -16,13 +16,8 @@ function Schema:AdjustCreationPayload(client, payload, newPayload)
     local facialHair = payload.physFacialHair or "None"
 
     -- Get the model path for gender detection
-    local faction = ix.faction.indices[payload.faction]
-    local modelPath = nil
-    if faction then
-        local models = faction:GetModels(client)
-        local model = models[payload.model or 1]
-        modelPath = istable(model) and model[1] or model
-    end
+    -- Helix's model OnAdjust already sets newPayload.model to the actual path
+    local modelPath = newPayload.model
 
     -- Calculate build from height and weight
     local build, bmi = ix.physical.CalculateBuild(height, weight)
