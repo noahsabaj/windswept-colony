@@ -40,6 +40,9 @@ FACTION.models = {
     "models/player/group01/female_06.mdl"
 }
 
+-- Pay for civilians (if using salary system)
+FACTION.pay = 0
+
 -- Called when a player creates a character in this faction
 function FACTION:OnCharacterCreated(client, character)
     -- Generate a unique 5-digit ID number
@@ -51,6 +54,7 @@ function FACTION:OnCharacterCreated(client, character)
 
     -- Get physical data stored during character creation
     local physical = character:GetData("physical", {})
+    print("[Civilians] OnCharacterCreated - physical.model: " .. tostring(physical.model))
 
     -- Give them their Personal ID card with physical attributes
     inventory:Add("personal_id", 1, {
