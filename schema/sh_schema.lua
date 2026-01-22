@@ -1,65 +1,3 @@
---[[
-    Redrock City RP
-    
-    SETTING:
-    The year is 2200. After humanity settled Venus in 2089, Earth's governments
-    unified into the Confederation of Earthly Governments (CEG). The CEG licenses
-    uninhabited planets to mining corporations for resource extraction.
-    
-    Redrock is one such planet - a hostile world where planet-wide windstorms
-    blast the surface, and radiation makes surface life impossible.
-    Humanity survives in underground cities and deep ravines.
-    
-    Eagle Extraction Conglomerate (EEC) holds the mining license. They appointed
-    a Head Foreman to oversee operations. But the CEG mandates democratic
-    governance for civilian protection - requiring elected positions for Governor,
-    Commissioner, and Union President.
-    
-    ECONOMY:
-    All money comes from carbon ore sales. Miners dig, trucks haul to surface,
-    cargo barges sell off-world. 70% goes to EEC (wages, equipment, corporate).
-    30% goes to Planetary Colonial Administration (Governor's budget, Security).
-    
-    POWER STRUCTURE:
-    
-    THE CONFEDERATION (Server Owner - Invisible)
-        │
-        ├── Licenses the planet, protects union rights
-        ├── Can oust any official (nuclear option)
-        └── Appoints the Head Foreman
-                │
-    ════════════╪════════════════════════════════════════
-                │
-        HEAD FOREMAN (Appointed, Termless)
-        Representative of Eagle Extraction Conglomerate
-        Controls 70% - pays wages, runs payroll
-                │
-                │ ...but will they obey?
-                ▼
-    ┌───────────────────────────────────────────────────┐
-    │              REDROCK CITY                         │
-    │                                                   │
-    │   GOVERNOR ◄────► COMMISSIONER ◄────► UNION       │
-    │   (Elected)       (Elected)       PRESIDENT       │
-    │   3 weeks         3 weeks         (Elected)       │
-    │                                   3 weeks         │
-    │   Controls 30%    Funded by       (union only)    │
-    │   colonial budget Governor                        │
-    │                                                   │
-    │   Appoints:       Appoints:       Appoints:       │
-    │   - Lt. Governor  - Deputies      - Vice Pres     │
-    │   - Judge         - Sergeants     - Secretary     │
-    │   - Quartermaster - Officers      - Treasurer     │
-    │                                   - Enforcers     │
-    └───────────────────────────────────────────────────┘
-                        ▲
-                        │
-                   CIVILIANS
-                 (Default Faction)
-              They vote. They labor.
-              They spend kegs.
-]]--
-
 Schema.name = "Redrock City RP"
 Schema.author = "kwabaj"
 Schema.description = "A serious roleplay experience on the mining colony of Redrock."
@@ -89,7 +27,7 @@ Schema.economy.adminCut = 0.30  -- 30% to Colonial Administration
 Schema.elections = Schema.elections or {}
 Schema.elections.termLength = 3 -- weeks
 Schema.elections.positions = {
-    "Governor",
+    "Mayor",
     "Commissioner",
     "Union President"
 }
