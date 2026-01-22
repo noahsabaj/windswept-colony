@@ -121,6 +121,10 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 
 - **Inventory sync overflow**: Storing >10KB in item data via `item:SetData()` causes "Trying to send an overflowed net message" during inventory sync. Fix: File-based storage in `data/` folder, store only ID reference in item.
 
+- **item:GetInventory() doesn't exist**: Helix items don't have a direct `GetInventory()` method. To get an item's inventory, go through the owner: `client:GetCharacter():GetInventory()`.
+
+- **WeaponEquip hook fires during Give()**: When calling `client:Give("weapon_class")`, the `WeaponEquip` hook fires immediately during that call, not after. If you're tracking equipped items with variables like `client.ixItem = item`, set them BEFORE `Give()`, not after, or the hook won't see them.
+
 ### SWEP/Weapon Development
 
 - **SWEP:CreateMove() doesn't exist**: Not a valid SWEP method. Use `hook.Add("CreateMove", ...)` globally and check `LocalPlayer():GetActiveWeapon()` inside.
@@ -130,6 +134,10 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 - **SWEP:Think() runs on both realms**: Server has no input context, so `owner:KeyDown()` returns false server-side, causing state flicker. Wrap all input logic in `if CLIENT then`.
 
 - **c_model vs v_model for UseHands**: GMod's `SWEP.UseHands = true` requires a c_model (weapon only, no arms). v_models have arms baked in and won't work with dynamic hands. Use `models/weapons/xxx/c_weapon.mdl` not `v_weapon.mdl`.
+
+- **SWEP properties don't network to client**: Setting `weapon.ixItem = item` on SERVER doesn't make it available on CLIENT. The client's SWEP copy has no knowledge of server-set properties. Fix: Client must find the data another way - look up equipped item from inventory, use networked vars, or send via net message.
+
+- **Worldmodel not visible in third person**: Some workshop models (especially small props like ID cards) lack proper SWEP worldmodel bone attachments. The model exists but won't render on the player's hand. Fix: Override `DrawWorldModel()` on CLIENT to manually position using `owner:LookupBone("ValveBiped.Bip01_R_Hand")` and `GetBoneMatrix()`, then offset with `ang:Forward()/Right()/Up()` and rotate with `RotateAroundAxis()`. See ix_personalid.lua for working example.
 
 ### GMod Networking
 
