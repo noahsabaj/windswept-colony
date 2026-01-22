@@ -4,13 +4,13 @@ rich in known Carbon reserves just underneath the surface of the planet.
 
 - EEC: Eagle Extraction Conglomerate (the owners of the mine in this colony, Redrock City)
 
-- The reason this colony exists is due to the massive reserves of pure carbon underneath the surface. The EEC operates a massive mine-colony here, exporting high-grade carbon from this colony to be used by humanity elsewhere (the solar system, other colonized locations). Like how Cuba was a massive sugar colony for Europe and America, Redrock City and Zephyrus (the planet we are on) is a massive coal mining colony for the human market. The EEC owns all the mines and has an agreement with the Miners Union that, officially, only union members are allowed access to the mines, meaning only union members (members of the CMU-RC, Carbon Miners Union-Redrock City) are allowed to extract the carbon, reaping the benefit for them and the union.
+- The reason this colony exists is due to the massive reserves of pure carbon underneath the surface. The EEC operates a massive mine-colony here, exporting high-grade carbon from this colony to be used by humanity elsewhere (the solar system, other colonized locations). Like how Cuba was a massive sugar colony for Europe and America, Redrock City is a massive carbon mining colony for the human market. The EEC owns all the mines and has an agreement with the Miners Union that, officially, only union members are allowed access to the mines, meaning only union members (members of the CMU-RC, Carbon Miners Union-Redrock City) are allowed to extract the carbon, reaping the benefit for them and the union.
 
-- Currency: CEG Dollar ($ Dollar, $ CEG Dollar).
+- Currency: CEG Dollar, written as "$50" or "50 dollars". The dollar is the standard currency used throughout CEG-controlled space.
 
 - D:\SteamLibrary\steamapps\common\GarrysMod\garrysmod\gamemodes\helix is the path for the framework that we are using to build this, it's locally cloned so we can edit it however we want. If you ever need to read the source code of the framework, just go to that path and all the source code is there for you to read and adjust however we want. It is MIT License.
 
-- D:\SteamLibrary\steamapps\common\GarrysMod\garrysmod\gamemodes\helix-hl2rp is the path for a fully implemented half life 2 RP gamemode in garrys mod using the helix framework. We can reverse engineer it however we want, it is a great imnplementation example and you can read its source code. It is MIT License.
+- D:\SteamLibrary\steamapps\common\GarrysMod\garrysmod\gamemodes\helix-hl2rp is the path for a fully implemented Half-Life 2 RP gamemode in Garry's Mod using the Helix framework. We can reverse engineer it however we want, it is a great implementation example and you can read its source code. It is MIT License.
 
 - Windswept is the name of the map that we will use.
 
@@ -49,3 +49,7 @@ rich in known Carbon reserves just underneath the surface of the planet.
 - Always be Helix-idiomatic. Before implementing any feature, check if Helix already provides it or has an established pattern for it. Read the framework source code in helix/gamemode/core/ to understand how things are done. For example, when we created custom character creation panels, we initially added our own labels and height logic, but Helix already auto-creates labels above OnDisplay panels and uses font-based height sizing (see ixTextEntry and ixNumSlider in cl_generic.lua). Following existing patterns avoids bugs and keeps code consistent.
 
 - All characters are created as Civilians (the default faction). Personal IDs are given only during Civilian character creation because every character starts there. Players join other factions (Medical, Security, Corrections, etc.) through in-game faction transfers after their character exists - no one is created directly into a non-Civilian faction.
+
+- Missing library include problem: Helix does NOT auto-include files in schema/libs/ - they must be explicitly added to sh_schema.lua via ix.util.Include(). If a library file exists but isn't included, its functions will be undefined and calls will silently return nil. Fix: Always add ix.util.Include("libs/your_file.lua") to sh_schema.lua for every lib file you create. Example: sh_physical.lua existed but wasn't included, so ix.physical.IsFemaleModel() returned nil, causing all sex checks to default to "M".
+
+- Helix hook data flow: In character creation hooks like AdjustCreationPayload, Helix's built-in OnAdjust functions run BEFORE your hook and populate newPayload with processed values. Don't re-derive values that Helix already computed - use them from newPayload instead. Example: payload.model contains the model INDEX (e.g., 10), but Helix's model OnAdjust already converts this to the actual path and stores it in newPayload.model (e.g., "models/player/group01/female_04.mdl"). We were manually looking up models[payload.model] when newPayload.model already had the correct path.
