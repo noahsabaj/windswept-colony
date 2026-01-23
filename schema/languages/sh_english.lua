@@ -140,4 +140,8 @@ LANGUAGE = {
 
     -- Description Editing
     descEditDisabled = "Physical descriptions cannot be manually edited.",
+
+    -- Weapons/Ammo
+    noAmmoToLoad = "You don't have any ammunition to load.",
+    mustHoldWeapon = "You must be holding the weapon to load it.",
 }
