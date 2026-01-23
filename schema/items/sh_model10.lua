@@ -6,7 +6,7 @@
 
 ITEM.base = "base_weapons"
 ITEM.name = "Model 10"
-ITEM.description = "A Smith & Wesson .38 caliber revolver. Standard issue sidearm for the Redrock City Security Department."
+ITEM.description = "A Smith & Wesson .38 caliber revolver."
 ITEM.model = Model("models/tfa_ins2_wpns/38revolver/w_38rev.mdl")
 ITEM.class = "tfa_ins2_wpn_38revolver"
 ITEM.weaponCategory = "sidearm"

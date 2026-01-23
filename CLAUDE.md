@@ -127,6 +127,8 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 
 ### SWEP/Weapon Development
 
+- **Item-only vs Item+SWEP**: If using an existing weapon class (TFA, HL2, CSS), the item just needs `ITEM.base = "base_weapons"` and `ITEM.class = "tfa_ins2_wpn_38revolver"` - no custom SWEP file needed. Only create a custom SWEP (`entities/weapons/ix_*.lua`) when you need custom behavior (battery drain, special actions, etc.). Examples: Model 10 revolver uses TFA's class directly (item only); flashlight/camera need custom battery logic (item + SWEP).
+
 - **SWEP:CreateMove() doesn't exist**: Not a valid SWEP method. Use `hook.Add("CreateMove", ...)` globally and check `LocalPlayer():GetActiveWeapon()` inside.
 
 - **PrimaryAttack/SecondaryAttack are SERVER-only in Helix**: Helix only calls these on SERVER. For client-side input, detect in Think() using `input.IsMouseDown()` with edge detection (`self.wasLMBDown`).
