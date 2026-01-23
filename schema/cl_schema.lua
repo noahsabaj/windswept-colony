@@ -8,12 +8,11 @@
 
 -- Receive frequency dialog request from server
 netstream.Hook("ixRadioFrequency", function(currentFreq)
-    Derma_StringRequest(
-        "Set Frequency",
-        "Enter frequency (format: ###.#)",
-        currentFreq,
-        function(text)
-            ix.command.Send("SetFreq", text)
-        end
-    )
+    -- Remove existing panel if open
+    if IsValid(ix.gui.radioFrequency) then
+        ix.gui.radioFrequency:Remove()
+    end
+
+    ix.gui.radioFrequency = vgui.Create("ixRadioFrequency")
+    ix.gui.radioFrequency:SetFrequency(currentFreq)
 end)

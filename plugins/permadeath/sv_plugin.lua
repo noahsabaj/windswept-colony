@@ -196,7 +196,7 @@ function PLUGIN:CreateKnockout(client, character, dmgInfo)
 
         if not protected[class] and activeWeapon.ixItem then
             local item = activeWeapon.ixItem
-            item:SetData("equipped", nil)
+            item:SetData("equip", nil)  -- base_weapons uses "equip", not "equipped"
             local dropPos = client:GetPos() + Vector(0, 0, 10)
             item:Transfer(nil, nil, nil, client, dropPos)
         end

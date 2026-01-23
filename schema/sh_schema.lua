@@ -50,7 +50,7 @@ ix.util.Include("sh_options.lua")
 do
     local CLASS = {}
     CLASS.color = Color(75, 150, 50)  -- Green
-    CLASS.format = "%s radios in \"%s\""
+    CLASS.format = "%s radios in: \"%s\""
 
     function CLASS:CanHear(speaker, listener)
         local listenerChar = listener:GetCharacter()
@@ -76,8 +76,11 @@ do
         return false
     end
 
+    -- Custom OnChatAdd: pass nil chatType so unrecognized speakers show as "Unknown"
+    -- (passing a chatType would show their physical description, which makes no sense over radio)
     function CLASS:OnChatAdd(speaker, text)
-        chat.AddText(self.color, string.format(self.format, speaker:Name(), text))
+        local name = hook.Run("GetCharacterName", speaker) or speaker:Name()
+        chat.AddText(self.color, string.format(self.format, name, text))
     end
 
     ix.chat.Register("radio", CLASS)
@@ -87,7 +90,7 @@ end
 do
     local CLASS = {}
     CLASS.color = Color(255, 255, 175)  -- Yellow
-    CLASS.format = "%s radios in \"%s\""
+    CLASS.format = "%s radios in: \"%s\""
 
     function CLASS:GetColor(speaker, text)
         if LocalPlayer():GetEyeTrace().Entity == speaker then
@@ -107,8 +110,10 @@ do
         return (speaker:GetPos() - listener:GetPos()):LengthSqr() <= (chatRange * chatRange)
     end
 
+    -- Custom OnChatAdd: pass nil chatType so unrecognized speakers show as "Unknown"
     function CLASS:OnChatAdd(speaker, text)
-        chat.AddText(self.color, string.format(self.format, speaker:NameSDS(), text))
+        local name = hook.Run("GetCharacterName", speaker) or speaker:Name()
+        chat.AddText(self.color, string.format(self.format, name, text))
     end
 
     ix.chat.Register("radio_eavesdrop", CLASS)

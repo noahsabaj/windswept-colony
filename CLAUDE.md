@@ -113,6 +113,8 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 
 - **Hook data flow in character creation**: In hooks like `AdjustCreationPayload`, Helix's OnAdjust functions run BEFORE your hook and populate `newPayload` with processed values. Use `newPayload.model` (the path) not `payload.model` (the index).
 
+- **Weapon equip data key is "equip" not "equipped"**: The base_weapons item uses `item:GetData("equip")` and `item:SetData("equip", true/nil)`. Do NOT use `"equipped"` - that's a different key used by some custom items (like Personal ID). Using the wrong key causes `CanTransfer` to block operations with "You cannot move a weapon that is currently equipped!"
+
 - **HOOKS_CACHE execution order**: Helix hook execution order: (1) HOOKS_CACHE plugin hooks, (2) Schema hooks, (3) Regular hook.Add hooks. To run before a Helix plugin, inject into HOOKS_CACHE directly. See ix_camera.lua lines 220-265.
 
 - **ITEM.isBag auto-opens "View"**: When `ITEM.isBag = true`, Helix auto-calls the "View" function on inventory open. Rename custom viewers to something else (e.g., "Browse") and keep "View" for the standard bag panel.
@@ -178,3 +180,38 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 ### Code Organization
 
 - **Plugins vs schema folders**: Plugins are for **cohesive gameplay systems** (prisoner, permadeath) where related code lives together. General items and weapons that aren't part of a specific system go in `schema/items/` and `entities/weapons/`, not in their own plugin. Don't create a plugin just to hold one item.
+
+### Derma/UI Development
+
+- **NEVER hardcode pixel sizes**: Treat hardcoded pixel values like magic numbers in web dev - they don't scale across resolutions. Always derive sizes from font metrics or use `ScreenScale()`.
+
+- **Font-based sizing pattern**: Measure text to determine element dimensions:
+```lua
+surface.SetFont("ixBigFont")
+local textW, textH = surface.GetTextSize("0")
+local digitBoxSize = math.max(textW, textH) + ScreenScale(12)  -- Content + padding
+```
+
+- **ScreenScale() for padding/margins**: `ScreenScale(n)` scales a value based on screen resolution (1080p baseline). Use for all spacing:
+```lua
+self.padding = ScreenScale(8)
+self.buttonHeight = textHeight + ScreenScale(10)
+```
+
+- **Helix font reference**: `ixBigFont` = 36px, `ixMediumFont` = 25px, `ixSmallFont` = scales with `ScreenScale(6)` minimum 17px. Always use these for consistency.
+
+- **Calculate panel size from content**: Don't set arbitrary panel dimensions. Calculate based on what's inside:
+```lua
+local contentWidth = (elementSize * count) + (spacing * (count - 1))
+local panelWidth = contentWidth + (padding * 2)
+self:SetSize(panelWidth, calculatedHeight)
+```
+
+- **Button width from text**: Measure the longest button label, add padding:
+```lua
+surface.SetFont("ixSmallFont")
+local maxTextW = math.max(surface.GetTextSize("Cancel"), surface.GetTextSize("Confirm"))
+local buttonWidth = maxTextW + ScreenScale(10) * 2
+```
+
+- **Helix auto-includes `schema/derma/`**: Files in this folder are automatically loaded by the framework (via `ix.util.IncludeDir` in sh_plugin.lua). No manual includes needed.
