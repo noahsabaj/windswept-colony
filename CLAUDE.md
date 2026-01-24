@@ -26,6 +26,7 @@ windswept/
 │   │   ├── sh_birthdata.lua # Birth date/age system
 │   │   ├── sh_physical.lua  # Physical appearance system
 │   │   └── thirdparty/      # Third-party libs
+|   |       └── sh_netstream2.lua
 │   ├── languages/           # Localization
 │   └── meta/                # Metatable extensions
 ├── plugins/                 # Modular features
