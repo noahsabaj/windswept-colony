@@ -23,66 +23,25 @@ end
 -- ============================================================================
 
 function ENT:OnPopulateEntityInfo(tooltip)
-    -- Get character name (stored permanently on entity)
-    local name = self:GetCharacterName()
-    if not name or name == "" then
-        name = "Unknown"
-    end
-    local charID = self:GetCharacterID()
-
-    -- Title row with name
+    -- Title row (no name - fog of war, check their ID if you want to know who they are)
     local title = tooltip:AddRow("name")
     title:SetImportant()
 
     if self:GetPermadead() then
-        title:SetText(name .. " (Dead)")
+        title:SetText("[DEAD]")
         title:SetBackgroundColor(Color(139, 0, 0))
     else
-        title:SetText(name .. " (Knocked Out)")
+        title:SetText("[KNOCKED OUT]")
         title:SetBackgroundColor(Color(139, 69, 19))
     end
     title:SizeToContents()
-
-    -- Status info
-    if not self:GetPermadead() then
-        -- Check if this is our character (only owner sees timer)
-        local localChar = LocalPlayer():GetCharacter()
-        local isOwner = localChar and localChar:GetID() == charID
-
-        if isOwner then
-            -- Show timer to owner
-            local timerRow = tooltip:AddRow("timer")
-            timerRow:SetText("Time remaining: " .. self:GetFormattedTime())
-            timerRow:SizeToContents()
-        else
-            -- Others just see that they're knocked out
-            local statusRow = tooltip:AddRow("status")
-            statusRow:SetText("Unconscious - can be revived")
-            statusRow:SizeToContents()
-        end
-
-        -- Show if being revived
-        if self:IsBeingRevived() then
-            local reviverRow = tooltip:AddRow("reviver")
-            local reviver = self:GetCurrentReviver()
-            local reviverName = IsValid(reviver) and reviver:Name() or "Someone"
-            reviverRow:SetText(reviverName .. " is attempting revival...")
-            reviverRow:SetBackgroundColor(Color(50, 100, 50))
-            reviverRow:SizeToContents()
-        end
-    else
-        local deadRow = tooltip:AddRow("dead")
-        deadRow:SetText("This person has died.")
-        deadRow:SetBackgroundColor(Color(100, 0, 0))
-        deadRow:SizeToContents()
-    end
 
     -- Instructions
     local instructions = tooltip:AddRow("instructions")
     if self:GetPermadead() then
         instructions:SetText("E: Search body")
     else
-        instructions:SetText("E: Search | Hold E: Revive")
+        instructions:SetText("E: Search body | Hold E: Attempt CPR")
     end
     instructions:SizeToContents()
 end
@@ -133,31 +92,18 @@ hook.Add("HUDDrawTargetID", "ixKnockedTargetID", function()
     local pos = trace.Entity:GetPos():ToScreen()
     if not pos.visible then return end
 
-    -- Get name (stored permanently on entity)
-    local name = knockedEnt:GetCharacterName()
-    if not name or name == "" then
-        name = "Unknown"
-    end
-
-    -- Draw name
-    local text = knockedEnt:GetPermadead() and (name .. " [DEAD]") or (name .. " [KNOCKED OUT]")
+    -- Draw status (no name - fog of war, check their ID if you want to know who they are)
+    local text = knockedEnt:GetPermadead() and "[DEAD]" or "[KNOCKED OUT]"
     local color = knockedEnt:GetPermadead() and Color(200, 50, 50) or Color(200, 150, 50)
 
-    draw.SimpleTextOutlined(text, "ixMediumFont", pos.x, pos.y - 30, color, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+    draw.SimpleTextOutlined(text, "ixMediumFont", pos.x, pos.y - 20, color, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
 
     -- Draw action hints
-    local hint1, hint2
     if knockedEnt:GetPermadead() then
-        hint1 = "E: Search body"
-        hint2 = nil
+        draw.SimpleTextOutlined("E: Search body", "ixSmallFont", pos.x, pos.y, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
     else
-        hint1 = "E: Search"
-        hint2 = "Hold E: Revive"
-    end
-
-    draw.SimpleTextOutlined(hint1, "ixSmallFont", pos.x, pos.y - 10, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
-    if hint2 then
-        draw.SimpleTextOutlined(hint2, "ixSmallFont", pos.x, pos.y + 5, Color(100, 200, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+        draw.SimpleTextOutlined("E: Search body", "ixSmallFont", pos.x, pos.y, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+        draw.SimpleTextOutlined("Hold E: Attempt CPR", "ixSmallFont", pos.x, pos.y + 15, Color(100, 200, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
     end
 
     -- Draw hold progress bar if holding E on a knocked (not dead) target

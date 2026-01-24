@@ -14,6 +14,150 @@ local knockoutDuration = 0
 local knockoutCount = 0
 
 -- ============================================================================
+-- SUICIDE STATE MACHINE
+-- ============================================================================
+
+local suicideState = "idle"  -- idle, raising, raised
+local suicideStartTime = 0
+local suicideRaisedTime = 0
+local suicideWasGDown = false
+local suicideWasLMBDown = false
+local SUICIDE_RAISE_DURATION = 5    -- Hold G for 5 seconds
+local SUICIDE_TIMEOUT = 15          -- 15 seconds before auto-lower
+
+-- Check if player has the right weapon equipped (no ammo check - can raise empty gun)
+local function HasSuicideWeapon()
+    local client = LocalPlayer()
+    if not IsValid(client) then return false end
+    if not client:Alive() then return false end
+
+    local weapon = client:GetActiveWeapon()
+    if not IsValid(weapon) then return false end
+    if weapon:GetClass() ~= "tfa_ins2_wpn_38revolver" then return false end
+
+    return true
+end
+
+local function ResetSuicideState()
+    suicideState = "idle"
+    suicideStartTime = 0
+    suicideRaisedTime = 0
+end
+
+-- G key detection and state machine
+hook.Add("Think", "ixSuicideGesture", function()
+    local client = LocalPlayer()
+    if not IsValid(client) then return end
+
+    local gKeyDown = input.IsKeyDown(KEY_G)
+
+    -- If weapon is switched/unequipped, always cancel
+    if suicideState ~= "idle" and not HasSuicideWeapon() then
+        ResetSuicideState()
+        return
+    end
+
+    if suicideState == "idle" then
+        -- Just need the weapon to start raising (no ammo check)
+        if gKeyDown and HasSuicideWeapon() then
+            suicideState = "raising"
+            suicideStartTime = RealTime()
+        end
+
+    elseif suicideState == "raising" then
+        -- Cancel only if released G
+        if not gKeyDown then
+            ResetSuicideState()
+        elseif RealTime() - suicideStartTime >= SUICIDE_RAISE_DURATION then
+            -- Completed raise
+            suicideState = "raised"
+            suicideRaisedTime = RealTime()
+            ix.util.Notify("You have aimed the gun at your temple. Pull the trigger, or press G to lower the gun.")
+        end
+
+    elseif suicideState == "raised" then
+        -- Check for G tap to lower
+        if gKeyDown and not suicideWasGDown then
+            ResetSuicideState()
+            ix.util.Notify("You lower the gun.")
+        elseif RealTime() - suicideRaisedTime >= SUICIDE_TIMEOUT then
+            -- Check for timeout
+            ResetSuicideState()
+            ix.util.Notify("You lower the gun.")
+        end
+
+        -- Check for LMB - pull trigger (bang or click depending on ammo)
+        if input.IsMouseDown(MOUSE_LEFT) and not suicideWasLMBDown then
+            local weapon = client:GetActiveWeapon()
+            if IsValid(weapon) and weapon:Clip1() >= 1 then
+                -- Has ammo - execute suicide
+                net.Start("ixSuicideExecute")
+                net.SendToServer()
+                ResetSuicideState()
+            else
+                -- No ammo - dry fire click, stay raised
+                surface.PlaySound("weapons/clipempty_pistol.wav")
+            end
+        end
+    end
+
+    -- Track previous key states for edge detection
+    suicideWasGDown = gKeyDown
+    suicideWasLMBDown = input.IsMouseDown(MOUSE_LEFT)
+end)
+
+-- Vignette effect for suicide gesture
+hook.Add("HUDPaint", "ixSuicideVignette", function()
+    if suicideState == "idle" then return end
+
+    local alpha = 0
+
+    if suicideState == "raising" then
+        -- Progressive darkening over 5 seconds (0 to 180 alpha)
+        local progress = math.Clamp((RealTime() - suicideStartTime) / SUICIDE_RAISE_DURATION, 0, 1)
+        alpha = progress * 180
+    elseif suicideState == "raised" then
+        -- Stay dark
+        alpha = 180
+    end
+
+    if alpha <= 0 then return end
+
+    -- Draw vignette (darkening around edges)
+    local scrW, scrH = ScrW(), ScrH()
+
+    -- Draw gradient from edges (simple approach: multiple rectangles with varying alpha)
+    for i = 0, 10 do
+        local frac = i / 10
+        local edgeAlpha = alpha * frac
+        local inset = (1 - frac) * math.min(scrW, scrH) * 0.3
+
+        surface.SetDrawColor(0, 0, 0, edgeAlpha)
+        -- Top
+        surface.DrawRect(0, 0, scrW, inset)
+        -- Bottom
+        surface.DrawRect(0, scrH - inset, scrW, inset)
+        -- Left
+        surface.DrawRect(0, inset, inset, scrH - inset * 2)
+        -- Right
+        surface.DrawRect(scrW - inset, inset, inset, scrH - inset * 2)
+    end
+end)
+
+-- Reset suicide state when weapon changes
+hook.Add("HUDWeaponPickedUp", "ixSuicideWeaponChange", function()
+    if suicideState ~= "idle" then
+        ResetSuicideState()
+    end
+end)
+
+hook.Add("PlayerSwitchWeapon", "ixSuicideWeaponSwitch", function(ply, oldWeapon, newWeapon)
+    if ply == LocalPlayer() and suicideState ~= "idle" then
+        ResetSuicideState()
+    end
+end)
+
+-- ============================================================================
 -- KNOCKOUT SCREEN PANEL
 -- ============================================================================
 

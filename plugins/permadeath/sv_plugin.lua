@@ -38,6 +38,10 @@ ix.log.AddType("defibKnockout", function(client, victimName)
         client:Name(), victimName)
 end, FLAG_WARNING)
 
+ix.log.AddType("suicide", function(client, charName)
+    return string.format("%s's character '%s' took their own life", client:Name(), charName)
+end, FLAG_DANGER)
+
 -- ============================================================================
 -- DAMAGE INTERCEPTION (using EntityTakeDamage hook)
 -- ============================================================================
@@ -123,6 +127,94 @@ function PLUGIN:ShouldSpawnClientRagdoll(client)
 end
 
 -- ============================================================================
+-- KNOCKOUT HELPERS
+-- ============================================================================
+
+-- Collect all bodygroups from a player
+function PLUGIN:CollectBodygroups(client)
+    local bodygroups = {}
+    for i = 0, client:GetNumBodyGroups() - 1 do
+        bodygroups[i] = client:GetBodygroup(i)
+    end
+    return bodygroups
+end
+
+-- Create and configure an ix_knocked entity
+function PLUGIN:CreateKnockedEntity(client, character, pos, ang, duration)
+    local entity = ents.Create("ix_knocked")
+    if not IsValid(entity) then
+        ErrorNoHalt("[Permadeath] Failed to create ix_knocked entity!\n")
+        return nil
+    end
+
+    entity:SetPos(pos)
+    entity:SetAngles(ang)
+    entity:Spawn()
+    entity:Activate()
+
+    -- Configure NetworkVars
+    entity:SetKnockedModel(client:GetModel())
+    entity:SetKnockedSkin(client:GetSkin())
+    entity:SetOwningPlayer(client)
+    entity:SetCharacterID(character:GetID())
+    entity:SetCharacterName(character:GetName())
+    entity:SetTimerStart(CurTime())
+    entity:SetTimerDuration(duration)
+
+    -- Link to character's inventory for looting
+    local inventory = character:GetInventory()
+    if inventory then
+        entity:SetInventoryID(inventory:GetID())
+    end
+
+    -- Create the visible ragdoll
+    local bodygroups = self:CollectBodygroups(client)
+    entity:CreateRagdoll(client:GetModel(), client:GetSkin(), bodygroups)
+
+    -- Store references
+    client.ixKnockedEntity = entity
+    entity.ixOwner = client
+    entity.ixSteamID64 = client:SteamID64()
+    self.knockedEntities[entity.ixSteamID64] = entity
+
+    return entity
+end
+
+-- Hide and freeze a knocked player
+function PLUGIN:HideKnockedPlayer(client, entity)
+    client:StripWeapons()
+    client:SetNoDraw(true)
+    client:SetNotSolid(true)
+    client:Freeze(true)
+    client:SetMoveType(MOVETYPE_NONE)
+    client:SetPos(entity:GetPos() + Vector(0, 0, 10000))
+    client:SetDSP(31)
+end
+
+-- Send knockout notification to client
+function PLUGIN:SendKnockoutStart(client, duration, knockoutCount)
+    net.Start("ixKnockoutStart")
+        net.WriteFloat(duration)
+        net.WriteUInt(knockoutCount, 8)
+    net.Send(client)
+end
+
+-- Validate a knocked body interaction (loot, revive, etc.)
+-- Returns entity if valid and in range, nil otherwise
+function PLUGIN:ValidateKnockedInteraction(client, entity)
+    if not IsValid(entity) or entity:GetClass() ~= "ix_knocked" then
+        return nil
+    end
+
+    -- 96 units is Helix default interaction range
+    if client:GetPos():Distance(entity:GetPos()) > 96 then
+        return nil
+    end
+
+    return entity
+end
+
+-- ============================================================================
 -- KNOCKOUT CREATION
 -- ============================================================================
 
@@ -139,54 +231,11 @@ function PLUGIN:CreateKnockout(client, character, dmgInfo)
     character:SetData("knockoutExpires", expireTime)
     character:SetData("knocked", true)
 
-    -- Store player position and angles before hiding
+    -- Create the knocked entity (zeroes pitch/roll for ragdoll)
     local pos = client:GetPos()
-    local ang = client:EyeAngles()
-    local model = client:GetModel()
-    local skin = client:GetSkin()
-
-    -- Collect bodygroups
-    local bodygroups = {}
-    for i = 0, client:GetNumBodyGroups() - 1 do
-        bodygroups[i] = client:GetBodygroup(i)
-    end
-
-    -- Create the ix_knocked entity (invisible controller)
-    local entity = ents.Create("ix_knocked")
-    if not IsValid(entity) then
-        ErrorNoHalt("[Permadeath] Failed to create ix_knocked entity!\n")
-        return
-    end
-
-    entity:SetPos(pos)
-    entity:SetAngles(Angle(0, ang.y, 0))
-    entity:Spawn()
-    entity:Activate()
-
-    -- Configure entity with player data (NetworkVars)
-    entity:SetKnockedModel(model)
-    entity:SetKnockedSkin(skin)
-    entity:SetOwningPlayer(client)
-    entity:SetCharacterID(character:GetID())
-    entity:SetCharacterName(character:GetName())  -- Store name permanently
-    entity:SetTimerStart(CurTime())
-    entity:SetTimerDuration(duration)
-
-    -- Link to character's inventory for looting BEFORE creating ragdoll
-    -- This ensures InventoryID is networked alongside the ragdoll
-    local inventory = character:GetInventory()
-    if inventory then
-        entity:SetInventoryID(inventory:GetID())
-    end
-
-    -- Create the visible ragdoll (after all NetworkVars are set)
-    entity:CreateRagdoll(model, skin, bodygroups)
-
-    -- Store references
-    client.ixKnockedEntity = entity
-    entity.ixOwner = client
-    entity.ixSteamID64 = client:SteamID64()
-    self.knockedEntities[entity.ixSteamID64] = entity
+    local ang = Angle(0, client:EyeAngles().y, 0)
+    local entity = self:CreateKnockedEntity(client, character, pos, ang, duration)
+    if not entity then return end
 
     -- Drop currently equipped weapon (except protected items)
     local activeWeapon = client:GetActiveWeapon()
@@ -197,28 +246,12 @@ function PLUGIN:CreateKnockout(client, character, dmgInfo)
         if not protected[class] and activeWeapon.ixItem then
             local item = activeWeapon.ixItem
             item:SetData("equip", nil)  -- base_weapons uses "equip", not "equipped"
-            local dropPos = client:GetPos() + Vector(0, 0, 10)
-            item:Transfer(nil, nil, nil, client, dropPos)
+            item:Transfer(nil, nil, nil, client, client:GetPos() + Vector(0, 0, 10))
         end
     end
 
-    -- Hide and freeze the actual player
-    client:StripWeapons()
-    client:SetNoDraw(true)
-    client:SetNotSolid(true)
-    client:Freeze(true)
-    client:SetMoveType(MOVETYPE_NONE)
-    client:SetPos(entity:GetPos() + Vector(0, 0, 10000))  -- Move player away
-
-    -- Apply muffled audio effect
-    client:SetDSP(31)
-
-    -- Notify the client they've been knocked out
-    print("[Permadeath] Sending ixKnockoutStart to client, duration: " .. duration .. ", count: " .. knockoutCount)
-    net.Start("ixKnockoutStart")
-        net.WriteFloat(duration)
-        net.WriteUInt(knockoutCount, 8)
-    net.Send(client)
+    self:HideKnockedPlayer(client, entity)
+    self:SendKnockoutStart(client, duration, knockoutCount)
 
     -- Log the knockout
     ix.log.Add(client, "knockout", knockoutCount, self:FormatTime(duration))
@@ -469,33 +502,24 @@ function PLUGIN:ApplyPermadeath(client, character, reason)
             net.WriteUInt(0, 8)
         net.Send(client)
 
-        -- Small delay before kicking to character menu and deleting
-        print("[Permadeath] Scheduling character:Kick() in 2 seconds")
+        -- Restore player state before kicking
+        client:SetNoDraw(false)
+        client:SetNotSolid(false)
+        client:Freeze(false)
+        client:SetMoveType(MOVETYPE_WALK)
+        client:SetDSP(0)
+        client:KillSilent()
+
+        -- Kick back to character menu
+        print("[Permadeath] Calling character:Kick()")
+        character:Kick()
+
+        -- Delete the character after a short delay to ensure kick completes
         local charID = character:GetID()
-        timer.Simple(2, function()
+        timer.Simple(0.5, function()
             if IsValid(client) then
-                print("[Permadeath] Timer fired, kicking to character menu")
-                client:SetNoDraw(false)
-                client:SetNotSolid(false)
-                client:Freeze(false)
-                client:SetMoveType(MOVETYPE_WALK)
-                client:SetDSP(0)
-                client:KillSilent()
-
-                -- Kick back to character menu
-                print("[Permadeath] Calling character:Kick()")
-                character:Kick()
-
-                -- Delete the character after a short delay to ensure kick completes
-                timer.Simple(0.5, function()
-                    if IsValid(client) then
-                        self:DeleteCharacter(client, character)
-                    end
-                end)
+                self:DeleteCharacter(client, character)
             else
-                print("[Permadeath] Timer fired but client no longer valid")
-                -- Player disconnected, still delete the character from database
-                -- Need to handle this case without a valid client
                 self:DeleteCharacterOffline(charID)
             end
         end)
@@ -681,10 +705,7 @@ function PLUGIN:RestoreKnockoutState(client, character, remainingTime)
 
         -- Ensure ragdoll exists (may have been removed)
         if not IsValid(existingEntity.ixRagdoll) then
-            local bodygroups = {}
-            for i = 0, client:GetNumBodyGroups() - 1 do
-                bodygroups[i] = client:GetBodygroup(i)
-            end
+            local bodygroups = self:CollectBodygroups(client)
             existingEntity:CreateRagdoll(client:GetModel(), client:GetSkin(), bodygroups)
         end
 
@@ -693,57 +714,13 @@ function PLUGIN:RestoreKnockoutState(client, character, remainingTime)
         existingEntity:SetTimerDuration(remainingTime)
     else
         -- Entity was removed (server restart?) - recreate it
-        local knockoutCount = character:GetData("knockoutCount") or 1
-
-        -- Collect bodygroups
-        local bodygroups = {}
-        for i = 0, client:GetNumBodyGroups() - 1 do
-            bodygroups[i] = client:GetBodygroup(i)
-        end
-
-        local entity = ents.Create("ix_knocked")
-        entity:SetPos(client:GetPos())
-        entity:SetAngles(client:EyeAngles())
-        entity:Spawn()
-        entity:Activate()
-
-        entity:SetKnockedModel(client:GetModel())
-        entity:SetKnockedSkin(client:GetSkin())
-        entity:SetOwningPlayer(client)
-        entity:SetCharacterID(character:GetID())
-        entity:SetCharacterName(character:GetName())  -- Store name permanently
-        entity:SetTimerStart(CurTime())
-        entity:SetTimerDuration(remainingTime)
-
-        -- Link to character's inventory for looting BEFORE creating ragdoll
-        local inventory = character:GetInventory()
-        if inventory then
-            entity:SetInventoryID(inventory:GetID())
-        end
-
-        -- Create the visible ragdoll (after all NetworkVars are set)
-        entity:CreateRagdoll(client:GetModel(), client:GetSkin(), bodygroups)
-
-        client.ixKnockedEntity = entity
-        entity.ixOwner = client
-        entity.ixSteamID64 = client:SteamID64()
-        self.knockedEntities[entity.ixSteamID64] = entity
+        local pos = client:GetPos()
+        local ang = client:EyeAngles()
+        self:CreateKnockedEntity(client, character, pos, ang, remainingTime)
     end
 
-    -- Hide and freeze player
-    client:StripWeapons()
-    client:SetNoDraw(true)
-    client:SetNotSolid(true)
-    client:Freeze(true)
-    client:SetMoveType(MOVETYPE_NONE)
-    client:SetPos(client.ixKnockedEntity:GetPos() + Vector(0, 0, 10000))
-    client:SetDSP(31)
-
-    -- Notify client
-    net.Start("ixKnockoutStart")
-        net.WriteFloat(remainingTime)
-        net.WriteUInt(character:GetData("knockoutCount") or 1, 8)
-    net.Send(client)
+    self:HideKnockedPlayer(client, client.ixKnockedEntity)
+    self:SendKnockoutStart(client, remainingTime, character:GetData("knockoutCount") or 1)
 end
 
 -- Handle player disconnect while knocked
@@ -843,20 +820,10 @@ end)
 net.Receive("ixKnockoutLoot", function(len, client)
     if not IsValid(client) then return end
 
-    local entity = net.ReadEntity()
+    local plugin = ix.plugin.Get("permadeath")
+    local entity = plugin:ValidateKnockedInteraction(client, net.ReadEntity())
+    if not entity then return end
 
-    -- Validate entity is a valid ix_knocked
-    if not IsValid(entity) or entity:GetClass() ~= "ix_knocked" then
-        return
-    end
-
-    -- Validate distance
-    local distance = client:GetPos():Distance(entity:GetPos())
-    if distance > 96 then
-        return
-    end
-
-    -- Open inventory for looting
     entity:OpenInventory(client)
 end)
 
@@ -864,28 +831,48 @@ end)
 net.Receive("ixKnockoutRevive", function(len, client)
     if not IsValid(client) then return end
 
-    local entity = net.ReadEntity()
+    local plugin = ix.plugin.Get("permadeath")
+    local entity = plugin:ValidateKnockedInteraction(client, net.ReadEntity())
+    if not entity then return end
 
-    -- Validate entity is a valid ix_knocked
-    if not IsValid(entity) or entity:GetClass() ~= "ix_knocked" then
-        return
-    end
-
-    -- Validate distance
-    local distance = client:GetPos():Distance(entity:GetPos())
-    if distance > 96 then
-        return
-    end
-
-    -- Can't revive the dead
     if entity:GetPermadead() then
         client:NotifyLocalized("knockedAlreadyDead")
         return
     end
 
-    -- Attempt revival through plugin
+    plugin:AttemptRevival(client, entity)
+end)
+
+-- ============================================================================
+-- SUICIDE EXECUTION
+-- ============================================================================
+
+net.Receive("ixSuicideExecute", function(len, client)
+    if not IsValid(client) then return end
+
+    local character = client:GetCharacter()
+    if not character then return end
+
+    -- Validate weapon
+    local weapon = client:GetActiveWeapon()
+    if not IsValid(weapon) then return end
+    if weapon:GetClass() ~= "tfa_ins2_wpn_38revolver" then return end
+
+    -- Validate ammo (must have at least 1 in clip)
+    if weapon:Clip1() < 1 then return end
+
+    -- Consume the bullet
+    weapon:SetClip1(weapon:Clip1() - 1)
+
+    -- Play gunshot sound
+    client:EmitSound("weapons/357/357_fire2.wav", 100, 100)
+
+    -- Log suicide
+    ix.log.Add(client, "suicide", character:GetName())
+
+    -- Apply instant permadeath (bypass knockout)
     local plugin = ix.plugin.Get("permadeath")
     if plugin then
-        plugin:AttemptRevival(client, entity)
+        plugin:ApplyPermadeath(client, character, "suicide")
     end
 end)

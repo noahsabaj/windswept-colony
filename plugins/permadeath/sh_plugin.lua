@@ -50,6 +50,7 @@ if SERVER then
     util.AddNetworkString("ixKnockoutLoot")    -- E tap: search/loot body
     util.AddNetworkString("ixKnockoutRevive")  -- E hold: attempt revival
     util.AddNetworkString("ixRevivalProgress")
+    util.AddNetworkString("ixSuicideExecute")  -- Suicide with gun
 end
 
 -- Hold E duration to trigger revival (in seconds)
