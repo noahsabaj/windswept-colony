@@ -51,6 +51,8 @@ if SERVER then
     util.AddNetworkString("ixKnockoutRevive")  -- E hold: attempt revival
     util.AddNetworkString("ixRevivalProgress")
     util.AddNetworkString("ixSuicideExecute")  -- Suicide with gun
+    util.AddNetworkString("ixPermadeathScreen")  -- Server → Client: show memorial
+    util.AddNetworkString("ixPermadeathReady")   -- Client → Server: player acknowledged
 end
 
 -- Hold E duration to trigger revival (in seconds)

@@ -13,6 +13,9 @@ local knockoutStartTime = 0
 local knockoutDuration = 0
 local knockoutCount = 0
 
+-- Memorial state
+local memorialActive = false
+
 -- ============================================================================
 -- SUICIDE STATE MACHINE
 -- ============================================================================
@@ -351,6 +354,175 @@ end
 vgui.Register("ixKnockoutScreen", PANEL, "DPanel")
 
 -- ============================================================================
+-- DEATH MEMORIAL SCREEN
+-- ============================================================================
+
+local MEMORIAL = {}
+
+function MEMORIAL:Init()
+    self:SetSize(ScrW(), ScrH())
+    self:SetPos(0, 0)
+    self:MakePopup()
+    self:SetKeyboardInputEnabled(true)
+
+    memorialActive = true
+
+    self.startTime = RealTime()
+    self.canDismiss = false
+    self.dismissed = false
+
+    -- Data (set via SetMemorialData)
+    self.charName = "Unknown"
+    self.birthDate = "Unknown"
+    self.deathDate = ix.birthdata.GetCurrentDate()
+    self.model = "models/player/group01/male_01.mdl"
+    self.skin = 0
+    self.bodygroups = ""
+
+    -- Calculate sizes based on fonts
+    surface.SetFont("ixMediumFont")
+    local _, headerH = surface.GetTextSize("You have died.")
+    self.headerHeight = headerH
+
+    surface.SetFont("ixBigFont")
+    local _, nameH = surface.GetTextSize("W")
+    self.nameHeight = nameH
+
+    surface.SetFont("ixSmallFont")
+    local _, smallH = surface.GetTextSize("W")
+    self.smallHeight = smallH
+
+    self.sectionGap = ScreenScale(16)
+    self.modelSize = ScrH() * 0.35
+
+    -- Calculate total content height for vertical centering
+    -- Content: header + gap + model + gap + name + gap + lifespan
+    self.totalContentHeight = self.headerHeight + self.sectionGap + self.modelSize + self.sectionGap + self.nameHeight + self.sectionGap + self.smallHeight
+    self.contentStartY = (ScrH() - self.totalContentHeight) / 2
+end
+
+function MEMORIAL:SetMemorialData(charName, model, skin, bodygroups, birthMonth, birthDay, age)
+    self.charName = charName
+    self.model = model
+    self.skin = skin
+    self.bodygroups = bodygroups
+
+    -- Format birth date
+    self.birthDate = ix.birthdata.FormatDate(birthMonth, birthDay, age)
+    self.deathDate = ix.birthdata.GetCurrentDate()
+
+    -- Create model panel
+    if IsValid(self.modelPanel) then
+        self.modelPanel:Remove()
+    end
+
+    self.modelPanel = vgui.Create("ixModelPanel", self)
+    self.modelPanel:SetModel(model, skin, bodygroups)
+    self.modelPanel:SetSize(self.modelSize, self.modelSize)
+
+    -- Center the model panel (vertically centered with content block)
+    local modelX = (ScrW() - self.modelSize) / 2
+    local modelY = self.contentStartY + self.headerHeight + self.sectionGap
+    self.modelPanel:SetPos(modelX, modelY)
+
+    -- Disable mouse interaction on model panel
+    self.modelPanel:SetMouseInputEnabled(false)
+end
+
+function MEMORIAL:Paint(w, h)
+    -- Pure black background
+    surface.SetDrawColor(0, 0, 0, 255)
+    surface.DrawRect(0, 0, w, h)
+
+    local centerX = w / 2
+    local y = self.contentStartY  -- Vertically centered
+
+    -- "You have died."
+    surface.SetFont("ixMediumFont")
+    local headerText = "You have died."
+    local headerW, headerH = surface.GetTextSize(headerText)
+    surface.SetTextColor(200, 200, 200, 255)
+    surface.SetTextPos(centerX - headerW / 2, y)
+    surface.DrawText(headerText)
+
+    y = y + headerH + self.sectionGap + self.modelSize + self.sectionGap
+
+    -- Character name
+    surface.SetFont("ixBigFont")
+    local nameW, nameH = surface.GetTextSize(self.charName)
+    surface.SetTextColor(255, 255, 255, 255)
+    surface.SetTextPos(centerX - nameW / 2, y)
+    surface.DrawText(self.charName)
+
+    y = y + nameH + self.sectionGap
+
+    -- Lifespan
+    surface.SetFont("ixSmallFont")
+    local lifespanText = self.birthDate .. "  —  " .. self.deathDate
+    local lifespanW, lifespanH = surface.GetTextSize(lifespanText)
+    surface.SetTextColor(180, 180, 180, 255)
+    surface.SetTextPos(centerX - lifespanW / 2, y)
+    surface.DrawText(lifespanText)
+
+    -- "Press any key to continue..." (only after 5 seconds)
+    if self.canDismiss and not self.dismissed then
+        local elapsed = RealTime() - self.startTime
+        local promptAlpha = math.Clamp((elapsed - 5) * 255, 0, 255)  -- Fade in over 1 second
+
+        surface.SetFont("ixSmallFont")
+        local promptText = "Press any key to continue..."
+        local promptW, promptH = surface.GetTextSize(promptText)
+        surface.SetTextColor(150, 150, 150, promptAlpha)
+        surface.SetTextPos(centerX - promptW / 2, h - self.sectionGap - promptH)
+        surface.DrawText(promptText)
+    end
+end
+
+function MEMORIAL:Think()
+    local elapsed = RealTime() - self.startTime
+
+    -- Enable dismissal after 5 seconds
+    if elapsed >= 5 and not self.canDismiss then
+        self.canDismiss = true
+    end
+
+    -- Keep panel on top
+    self:MoveToFront()
+end
+
+function MEMORIAL:OnKeyCodePressed(key)
+    if self.canDismiss and not self.dismissed then
+        self.dismissed = true
+
+        -- Notify server we're ready
+        net.Start("ixPermadeathReady")
+        net.SendToServer()
+
+        -- Remove panel
+        self:Remove()
+        return true
+    end
+    return true  -- Block all keys regardless
+end
+
+function MEMORIAL:OnMousePressed(key)
+    if self.canDismiss and not self.dismissed then
+        self.dismissed = true
+
+        net.Start("ixPermadeathReady")
+        net.SendToServer()
+
+        self:Remove()
+    end
+end
+
+function MEMORIAL:OnRemove()
+    memorialActive = false
+end
+
+vgui.Register("ixDeathMemorial", MEMORIAL, "EditablePanel")
+
+-- ============================================================================
 -- NETWORK RECEIVERS
 -- ============================================================================
 
@@ -434,6 +606,33 @@ net.Receive("ixKnockoutEnd", function()
     end
 end)
 
+-- Receive permadeath memorial data
+net.Receive("ixPermadeathScreen", function()
+    local charName = net.ReadString()
+    local model = net.ReadString()
+    local skin = net.ReadUInt(8)
+    local bodygroups = net.ReadString()
+    local birthMonth = net.ReadUInt(4)
+    local birthDay = net.ReadUInt(5)
+    local age = net.ReadUInt(8)
+
+    print("[Permadeath] Received memorial screen data for: " .. charName)
+
+    -- Clean up any existing knockout panel
+    if IsValid(knockoutPanel) then
+        knockoutPanel:Remove()
+        knockoutPanel = nil
+    end
+
+    -- Reset knockout state
+    isKnockedOut = false
+    gui.EnableScreenClicker(false)
+
+    -- Create memorial panel
+    local memorial = vgui.Create("ixDeathMemorial")
+    memorial:SetMemorialData(charName, model, skin, bodygroups, birthMonth, birthDay, age)
+end)
+
 -- Clean up knockout UI when character is kicked/unloaded
 function PLUGIN:CharacterLoaded(character)
     -- Clean up any leftover knockout UI from previous character
@@ -511,9 +710,9 @@ function PLUGIN:HUDPaint()
     end
 end
 
--- Block HUD elements while knocked out
+-- Block HUD elements while knocked out or memorial active
 function PLUGIN:HUDShouldDraw(element)
-    if isKnockedOut then
+    if isKnockedOut or memorialActive then
         return false
     end
 end
@@ -538,7 +737,7 @@ end
 
 -- Block movement commands
 function PLUGIN:StartCommand(client, cmd)
-    if client == LocalPlayer() and isKnockedOut then
+    if client == LocalPlayer() and (isKnockedOut or memorialActive) then
         cmd:ClearButtons()
         cmd:ClearMovement()
     end

@@ -470,6 +470,19 @@ function PLUGIN:DeleteCharacterOffline(charID)
     print("[Permadeath] Offline character deleted successfully")
 end
 
+-- Find a character's Personal ID item from their inventory
+function PLUGIN:FindPersonalID(character)
+    local inventory = character:GetInventory()
+    if not inventory then return nil end
+
+    for _, item in pairs(inventory:GetItems()) do
+        if item.uniqueID == "personal_id" then
+            return item
+        end
+    end
+    return nil
+end
+
 function PLUGIN:ApplyPermadeath(client, character, reason)
     print("[Permadeath] ApplyPermadeath called for " .. (IsValid(client) and client:Name() or "invalid") .. ", reason: " .. reason)
 
@@ -485,7 +498,6 @@ function PLUGIN:ApplyPermadeath(client, character, reason)
     -- If there's a knockout entity, mark it as permadead (stays for looting)
     if IsValid(client) and IsValid(client.ixKnockedEntity) then
         local knockedEntity = client.ixKnockedEntity
-        -- Clean up tracking table
         if knockedEntity.ixSteamID64 then
             self.knockedEntities[knockedEntity.ixSteamID64] = nil
         end
@@ -494,39 +506,71 @@ function PLUGIN:ApplyPermadeath(client, character, reason)
         client.ixKnockedEntity = nil
     end
 
-    -- Notify client and kick to character menu
-    if IsValid(client) then
-        print("[Permadeath] Sending ixKnockoutEnd to client")
-        net.Start("ixKnockoutEnd")
-            net.WriteBool(false)  -- Permadead
-            net.WriteUInt(0, 8)
-        net.Send(client)
+    -- Log permadeath
+    ix.log.Add(client, "permadeath", character:GetName(), reason)
 
-        -- Restore player state before kicking
+    if IsValid(client) then
+        -- Gather memorial data BEFORE deleting character
+        local charName = character:GetName()
+        local model = character:GetModel()
+        local personalID = self:FindPersonalID(character)
+        local physical = personalID and personalID:GetData("physical", {}) or {}
+
+        local birthMonth = physical.birthMonth or 1
+        local birthDay = physical.birthDay or 1
+        local age = physical.age or 25
+        local skin = physical.skin or client:GetSkin() or 0
+        local bodygroups = physical.bodygroups or ""
+
+        -- Convert bodygroups table to string if needed
+        if istable(bodygroups) then
+            local bgStr = ""
+            for i = 0, 20 do
+                bgStr = bgStr .. (bodygroups[i] or 0)
+            end
+            bodygroups = bgStr
+        end
+
+        -- Restore player state (make visible again for memorial)
         client:SetNoDraw(false)
         client:SetNotSolid(false)
-        client:Freeze(false)
-        client:SetMoveType(MOVETYPE_WALK)
+        client:Freeze(true)  -- Keep frozen so they can't move
+        client:SetMoveType(MOVETYPE_NONE)
         client:SetDSP(0)
-        client:KillSilent()
 
-        -- Kick back to character menu
-        print("[Permadeath] Calling character:Kick()")
-        character:Kick()
+        -- Delete the character NOW (before memorial - no escape)
+        self:DeleteCharacter(client, character)
 
-        -- Delete the character after a short delay to ensure kick completes
-        local charID = character:GetID()
-        timer.Simple(0.5, function()
+        -- Send memorial screen data
+        net.Start("ixPermadeathScreen")
+            net.WriteString(charName)
+            net.WriteString(model)
+            net.WriteUInt(skin, 8)
+            net.WriteString(bodygroups)
+            net.WriteUInt(birthMonth, 4)
+            net.WriteUInt(birthDay, 5)
+            net.WriteUInt(age, 8)
+        net.Send(client)
+
+        -- Start 60s timeout timer (in case client never responds)
+        local steamID = client:SteamID64()
+        timer.Create("ixPermadeathTimeout_" .. steamID, 60, 1, function()
             if IsValid(client) then
-                self:DeleteCharacter(client, character)
-            else
-                self:DeleteCharacterOffline(charID)
+                print("[Permadeath] Memorial timeout, force kicking")
+                client:Freeze(false)
+                client:KillSilent()
+
+                -- Tell client to open character menu
+                net.Start("ixCharacterKick")
+                    net.WriteBool(true)  -- isCurrentChar = true
+                net.Send(client)
+
+                -- Clear the character netvar and spawn
+                client:SetNetVar("char", nil)
+                client:Spawn()
             end
         end)
     end
-
-    -- Log permadeath
-    ix.log.Add(client, "permadeath", character:GetName(), reason)
 end
 
 -- Called when knockout timer expires
@@ -725,6 +769,9 @@ end
 
 -- Handle player disconnect while knocked
 function PLUGIN:PlayerDisconnected(client)
+    -- Clean up memorial timeout timer
+    timer.Remove("ixPermadeathTimeout_" .. client:SteamID64())
+
     local entity = client.ixKnockedEntity
 
     if IsValid(entity) then
@@ -841,6 +888,35 @@ net.Receive("ixKnockoutRevive", function(len, client)
     end
 
     plugin:AttemptRevival(client, entity)
+end)
+
+-- ============================================================================
+-- MEMORIAL ACKNOWLEDGMENT
+-- ============================================================================
+
+-- Client acknowledged memorial screen
+net.Receive("ixPermadeathReady", function(len, client)
+    if not IsValid(client) then return end
+
+    local steamID = client:SteamID64()
+
+    -- Cancel the timeout timer
+    timer.Remove("ixPermadeathTimeout_" .. steamID)
+
+    print("[Permadeath] Client acknowledged memorial, kicking to character menu")
+
+    -- Properly kick to character menu (replicating Helix's character:Kick() logic)
+    client:Freeze(false)
+    client:KillSilent()
+
+    -- Tell client to open character menu
+    net.Start("ixCharacterKick")
+        net.WriteBool(true)  -- isCurrentChar = true
+    net.Send(client)
+
+    -- Clear the character netvar and spawn
+    client:SetNetVar("char", nil)
+    client:Spawn()
 end)
 
 -- ============================================================================

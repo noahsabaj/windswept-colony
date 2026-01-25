@@ -100,3 +100,10 @@ function ix.birthdata.IsValidLocation(location)
     end
     return false
 end
+
+-- Get current in-game date (real month/day, year 2200)
+function ix.birthdata.GetCurrentDate()
+    local realDate = os.date("*t")
+    local monthName = ix.birthdata.months[realDate.month]
+    return string.format("%s %d, %d", monthName, realDate.day, ix.birthdata.CURRENT_YEAR)
+end
