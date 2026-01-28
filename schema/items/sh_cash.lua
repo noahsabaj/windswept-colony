@@ -51,3 +51,97 @@ ITEM.functions.Split = {
         return item:GetData("quantity", 1) > 1
     end
 }
+
+ITEM.functions.MergeAll = {
+    name = "Merge All",
+    icon = "icon16/arrow_join.png",
+    OnRun = function(item)
+        local inventory = item.player:GetCharacter():GetInventory()
+        local currentQuantity = item:GetData("quantity", 1)
+        local maxStack = ix.currency.MAX_STACK
+        local canAdd = maxStack - currentQuantity
+
+        if canAdd <= 0 then
+            item.player:Notify("This stack is already full.")
+            return false
+        end
+
+        -- Find other stacks of the same currency type
+        local mergedTotal = 0
+        local itemsToRemove = {}
+
+        for _, otherItem in pairs(inventory:GetItems()) do
+            if otherItem.uniqueID == item.uniqueID and otherItem:GetID() != item:GetID() then
+                local otherQuantity = otherItem:GetData("quantity", 1)
+
+                if canAdd >= otherQuantity then
+                    -- Merge entire stack
+                    mergedTotal = mergedTotal + otherQuantity
+                    canAdd = canAdd - otherQuantity
+                    table.insert(itemsToRemove, otherItem)
+                elseif canAdd > 0 then
+                    -- Partial merge
+                    mergedTotal = mergedTotal + canAdd
+                    otherItem:SetData("quantity", otherQuantity - canAdd)
+                    canAdd = 0
+                    break
+                end
+
+                if canAdd <= 0 then break end
+            end
+        end
+
+        if mergedTotal == 0 then
+            item.player:Notify("No stacks to merge.")
+            return false
+        end
+
+        -- Update main stack
+        item:SetData("quantity", currentQuantity + mergedTotal)
+
+        -- Remove empty stacks
+        for _, otherItem in ipairs(itemsToRemove) do
+            otherItem:Remove()
+        end
+
+        item.player:Notify("Merged " .. mergedTotal .. " into stack.")
+        return false
+    end,
+    OnCanRun = function(item)
+        -- Can only merge if not full and there are other stacks
+        if item:GetData("quantity", 1) >= ix.currency.MAX_STACK then
+            return false
+        end
+
+        local inventory = item.player:GetCharacter():GetInventory()
+        for _, otherItem in pairs(inventory:GetItems()) do
+            if otherItem.uniqueID == item.uniqueID and otherItem:GetID() != item:GetID() then
+                return true
+            end
+        end
+        return false
+    end
+}
+
+ITEM.functions.MergeWith = {
+    name = "Merge With...",
+    icon = "icon16/arrow_in.png",
+    OnRun = function(item)
+        ix.currency.SendMergeSelectList(item.player, item)
+        return false
+    end,
+    OnCanRun = function(item)
+        -- Can only merge if not full and there are other stacks
+        if item:GetData("quantity", 1) >= ix.currency.MAX_STACK then
+            return false
+        end
+
+        local inventory = item.player:GetCharacter():GetInventory()
+        for _, otherItem in pairs(inventory:GetItems()) do
+            if otherItem.uniqueID == item.uniqueID and otherItem:GetID() != item:GetID() then
+                return true
+            end
+        end
+        return false
+    end
+}
