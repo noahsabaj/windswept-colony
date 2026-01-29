@@ -216,3 +216,7 @@ local buttonWidth = maxTextW + ScreenScale(10) * 2
 ```
 
 - **Helix auto-includes `schema/derma/`**: Files in this folder are automatically loaded by the framework (via `ix.util.IncludeDir` in sh_plugin.lua). No manual includes needed.
+
+## Quick Notes from the Human Developer
+
+- **Use ripgrep (rg) instead of grep (grep)**. Ripgrep is way faster than grep, and you know that.
