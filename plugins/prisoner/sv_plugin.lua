@@ -108,7 +108,8 @@ end
 
 -- Start sentence timer when prisoner loads character
 function PLUGIN:PlayerLoadedCharacter(client, character)
-    if character:GetFaction() == FACTION_PRISONERS then
+    local factionIndex = character:GetFaction()
+    if (factionIndex and factionIndex == FACTION_PRISONERS) then
         self:StartSentenceTimer(client)
         -- Spawn in cell
         timer.Simple(0.5, function()
@@ -164,14 +165,15 @@ function PLUGIN:SentencePlayer(target, judge, duration, reason)
 
     local oldModel = character:GetModel()
 
-    -- Store sentence data (including original model for restoration on release)
+    -- Store sentence data (including original model and faction for restoration on release)
     character:SetData("sentence", {
         duration = duration,
         timeServed = 0,
         reason = reason,
         judge = judge:GetCharacter():GetName(),
         date = os.date("%Y-%m-%d %H:%M"),
-        originalModel = oldModel
+        originalModel = oldModel,
+        originalFaction = character:GetFaction() -- Can be nil for factionless
     })
 
     -- Transfer to Prisoners faction
@@ -285,10 +287,17 @@ function PLUGIN:RemovePrisonJumpsuit(client)
     if sentence and sentence.originalModel then
         character:SetModel(sentence.originalModel)
     else
-        -- Fallback: set to first civilian model if no original stored
-        local factionTable = ix.faction.Get(FACTION_CIVILIAN)
+        -- Fallback: set to first model from original faction or factionless models
+        local originalFaction = sentence and sentence.originalFaction
+        local factionTable = originalFaction and ix.faction.Get(originalFaction)
         if factionTable and factionTable.models and #factionTable.models > 0 then
             character:SetModel(factionTable.models[1])
+        else
+            -- Factionless fallback - use config factionlessModels
+            local factionlessModels = ix.config.Get("factionlessModels", {})
+            if #factionlessModels > 0 then
+                character:SetModel(factionlessModels[1])
+            end
         end
     end
 end
@@ -313,8 +322,14 @@ function PLUGIN:ReleasePlayer(client)
     -- Remove jumpsuit, restore model
     self:RemovePrisonJumpsuit(client)
 
-    -- Transfer back to Civilians
-    character:SetFaction(FACTION_CIVILIAN)
+    -- Restore original faction (or stay factionless)
+    local originalFaction = sentence and sentence.originalFaction
+    if (originalFaction) then
+        character:SetFaction(originalFaction)
+    else
+        character:SetFaction(nil)
+        client:SetTeam(TEAM_UNASSIGNED)
+    end
 
     -- Clear sentence data
     character:SetData("sentence", nil)
