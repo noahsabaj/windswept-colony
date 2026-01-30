@@ -86,6 +86,7 @@ end
 
 function SWEP:Initialize()
     self:SetHoldType(self.HoldType)
+    self.wasLMBDown = false
 end
 
 function SWEP:Deploy()
@@ -189,26 +190,7 @@ if SERVER then
     end)
 end
 
--- ============================================================================
--- PRIMARY ATTACK - Toggle Light (Click)
--- ============================================================================
-
-function SWEP:PrimaryAttack()
-    self:SetNextPrimaryFire(CurTime() + 0.3)
-
-    -- PrimaryAttack only runs on SERVER in Helix
-    if SERVER then
-        self:SetLight(not self:GetLanternOn())
-    end
-end
-
--- ============================================================================
--- SECONDARY ATTACK - Place Lantern (Hold RMB for 0.5s)
--- ============================================================================
-
-function SWEP:SecondaryAttack()
-    -- Handled in Think() for hold detection
-end
+-- PrimaryAttack/SecondaryAttack not used - input handled in Think() for Helix compatibility
 
 if SERVER then
     net.Receive("ixLanternPlace", function(len, ply)
@@ -281,11 +263,28 @@ function SWEP:Think()
     if CLIENT then
         self:UpdateLight()
 
-        -- RMB hold detection for placement
+        -- Don't process input if a UI panel is open
+        if vgui.CursorVisible() then
+            self.wasLMBDown = false
+            self.rmbStartTime = nil
+            return
+        end
+
         local owner = self:GetOwner()
         if IsValid(owner) then
+            local lmbDown = input.IsMouseDown(MOUSE_LEFT)
             local rmbDown = input.IsMouseDown(MOUSE_RIGHT)
 
+            -- LMB pressed - toggle light
+            if lmbDown and not self.wasLMBDown then
+                net.Start("ixLanternSetLight")
+                net.WriteBool(not self:GetLanternOn())
+                net.SendToServer()
+            end
+
+            self.wasLMBDown = lmbDown
+
+            -- RMB hold detection for placement
             if rmbDown then
                 if not self.rmbStartTime then
                     self.rmbStartTime = CurTime()

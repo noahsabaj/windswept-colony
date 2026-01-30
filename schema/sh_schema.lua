@@ -11,6 +11,9 @@ ix.util.Include("libs/sh_birthdata.lua")
 -- Include physical description system (for character creation and Personal ID)
 ix.util.Include("libs/sh_physical.lua")
 
+-- Include door frame management library (for physical lock & key system)
+ix.util.Include("libs/sh_doors.lua")
+
 -- Schema Configuration
 Schema.colony = Schema.colony or {}
 Schema.colony.name = "Redrock City"

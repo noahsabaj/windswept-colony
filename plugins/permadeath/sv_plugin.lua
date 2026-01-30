@@ -241,11 +241,13 @@ function PLUGIN:CreateKnockout(client, character, dmgInfo)
     local activeWeapon = client:GetActiveWeapon()
     if IsValid(activeWeapon) then
         local class = activeWeapon:GetClass()
-        local protected = {["ix_keys"] = true, ["ix_hands"] = true, ["ix_handsup"] = true}
+        local protected = {["ix_hands"] = true, ["ix_handsup"] = true}
 
         if not protected[class] and activeWeapon.ixItem then
             local item = activeWeapon.ixItem
-            item:SetData("equip", nil)  -- base_weapons uses "equip", not "equipped"
+            -- Clear both keys - base_weapons uses "equip", custom items use "equipped"
+            item:SetData("equip", nil)
+            item:SetData("equipped", nil)
             item:Transfer(nil, nil, nil, client, client:GetPos() + Vector(0, 0, 10))
         end
     end

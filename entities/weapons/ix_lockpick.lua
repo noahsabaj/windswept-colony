@@ -1,0 +1,540 @@
+--[[
+    Lockpick SWEP
+
+    Controls:
+    - RMB on locked door: Start lockpicking minigame
+
+    The minigame is a timing bar with a sweet spot.
+    Player must press LMB when ticker is in the sweet spot.
+    Each attempt damages lock durability.
+    Failed attempts may break the lockpick.
+]]--
+
+AddCSLuaFile()
+
+SWEP.PrintName = "Lockpick"
+SWEP.Author = "Windswept"
+SWEP.Purpose = "Pick locks on doors."
+SWEP.Instructions = "RMB on locked door: Pick lock"
+
+SWEP.Spawnable = false
+SWEP.Drop = false
+
+SWEP.ViewModelFOV = 54
+SWEP.ViewModel = "models/weapons/c_arms.mdl"
+SWEP.WorldModel = "models/props_c17/tools_pliers01a.mdl"
+SWEP.UseHands = true
+SWEP.HoldType = "normal"
+
+SWEP.Primary.ClipSize = -1
+SWEP.Primary.DefaultClip = -1
+SWEP.Primary.Automatic = false
+SWEP.Primary.Ammo = ""
+
+SWEP.Secondary.ClipSize = -1
+SWEP.Secondary.DefaultClip = -1
+SWEP.Secondary.Automatic = false
+SWEP.Secondary.Ammo = ""
+
+SWEP.DrawAmmo = false
+SWEP.DrawCrosshair = true
+
+SWEP.MaxUseDistance = 96
+
+-- Minigame settings
+SWEP.TickerSpeed = 2.0  -- Full bar traversals per second
+SWEP.LockDamageMin = 1
+SWEP.LockDamageMax = 5
+
+-- ============================================================================
+-- NETWORKING
+-- ============================================================================
+
+if SERVER then
+    util.AddNetworkString("ixLockpickStart")
+    util.AddNetworkString("ixLockpickAttempt")
+    util.AddNetworkString("ixLockpickResult")
+    util.AddNetworkString("ixLockpickCancel")
+    util.AddNetworkString("ixLockpickState")
+end
+
+-- ============================================================================
+-- DATA TABLES
+-- ============================================================================
+
+function SWEP:SetupDataTables()
+    self:NetworkVar("Bool", 0, "Picking")
+    self:NetworkVar("Float", 0, "SweetSpotStart")
+    self:NetworkVar("Float", 1, "SweetSpotSize")
+    self:NetworkVar("Int", 0, "CurrentHits")
+    self:NetworkVar("Int", 1, "RequiredHits")
+    self:NetworkVar("Int", 2, "AttemptsLeft")
+end
+
+-- ============================================================================
+-- INITIALIZATION
+-- ============================================================================
+
+function SWEP:Initialize()
+    self:SetHoldType(self.HoldType)
+    self.wasLMBDown = false
+    self.wasRMBDown = false
+    self.nextPickAttempt = 0
+
+    if self.SetPicking then
+        self:SetPicking(false)
+    end
+end
+
+function SWEP:Deploy()
+    self:SetHoldType(self.HoldType)
+    if self.SetPicking then
+        self:SetPicking(false)
+    end
+    return true
+end
+
+function SWEP:IsPicking()
+    if not self.GetPicking then return false end
+    return self:GetPicking()
+end
+
+function SWEP:Holster()
+    self:CancelPicking()
+    return true
+end
+
+function SWEP:OnRemove()
+    self:CancelPicking()
+end
+
+-- ============================================================================
+-- HELPER FUNCTIONS
+-- ============================================================================
+
+function SWEP:GetTargetDoor()
+    local owner = self:GetOwner()
+    if not IsValid(owner) then return nil end
+
+    local tr = util.TraceLine({
+        start = owner:GetShootPos(),
+        endpos = owner:GetShootPos() + owner:GetAimVector() * self.MaxUseDistance,
+        filter = owner
+    })
+
+    local ent = tr.Entity
+    if not IsValid(ent) then return nil end
+
+    -- Check if it's our managed door
+    if ent.ixIsWindsweptDoor then
+        return ent
+    end
+
+    return nil
+end
+
+function SWEP:GenerateSweetSpot()
+    local item = self.ixItem
+    if not item then return 0.5, 0.1 end
+
+    local size = item:GetSweetSpotSize()
+    -- Random position, but ensure it fits on bar
+    local start = math.Rand(0.05, 0.95 - size)
+
+    return start, size
+end
+
+-- ============================================================================
+-- NET RECEIVERS (Server)
+-- ============================================================================
+
+if SERVER then
+    net.Receive("ixLockpickStart", function(len, ply)
+        local weapon = ply:GetActiveWeapon()
+        if not IsValid(weapon) or weapon:GetClass() ~= "ix_lockpick" then return end
+        weapon:StartPicking()
+    end)
+
+    net.Receive("ixLockpickAttempt", function(len, ply)
+        local weapon = ply:GetActiveWeapon()
+        if not IsValid(weapon) or weapon:GetClass() ~= "ix_lockpick" then return end
+        if not weapon:IsPicking() then return end
+
+        local hit = net.ReadBool()
+
+        -- Do damage to lock regardless
+        weapon:DoAttempt()
+
+        if hit then
+            local currentHits = weapon:GetCurrentHits() + 1
+            weapon:SetCurrentHits(currentHits)
+
+            if currentHits >= weapon:GetRequiredHits() then
+                weapon:OnPickSuccess()
+            else
+                -- Partial success, continue
+                ply:EmitSound("buttons/button14.wav", 40)
+
+                -- Generate new sweet spot
+                local sweetStart, sweetSize = weapon:GenerateSweetSpot()
+                weapon:SetSweetSpotStart(sweetStart)
+                weapon:SetSweetSpotSize(sweetSize)
+            end
+        else
+            weapon:OnPickFail()
+        end
+    end)
+
+    net.Receive("ixLockpickCancel", function(len, ply)
+        local weapon = ply:GetActiveWeapon()
+        if not IsValid(weapon) or weapon:GetClass() ~= "ix_lockpick" then return end
+        weapon:CancelPicking()
+    end)
+end
+
+function SWEP:StartPicking()
+    if CLIENT then return end
+    if not self.SetPicking then return end
+    if self:IsPicking() then return end
+
+    local owner = self:GetOwner()
+    local door = self:GetTargetDoor()
+
+    if not IsValid(door) then
+        owner:NotifyLocalized("lockpickNoDoor")
+        return
+    end
+
+    -- Check if door has a lock
+    if not ix.doors.HasLock(door) then
+        owner:NotifyLocalized("lockpickNoLock")
+        return
+    end
+
+    -- Check if door is locked
+    if not door:IsLocked() then
+        owner:NotifyLocalized("lockpickAlreadyUnlocked")
+        return
+    end
+
+    -- Check if lock is broken
+    local lockData = door.ixLockData
+    if lockData.durability and lockData.durability <= 0 then
+        owner:NotifyLocalized("lockpickLockBroken")
+        return
+    end
+
+    local item = self.ixItem
+    if not item then return end
+
+    -- Initialize minigame state
+    local sweetStart, sweetSize = self:GenerateSweetSpot()
+    self:SetSweetSpotStart(sweetStart)
+    self:SetSweetSpotSize(sweetSize)
+    self:SetCurrentHits(0)
+    self:SetRequiredHits(item:GetRequiredHits())
+    self:SetAttemptsLeft(item:GetMaxAttempts())
+    self:SetPicking(true)
+    self.targetDoor = door
+
+    owner:EmitSound("physics/metal/metal_solid_impact_soft3.wav", 40)
+end
+
+function SWEP:CancelPicking()
+    if not self:IsPicking() then return end
+
+    self:SetPicking(false)
+    self.targetDoor = nil
+
+    local owner = self:GetOwner()
+    if IsValid(owner) and SERVER then
+        owner:EmitSound("buttons/button10.wav", 40)
+    end
+end
+
+function SWEP:DoAttempt()
+    if CLIENT then return end
+    if not self:IsPicking() then return end
+
+    local owner = self:GetOwner()
+    local door = self.targetDoor
+    local item = self.ixItem
+
+    if not IsValid(door) or not item then
+        self:CancelPicking()
+        return
+    end
+
+    -- Calculate ticker position (server doesn't have precise timing, use approximate)
+    -- In a real implementation, client would send their ticker position
+    -- For now, we'll trust the client's timing check
+
+    -- Damage the lock
+    if ix.doors.HasLock(door) then
+        local damage = math.random(self.LockDamageMin, self.LockDamageMax)
+        local newDurability = ix.doors.DamageLock(door, damage)
+
+        if newDurability <= 0 then
+            -- Lock broken!
+            door:Fire("unlock")
+            owner:NotifyLocalized("lockpickLockDestroyed")
+            owner:EmitSound("physics/metal/metal_box_break1.wav", 70)
+            self:CancelPicking()
+            return
+        end
+    end
+end
+
+function SWEP:OnPickSuccess()
+    if CLIENT then return end
+
+    local owner = self:GetOwner()
+    local door = self.targetDoor
+
+    if not IsValid(door) then
+        self:CancelPicking()
+        return
+    end
+
+    -- Unlock the door (syncs to partner for double doors)
+    ix.doors.UnlockDoor(door)
+
+    owner:EmitSound("doors/door_latch1.wav", 60)
+    owner:NotifyLocalized("lockpickSuccess")
+
+    self:CancelPicking()
+
+    -- Save persistence
+    if ix.doors and ix.doors.Save then
+        ix.doors.Save()
+    end
+end
+
+function SWEP:OnPickFail()
+    if CLIENT then return end
+
+    local owner = self:GetOwner()
+    local item = self.ixItem
+
+    if not item then
+        self:CancelPicking()
+        return
+    end
+
+    -- Check if lockpick breaks
+    local breakChance = item:GetBreakChance()
+    if math.random() < breakChance then
+        -- Lockpick breaks!
+        owner:EmitSound("physics/metal/metal_sheet_impact_hard6.wav", 70)
+        owner:NotifyLocalized("lockpickBroke")
+
+        -- Remove the lockpick item
+        local character = owner:GetCharacter()
+        if character then
+            local inventory = character:GetInventory()
+            if inventory then
+                inventory:Remove(item:GetID())
+            end
+        end
+
+        owner:StripWeapon("ix_lockpick")
+        owner.ixLockpickItem = nil
+        self:SetPicking(false)
+        self.targetDoor = nil
+        return
+    end
+
+    -- Decrease attempts
+    local attemptsLeft = self:GetAttemptsLeft() - 1
+    self:SetAttemptsLeft(attemptsLeft)
+
+    if attemptsLeft <= 0 then
+        -- Out of attempts
+        owner:NotifyLocalized("lockpickOutOfAttempts")
+        self:CancelPicking()
+        return
+    end
+
+    -- Generate new sweet spot for next attempt
+    local sweetStart, sweetSize = self:GenerateSweetSpot()
+    self:SetSweetSpotStart(sweetStart)
+    self:SetSweetSpotSize(sweetSize)
+
+    owner:EmitSound("buttons/button11.wav", 50)
+end
+
+-- ============================================================================
+-- THINK - Input Detection & Picking Progress
+-- ============================================================================
+
+function SWEP:Think()
+    local owner = self:GetOwner()
+    if not IsValid(owner) then return end
+
+    -- Client-side input detection (Helix doesn't call PrimaryAttack/SecondaryAttack on client)
+    if CLIENT then
+        -- Don't process input if a UI panel is open
+        if vgui.CursorVisible() then
+            self.wasLMBDown = false
+            self.wasRMBDown = false
+            return
+        end
+
+        local rmbDown = input.IsMouseDown(MOUSE_RIGHT)
+        local lmbDown = input.IsMouseDown(MOUSE_LEFT)
+
+        -- RMB pressed - start picking or cancel
+        if rmbDown and not self.wasRMBDown then
+            if self:IsPicking() then
+                -- Cancel while picking
+                net.Start("ixLockpickCancel")
+                net.SendToServer()
+            elseif CurTime() >= (self.nextPickAttempt or 0) then
+                -- Start picking
+                self.nextPickAttempt = CurTime() + 0.5
+                net.Start("ixLockpickStart")
+                net.SendToServer()
+            end
+        end
+
+        -- LMB pressed - attempt pick (when minigame active)
+        if lmbDown and not self.wasLMBDown then
+            if self:IsPicking() then
+                -- Calculate if ticker is in sweet spot
+                local tickerPos = self:GetTickerPosition()
+                local sweetStart = self:GetSweetSpotStart()
+                local sweetSize = self:GetSweetSpotSize()
+
+                local hit = tickerPos >= sweetStart and tickerPos <= (sweetStart + sweetSize)
+
+                net.Start("ixLockpickAttempt")
+                net.WriteBool(hit)
+                net.SendToServer()
+            end
+        end
+
+        self.wasRMBDown = rmbDown
+        self.wasLMBDown = lmbDown
+    end
+
+    -- Picking progress checks (server only)
+    if self:IsPicking() then
+        if SERVER then
+            -- Check if still looking at the same door
+            local currentDoor = self:GetTargetDoor()
+            if currentDoor ~= self.targetDoor then
+                self:CancelPicking()
+                owner:NotifyLocalized("lockpickLookedAway")
+                return
+            end
+
+            -- Check distance
+            if not IsValid(self.targetDoor) then
+                self:CancelPicking()
+                return
+            end
+
+            local distance = owner:GetPos():Distance(self.targetDoor:GetPos())
+            if distance > self.MaxUseDistance + 32 then
+                self:CancelPicking()
+                owner:NotifyLocalized("lockpickTooFar")
+                return
+            end
+        end
+    end
+end
+
+function SWEP:GetTickerPosition()
+    -- Oscillate between 0 and 1
+    local time = CurTime() * self.TickerSpeed
+    return (math.sin(time * math.pi) + 1) / 2
+end
+
+-- ============================================================================
+-- WORLD MODEL RENDERING
+-- ============================================================================
+
+function SWEP:DrawWorldModel()
+    local owner = self:GetOwner()
+    if not IsValid(owner) then
+        return self:DrawModel()
+    end
+
+    local boneIndex = owner:LookupBone("ValveBiped.Bip01_R_Hand")
+    if not boneIndex then
+        return self:DrawModel()
+    end
+
+    local boneMatrix = owner:GetBoneMatrix(boneIndex)
+    if not boneMatrix then
+        return self:DrawModel()
+    end
+
+    local pos = boneMatrix:GetTranslation()
+    local ang = boneMatrix:GetAngles()
+
+    pos = pos + ang:Forward() * 3 + ang:Right() * 0.5 + ang:Up() * -1
+    ang:RotateAroundAxis(ang:Forward(), 45)
+
+    self:SetRenderOrigin(pos)
+    self:SetRenderAngles(ang)
+    self:DrawModel()
+end
+
+-- ============================================================================
+-- HUD - Lockpicking Minigame
+-- ============================================================================
+
+if CLIENT then
+    function SWEP:DrawHUD()
+        if not self:IsPicking() then return end
+
+        local w, h = ScrW(), ScrH()
+        local barW, barH = 300, 30
+        local x, y = (w - barW) / 2, h * 0.6
+
+        -- Background
+        surface.SetDrawColor(30, 30, 30, 230)
+        surface.DrawRect(x - 10, y - 60, barW + 20, barH + 100)
+
+        -- Sweet spot
+        local sweetStart = self:GetSweetSpotStart()
+        local sweetSize = self:GetSweetSpotSize()
+        local sweetX = x + (barW * sweetStart)
+        local sweetW = barW * sweetSize
+
+        surface.SetDrawColor(50, 150, 50, 200)
+        surface.DrawRect(sweetX, y, sweetW, barH)
+
+        -- Bar background
+        surface.SetDrawColor(60, 60, 60, 255)
+        surface.DrawRect(x, y, barW, barH)
+
+        -- Sweet spot on top
+        surface.SetDrawColor(80, 200, 80, 255)
+        surface.DrawRect(sweetX, y, sweetW, barH)
+
+        -- Border
+        surface.SetDrawColor(200, 200, 200, 255)
+        surface.DrawOutlinedRect(x, y, barW, barH, 2)
+
+        -- Ticker
+        local tickerPos = self:GetTickerPosition()
+        local tickerX = x + (barW * tickerPos) - 2
+        surface.SetDrawColor(255, 255, 255, 255)
+        surface.DrawRect(tickerX, y - 5, 4, barH + 10)
+
+        -- Progress (hits)
+        local currentHits = self:GetCurrentHits()
+        local requiredHits = self:GetRequiredHits()
+
+        draw.SimpleText("Progress: " .. currentHits .. "/" .. requiredHits, "ixSmallFont", w / 2, y - 30, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
+
+        -- Attempts remaining
+        local attemptsLeft = self:GetAttemptsLeft()
+        draw.SimpleText("Attempts: " .. attemptsLeft, "ixSmallFont", w / 2, y + barH + 15, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+
+        -- Instructions
+        draw.SimpleText("LMB when ticker is in green zone | RMB to cancel", "ixSmallFont", w / 2, y + barH + 35, Color(150, 150, 150), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+    end
+end

@@ -84,6 +84,14 @@ windswept/
 
 - For the battery system, "up" stands for "units of power", so a 100up battery has 100 units of power. Device drain rates vary: flashlight ~0.083up/sec (20 min per battery), lantern ~0.167up/sec (10 min per battery). Batteries are universal across all devices (defibrillator, flashlight, camera, lantern, etc.).
 
+- **Door & Lock System**: Physical lock and key system replacing Helix's door ownership. Key points:
+  - **Brush-based doors are ignored**: Doors with models starting with `*` (func_door, func_door_rotating) are skipped by the entire system - detection, tools, battering ram, everything. Only `prop_door_rotating` doors are managed.
+  - **Double door linking**: After spawning, doors are linked via `ixPartner` based on `targetname`/`slavename` keyvalues. This enables Helix's `GetDoorPartner()` to work for lock sync and breach sync.
+  - **Lock sync for double doors**: `InstallLock()`, `RemoveLock()`, `LockDoor()`, `UnlockDoor()`, and `DamageLock()` all sync to partner doors automatically. Install a lock on one door, both doors get it.
+  - **Breach = permanent destruction**: `ix.doors.BreachDoor()` permanently destroys the door with debris gibs and particle effects. The door is gone - frame is empty until a new door is installed. No restore, no respawn.
+  - **Battering ram hit counter persists**: When a door is hit, the hit counter (`ixBatteringRamRequired`, `ixBatteringRamHits`) persists until the door is **repaired** or **destroyed**. No time-based reset. Saved to persistence file.
+  - **Repair resets damage**: `ix.doors.RepairDoor()` resets health AND clears the battering ram hit counter.
+
 ## Workflows
 
 ### How Workshop Addons Work
@@ -134,7 +142,64 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 
 - **SWEP:CreateMove() doesn't exist**: Not a valid SWEP method. Use `hook.Add("CreateMove", ...)` globally and check `LocalPlayer():GetActiveWeapon()` inside.
 
-- **PrimaryAttack/SecondaryAttack are SERVER-only in Helix**: Helix only calls these on SERVER. For client-side input, detect in Think() using `input.IsMouseDown()` with edge detection (`self.wasLMBDown`).
+- **PrimaryAttack/SecondaryAttack are SERVER-only in Helix (CRITICAL)**: Helix only calls these on SERVER, not CLIENT. This is the most common SWEP bug in this codebase. Any code inside `if CLIENT then` blocks within these functions will NEVER execute.
+
+  **The Problem:**
+  ```lua
+  -- THIS DOES NOT WORK - client code inside PrimaryAttack never runs
+  function SWEP:PrimaryAttack()
+      if CLIENT then
+          net.Start("ixMyAction")  -- Never executes!
+          net.SendToServer()
+      end
+  end
+  ```
+
+  **The Solution:** Detect input in Think() using `input.IsMouseDown()` with edge detection:
+  ```lua
+  function SWEP:Initialize()
+      self:SetHoldType(self.HoldType)
+      self.wasLMBDown = false
+      self.wasRMBDown = false
+  end
+
+  function SWEP:Think()
+      if CLIENT then
+          -- Block input when UI is open
+          if vgui.CursorVisible() then
+              self.wasLMBDown = false
+              self.wasRMBDown = false
+              return
+          end
+
+          local lmbDown = input.IsMouseDown(MOUSE_LEFT)
+          local rmbDown = input.IsMouseDown(MOUSE_RIGHT)
+
+          -- Edge detection: only trigger on press, not hold
+          if lmbDown and not self.wasLMBDown then
+              net.Start("ixMyAction")
+              net.SendToServer()
+          end
+
+          self.wasLMBDown = lmbDown
+          self.wasRMBDown = rmbDown
+      end
+  end
+  ```
+
+  **Key components:**
+  - `self.wasLMBDown`/`self.wasRMBDown` - Track previous frame's state for edge detection
+  - `vgui.CursorVisible()` - Prevent weapon input when inventory/menus are open
+  - `input.IsMouseDown(MOUSE_LEFT/MOUSE_RIGHT)` - Direct input polling
+  - Edge detection pattern: `if down and not wasDown then` - Triggers once per click, not continuously
+
+  **For NetworkVars:** Add safety checks since Think() runs before SetupDataTables completes:
+  ```lua
+  function SWEP:IsPerformingAction()
+      if not self.GetLocking then return false end  -- Safety check
+      return self:GetLocking() or self:GetUnlocking()
+  end
+  ```
 
 - **SWEP:Think() runs on both realms**: Server has no input context, so `owner:KeyDown()` returns false server-side, causing state flicker. Wrap all input logic in `if CLIENT then`.
 
@@ -172,11 +237,15 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 
 - **Double door synchronization**: Double doors use `targetname`/`slavename` to sync. The master door's `slavename` references the slave door's `targetname`. Without capturing BOTH keyvalues when replacing map doors, double doors will open/close independently and may open in opposite directions.
 
+- **ixPartner vs targetname/slavename**: Source Engine uses `targetname`/`slavename` keyvalues for engine-level door sync (open/close together). Helix uses `door.ixPartner` (a Lua property) for Lua-level partner lookup (`GetDoorPartner()`). These are SEPARATE systems. Setting keyvalues does NOT set `ixPartner`. If you spawn doors with keyvalues but don't set `ixPartner`, Helix functions like `BlastDoor()` won't find partners. Our `ix.doors.LinkPartners()` builds `ixPartner` links after spawning by matching `slavename` to `targetname`.
+
 - **Door handles are NOT separate entities**: They're part of the door model, controlled by the `hardware` keyvalue and model bodygroups. The model has a "handle" bone that can be queried via `LookupBone("handle")`.
 
 - **Brush-based doors vs prop-based doors**: Source maps have two door types. `prop_door_rotating` uses model files (`models/props/door01.mdl`). `func_door`/`func_door_rotating` use brush geometry with models like `*90`, `*57` - these are BSP brush references. You CANNOT spawn a prop entity with a brush model (`ent:SetModel("*90")` fails with "CBreakableProp::Spawn - GetModelPtr returned NULL!"). When detecting map doors with `ent:IsDoor()`, check if the model starts with `*` and skip those - they can't be replaced with prop entities.
 
 - **MapIO infinite loop warnings**: Firing events (`door:Fire("unlock")`) on map entities can trigger I/O chains. If the map has circular I/O connections, Source emits "Breaking out of potential MapIO infinite loop!" warnings. This is map design, not a code bug - Source is protecting itself.
+
+- **Door lock/unlock sounds**: Use `doors/door_latch3.wav` for locking (heavier click) and `doors/door_latch1.wav` for unlocking (lighter click).
 
 ### GMod Networking
 
@@ -216,29 +285,45 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 
 ### Derma/UI Development
 
-- **NEVER hardcode pixel sizes**: Treat hardcoded pixel values like magic numbers in web dev - they don't scale across resolutions. Always derive sizes from font metrics or use `ScreenScale()`.
+- **NEVER hardcode pixel sizes**: Treat hardcoded pixel values like magic numbers in web dev - they don't scale across resolutions and lead to "pixel whack-a-mole" debugging. ALL UI should be dynamically/responsively sized based on content.
 
-- **Font-based sizing pattern**: Measure text to determine element dimensions:
+- **Dynamic box sizing pattern (PREFERRED)**: Measure content first, then size container to fit:
 ```lua
-surface.SetFont("ixBigFont")
-local textW, textH = surface.GetTextSize("0")
-local digitBoxSize = math.max(textW, textH) + ScreenScale(12)  -- Content + padding
+function SWEP:DrawHUD()
+    local padding = ScreenScale(5)
+    local lineSpacing = ScreenScale(2)
+
+    -- 1. Measure all text FIRST
+    surface.SetFont("ixSmallFont")
+    local line1W, line1H = surface.GetTextSize(text1)
+    local line2W, line2H = surface.GetTextSize(text2)
+
+    -- 2. Calculate box size FROM content
+    local boxW = math.max(line1W, line2W) + (padding * 2)
+    local boxH = line1H + lineSpacing + line2H + (padding * 2)
+
+    -- 3. Position and draw
+    local x = (ScrW() - boxW) / 2
+    local y = ScrH() * 0.7
+
+    surface.SetDrawColor(30, 30, 30, 200)
+    surface.DrawRect(x, y, boxW, boxH)
+
+    -- 4. Draw text at calculated positions
+    local textY = y + padding
+    draw.SimpleText(text1, "ixSmallFont", ScrW() / 2, textY, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+    textY = textY + line1H + lineSpacing
+    draw.SimpleText(text2, "ixSmallFont", ScrW() / 2, textY, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+end
 ```
 
 - **ScreenScale() for padding/margins**: `ScreenScale(n)` scales a value based on screen resolution (1080p baseline). Use for all spacing:
 ```lua
-self.padding = ScreenScale(8)
-self.buttonHeight = textHeight + ScreenScale(10)
+local padding = ScreenScale(5)
+local lineSpacing = ScreenScale(2)
 ```
 
 - **Helix font reference**: `ixBigFont` = 36px, `ixMediumFont` = 25px, `ixSmallFont` = scales with `ScreenScale(6)` minimum 17px. Always use these for consistency.
-
-- **Calculate panel size from content**: Don't set arbitrary panel dimensions. Calculate based on what's inside:
-```lua
-local contentWidth = (elementSize * count) + (spacing * (count - 1))
-local panelWidth = contentWidth + (padding * 2)
-self:SetSize(panelWidth, calculatedHeight)
-```
 
 - **Button width from text**: Measure the longest button label, add padding:
 ```lua

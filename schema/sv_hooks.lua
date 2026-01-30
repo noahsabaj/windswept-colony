@@ -3,6 +3,14 @@
 ]]--
 
 -- ============================================================================
+-- LOG TYPES
+-- ============================================================================
+
+ix.log.AddType("battering_ram_breach", function(client, doorClass, doorIndex)
+	return string.format("%s breached a door (%s #%d) with a battering ram.", client:Name(), doorClass, doorIndex)
+end)
+
+-- ============================================================================
 -- LADDER INTEGRATION
 -- ============================================================================
 
