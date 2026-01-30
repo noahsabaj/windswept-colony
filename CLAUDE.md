@@ -40,9 +40,9 @@ windswept/
 
 ## Reference Codebases
 
-- D:\SteamLibrary\steamapps\common\GarrysMod\garrysmod\gamemodes\helix is the path for the framework that we are using to build this, it's locally cloned so we can edit it however we want. If you ever need to read the source code of the framework, just go to that path and all the source code is there for you to read and adjust however we want. It is MIT License.
+- D:\SteamLibrary\steamapps\common\GarrysMod\garrysmod\gamemodes\helix is **OUR framework** - not a dependency. We forked it and own it completely. Edit it directly whenever needed. The original Helix is unmaintained on GitHub anyway. Don't create workarounds or overrides when you can just fix it in Helix itself.
 
-- D:\SteamLibrary\steamapps\common\GarrysMod\garrysmod\gamemodes\helix-hl2rp is the path for a fully implemented Half-Life 2 RP gamemode in Garry's Mod using the Helix framework. We can reverse engineer it however we want, it is a great implementation example and you can read its source code. It is MIT License.
+- D:\SteamLibrary\steamapps\common\GarrysMod\garrysmod\gamemodes\helix-hl2rp is a fully implemented Half-Life 2 RP gamemode using the Helix framework. Great implementation reference. MIT License.
 
 ## Lore Details
 
@@ -146,6 +146,38 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 
 - **Entity/weapon naming conflict**: Don't name a scripted entity the same as a weapon class. If weapon `ix_lantern` exists, an entity named `ix_lantern` will have broken NetworkVars (SetupDataTables doesn't register methods properly). Use distinct names like `ix_lantern` (weapon) and `ix_lantern_dropped` (entity).
 
+- **SWEP.Drop = false is intentional**: All custom SWEPs use `SWEP.Drop = false` to prevent GMod's native weapon drop (which creates raw weapon entities). Instead, the permadeath system handles drops via `item:Transfer()` in `CreateKnockout()`, which properly creates Helix item entities that preserve all item data. When a player is knocked while holding an item, only the actively held weapon drops - other equipped items stay in inventory. Protected weapons (ix_hands, ix_handsup) never drop.
+
+- **Equip data key inconsistency**: Helix's `base_weapons` uses `"equip"` while custom items (flashlight, binoculars, camera, etc.) use `"equipped"`. When writing code that handles both (like knockout drops), clear BOTH keys: `item:SetData("equip", nil)` and `item:SetData("equipped", nil)`.
+
+- **TFA/addon weapon models have broken collision for item pickup**: Workshop weapon models (TFA, M9K, CW, etc.) are designed as weapon attachments, not physics props. Their collision meshes are often razor-thin (1-2 units) because collision doesn't matter when attached to a player's hand. When used as Helix items dropped on the ground, eye traces can't hit them → no tooltip, no pickup. Fix is in `ix_item.lua`: detect thin collision bounds (<4 units in any dimension), replace with OBB-based fallback box physics, and use `COLLISION_GROUP_WEAPON` to prevent trapping players.
+
+### Source Engine Entities
+
+- **Replacing map entities requires full data capture**: When spawning entities to replace map-placed ones (like our door system), you must capture and restore ALL visual properties: `GetSkin()`, `GetColor()`, `GetMaterial()`, `GetSubMaterial()`, `GetBodyGroups()`. Missing any of these causes visual differences (wrong door color, missing parts, etc.).
+
+- **Entity keyvalues via GetKeyValues()**: Map entities have keyvalues set by the mapper. Use `ent:GetKeyValues()` to get them all as a table, then `ent:SetKeyValue(key, value)` to apply to spawned entities. Critical for doors, buttons, etc.
+
+- **SetKeyValue() BEFORE Spawn()**: Some keyvalues (like `hardware` for door handles) must be set before calling `Spawn()` or they won't take effect. Set model, position, angles, and keyvalues first, THEN call `Spawn()` and `Activate()`.
+
+- **prop_door_rotating keyvalues** (from [Valve Developer Wiki](https://developer.valvesoftware.com/wiki/Prop_door_rotating)):
+  - `hardware`: Door handle type (0=none, 1=lever, 2=push bar, 3=keypad) - **critical for handles to appear**
+  - `targetname`: Door's name for I/O references and double door linking
+  - `slavename`: Name of door(s) that open/close together - **critical for double doors**
+  - `opendir`: Force open direction (0=both, 1=forward only, 2=backward only)
+  - `skin`: Model skin variant (same model, different textures)
+  - `spawnflags`: Behavior flags (starts locked, silent, etc.)
+  - `distance`, `speed`, `returndelay`: Door movement settings
+  - `soundopenoverride`, `soundcloseoverride`, etc.: Custom sounds
+
+- **Double door synchronization**: Double doors use `targetname`/`slavename` to sync. The master door's `slavename` references the slave door's `targetname`. Without capturing BOTH keyvalues when replacing map doors, double doors will open/close independently and may open in opposite directions.
+
+- **Door handles are NOT separate entities**: They're part of the door model, controlled by the `hardware` keyvalue and model bodygroups. The model has a "handle" bone that can be queried via `LookupBone("handle")`.
+
+- **Brush-based doors vs prop-based doors**: Source maps have two door types. `prop_door_rotating` uses model files (`models/props/door01.mdl`). `func_door`/`func_door_rotating` use brush geometry with models like `*90`, `*57` - these are BSP brush references. You CANNOT spawn a prop entity with a brush model (`ent:SetModel("*90")` fails with "CBreakableProp::Spawn - GetModelPtr returned NULL!"). When detecting map doors with `ent:IsDoor()`, check if the model starts with `*` and skip those - they can't be replaced with prop entities.
+
+- **MapIO infinite loop warnings**: Firing events (`door:Fire("unlock")`) on map entities can trigger I/O chains. If the map has circular I/O connections, Source emits "Breaking out of potential MapIO infinite loop!" warnings. This is map design, not a code bug - Source is protecting itself.
+
 ### GMod Networking
 
 - **64KB net message limit**: `net.WriteData()` and `net.WriteString()` cap at ~64KB. Reduce data at source (smaller images, lower quality) rather than chunking.
@@ -217,6 +249,27 @@ local buttonWidth = maxTextW + ScreenScale(10) * 2
 
 - **Helix auto-includes `schema/derma/`**: Files in this folder are automatically loaded by the framework (via `ix.util.IncludeDir` in sh_plugin.lua). No manual includes needed.
 
+## Persistence & Save Files
+
+Custom systems that persist data across server restarts save JSON files to `garrysmod/data/helix/<system>/<mapname>.json`. To reset a system to its default/bootstrap state, delete its save file:
+
+| System | Save File Location |
+|--------|-------------------|
+| Doors | `data/helix/doors/gm_windswept.json` |
+
+**Full path example:** `D:/SteamLibrary/steamapps/common/GarrysMod/garrysmod/data/helix/doors/gm_windswept.json`
+
+When a save file is missing, systems typically run a bootstrap function to initialize default state (e.g., `ix.doors.BootstrapDefaultDoors()` spawns all map doors on first run).
+
+**When to delete save files:**
+- After major refactors that change data structure
+- To test fresh bootstrap behavior
+- When saved state becomes corrupted or inconsistent
+
 ## Quick Notes from the Human Developer
 
 - **Use ripgrep (rg) instead of grep (grep)**. Ripgrep is way faster than grep, and you know that.
+
+- **How I give items to myself when in game playing**: If we make a new item, to test it in game, I'll write into the text chat bar: /chargiveitem playername item quantity.
+
+- **Use developer.valvesoftware.com docs**: Use whenever you need help with anything like for example when we were implementing custom doors entity we read through https://developer.valvesoftware.com/wiki/Prop_door_rotating and it really helped us solve the problems with all the doors on the map
