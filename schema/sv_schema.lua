@@ -22,3 +22,23 @@ function playerMeta:HasWhitelist(faction)
     -- Always return true - no whitelist restrictions
     return true
 end
+
+-- Give Personal ID to ALL new characters (moved from Civilians faction)
+hook.Add("OnCharacterCreated", "ixWindsweptPersonalID", function(client, character)
+    -- Generate a unique 5-digit ID number
+    local id = string.format("%05d", math.random(1, 99999))
+    local inventory = character:GetInventory()
+
+    -- Store the ID on the character for reference
+    character:SetData("personalID", id)
+
+    -- Get physical data stored during character creation
+    local physical = character:GetData("physical", {})
+
+    -- Give them their Personal ID card with physical attributes
+    inventory:Add("personal_id", 1, {
+        ownerName = character:GetName(),
+        id = id,
+        physical = physical
+    })
+end)
