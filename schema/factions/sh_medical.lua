@@ -1,7 +1,7 @@
 --[[
     MEDICAL FACTION
     
-    Colonial Medical - the medical staff at Redrock City, working at the hospital.
+    Redrock City Medical Department - the medical staff at Redrock City, working at the hospital.
 
     The Hospital is Redrock City General Hospital.
 
@@ -10,13 +10,13 @@
     The Chief Medical Officer then appoints all medical staff below them.
 
     They provide medical care to all patients and residents of Redrock City.
-    They report to the Mayor and work closely with Colonial Security.
+    They report to the Mayor and work closely with Redrock City Security.
     They also ensure the hospital can function as a medical resource for the colony,
     overseeing patient care and coordinating with civilian supervisors.
 ]]--
 
 FACTION.name = "Medical"
-FACTION.description = "Colonial Medical. You provide medical care at Redrock City. Your Chief Medical Officer is appointed by the Mayor."
+FACTION.description = "Redrock City Medical Department. You provide medical care at Redrock City. Your Chief Medical Officer is appointed by the Mayor."
 FACTION.color = Color(200, 200, 200) -- Light gray
 FACTION.isDefault = false
 
