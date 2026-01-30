@@ -14,8 +14,7 @@ resource.AddWorkshop("1376312181")  -- TFA INS2 KA-BAR Combat Knife
 
 -- Disable faction whitelist requirements
 -- All factions are open for transfer without needing /PlyWhitelist first
--- Players still start as Civilians (the only isDefault=true faction)
--- but admins can /PlyTransfer them to any faction directly
+-- Players start factionless (no faction) and admins use /PlyTransfer to assign factions
 local playerMeta = FindMetaTable("Player")
 
 function playerMeta:HasWhitelist(faction)

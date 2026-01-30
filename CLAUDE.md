@@ -76,7 +76,7 @@ windswept/
 
 - Always be Helix-idiomatic. Before implementing any feature, check if Helix already provides it or has an established pattern for it. Read the framework source code in helix/gamemode/core/ to understand how things are done. For example, when we created custom character creation panels, we initially added our own labels and height logic, but Helix already auto-creates labels above OnDisplay panels and uses font-based height sizing (see ixTextEntry and ixNumSlider in cl_generic.lua). Following existing patterns avoids bugs and keeps code consistent.
 
-- All characters are created as Civilians (the default faction). Personal IDs are given (spawned into inventory upon character creation) only during Civilian character creation because every character starts there. Players join other factions (Medical, Security, Corrections, etc.) through in-game faction transfers after their character exists - no one is created directly into a non-Civilian faction.
+- All characters are created **factionless** by default (no faction assignment). Personal IDs are given to ALL new characters via the `OnCharacterCreated` hook in `sv_schema.lua`. Players join factions (Medical, Security, Corrections, Miners Union, etc.) through in-game faction transfers (`/PlyTransfer`) after their character exists. Factionless characters appear in the "Unaffiliated" section of the scoreboard and use `TEAM_UNASSIGNED` (0) in Source Engine. Citizenship is an RP concept tracked by players, not a faction.
 
 ## Game Systems
 
