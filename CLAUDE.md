@@ -135,6 +135,14 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
       type = ix.type.array  -- Required for arrays!
   })
   ```
+  **WARNING**: `ix.type.array` is for **dropdown selections** (single choice from options), not static lists. It requires a `populate` function to provide dropdown options. If your config is a static list not meant to be edited via dropdown (like a list of models), add `hidden = function() return true end` to prevent the settings UI from trying to render it as a broken dropdown:
+  ```lua
+  ix.config.Add("modelList", {"model1.mdl", "model2.mdl"}, "Description", nil, {
+      category = "myCategory",
+      type = ix.type.array,
+      hidden = function() return true end  -- Prevents DComboBox nil error
+  })
+  ```
 
 - **CanTransferItem hook name**: The hook is `CanTransferItem`, NOT `CanItemBeTransfered`. Wrong name = silent failure.
 
