@@ -287,6 +287,9 @@ function ENT:Think()
         -- goes out it means it was actively extinguished - don't auto-reignite
         if self:IsRagdollOnFire() then
             self:HandleCremation()
+        else
+            -- Fire not burning - clear burn tracking so resuming doesn't count gap time
+            self.ixLastBurnThink = nil
         end
         self:NextThink(CurTime() + 0.5)
         return true
@@ -302,6 +305,9 @@ function ENT:Think()
             self:HalveTimer()
             self.ixLastFireDamage = CurTime()
         end
+    else
+        -- Fire not burning - clear burn tracking so resuming doesn't count gap time
+        self.ixLastBurnThink = nil
     end
 
     -- Check knockout timer expiration (for knocked but not dead bodies)
