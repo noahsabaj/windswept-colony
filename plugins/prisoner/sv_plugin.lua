@@ -19,6 +19,8 @@ util.AddNetworkString("ixPrisonerManageSubmit")
 util.AddNetworkString("ixPrisonerRelease")
 util.AddNetworkString("ixPrisonerAdjust")
 util.AddNetworkString("ixPrisonCardView")
+util.AddNetworkString("ixDragStart")
+util.AddNetworkString("ixDragStop")
 
 -- Store reference to plugin for use in net.Receive handlers
 -- (PLUGIN global is only available during initial load)
@@ -71,15 +73,17 @@ function PLUGIN:PlayerUse(client, entity)
     end)
 end
 
--- Handle gagging when pressing USE on a restricted player while holding shift
+-- Handle gagging when pressing R (reload) while looking at a restricted player
 function PLUGIN:KeyPress(client, key)
-    if key ~= IN_USE then return end
+    if key ~= IN_RELOAD then return end
     if client:IsRestricted() then return end
-    if not client:KeyDown(IN_SPEED) then return end -- Require SHIFT+USE to gag
 
     local target = client:GetEyeTrace().Entity
     if not IsValid(target) or not target:IsPlayer() then return end
     if not target:IsRestricted() then return end
+
+    -- Must be within interaction range
+    if client:GetPos():DistToSqr(target:GetPos()) > (96 * 96) then return end
 
     -- Toggle gag state
     local gagged = target:GetNetVar("gagged", false)
@@ -124,10 +128,22 @@ function PLUGIN:PlayerLoadedCharacter(client, character)
     end
 end
 
--- Clean up timer on disconnect
+-- Clean up timer and drag on disconnect
 function PLUGIN:PlayerDisconnected(client)
     local timerName = "ixSentence_" .. client:SteamID64()
     timer.Remove(timerName)
+
+    -- Stop any active drag (this player as dragger)
+    self:StopDrag(client)
+
+    -- Also check if this player was being dragged
+    local draggedBy = client:GetNetVar("ixDraggedBy")
+    if draggedBy then
+        local dragger = Entity(draggedBy)
+        if IsValid(dragger) then
+            self:StopDrag(dragger)
+        end
+    end
 end
 
 -- Start the sentence countdown timer
@@ -422,6 +438,152 @@ function PLUGIN:GetReleasePoint()
     end
     return nil
 end
+
+-- ============================================================================
+-- DRAG MECHANIC
+-- ============================================================================
+
+-- Start dragging a restrained player
+function PLUGIN:StartDrag(dragger, target)
+    if not IsValid(dragger) or not IsValid(target) then return false end
+    if not target:IsRestricted() then return false end
+    if dragger:IsRestricted() then return false end
+
+    -- Must be holding ix_hands weapon
+    local weapon = dragger:GetActiveWeapon()
+    if not IsValid(weapon) or weapon:GetClass() ~= "ix_hands" then return false end
+
+    -- Hands must be lowered (not raised)
+    if dragger:IsWepRaised() then return false end
+
+    -- Check if dragger is already dragging someone
+    if dragger:GetNetVar("ixDragging") then return false end
+
+    -- Check if target is already being dragged
+    if target:GetNetVar("ixDraggedBy") then return false end
+
+    -- Check distance
+    if dragger:GetPos():DistToSqr(target:GetPos()) > (96 * 96) then return false end
+
+    -- Set drag state
+    dragger:SetNetVar("ixDragging", target:EntIndex())
+    target:SetNetVar("ixDraggedBy", dragger:EntIndex())
+
+    -- Store original speeds to restore later
+    dragger.ixOriginalRunSpeed = dragger:GetRunSpeed()
+    target.ixOriginalWalkSpeed = target:GetWalkSpeed()
+    target.ixOriginalRunSpeed = target:GetRunSpeed()
+
+    -- Dragger can't sprint while dragging
+    dragger:SetRunSpeed(dragger:GetWalkSpeed())
+
+    -- Target moves at snail's pace
+    target:SetWalkSpeed(30)
+    target:SetRunSpeed(30)
+
+    -- Play grab sound
+    dragger:EmitSound("physics/body/body_medium_impact_soft2.wav", 60)
+
+    return true
+end
+
+-- Stop dragging
+function PLUGIN:StopDrag(dragger)
+    if not IsValid(dragger) then return end
+
+    local targetIndex = dragger:GetNetVar("ixDragging")
+    if not targetIndex then return end
+
+    local target = Entity(targetIndex)
+
+    -- Restore dragger speed
+    if dragger.ixOriginalRunSpeed then
+        dragger:SetRunSpeed(dragger.ixOriginalRunSpeed)
+        dragger.ixOriginalRunSpeed = nil
+    end
+
+    -- Restore target speed (if still valid and restrained)
+    if IsValid(target) then
+        if target.ixOriginalWalkSpeed then
+            target:SetWalkSpeed(target.ixOriginalWalkSpeed)
+            target.ixOriginalWalkSpeed = nil
+        end
+        if target.ixOriginalRunSpeed then
+            target:SetRunSpeed(target.ixOriginalRunSpeed)
+            target.ixOriginalRunSpeed = nil
+        end
+        target:SetNetVar("ixDraggedBy", nil)
+    end
+
+    dragger:SetNetVar("ixDragging", nil)
+end
+
+-- Think hook for drag physics
+function PLUGIN:Think()
+    for _, dragger in player.Iterator() do
+        local targetIndex = dragger:GetNetVar("ixDragging")
+        if targetIndex then
+            local target = Entity(targetIndex)
+
+            -- Validate drag still valid
+            if not IsValid(target) or not target:IsPlayer() or not target:IsRestricted() then
+                self:StopDrag(dragger)
+            -- Check dragger still has hands equipped and lowered
+            elseif not IsValid(dragger:GetActiveWeapon()) or dragger:GetActiveWeapon():GetClass() ~= "ix_hands" then
+                self:StopDrag(dragger)
+            elseif dragger:IsWepRaised() then
+                self:StopDrag(dragger)
+            else
+                local distance = dragger:GetPos():Distance(target:GetPos())
+
+                -- Break drag if too far (150 units)
+                if distance > 150 then
+                    self:StopDrag(dragger)
+                    dragger:Notify("You lost your grip.")
+                elseif distance > 48 then
+                    -- Pull target toward dragger
+                    local direction = (dragger:GetPos() - target:GetPos()):GetNormalized()
+                    local pullStrength = math.Clamp((distance - 48) * 3, 50, 200)
+                    target:SetVelocity(direction * pullStrength)
+                end
+            end
+        end
+    end
+end
+
+-- Stop drag when target is unrestrained
+hook.Add("OnPlayerUnRestricted", "ixStopDragOnUnrestrain", function(target)
+    local draggedBy = target:GetNetVar("ixDraggedBy")
+    if draggedBy then
+        local dragger = Entity(draggedBy)
+        if IsValid(dragger) then
+            local plugin = ix.plugin.Get("prisoner")
+            if plugin then
+                plugin:StopDrag(dragger)
+            end
+        end
+    end
+end)
+
+-- Net receivers for drag
+net.Receive("ixDragStart", function(len, client)
+    local target = net.ReadEntity()
+    local plugin = ix.plugin.Get("prisoner")
+    if plugin then
+        plugin:StartDrag(client, target)
+    end
+end)
+
+net.Receive("ixDragStop", function(len, client)
+    local plugin = ix.plugin.Get("prisoner")
+    if plugin then
+        plugin:StopDrag(client)
+    end
+end)
+
+-- ============================================================================
+-- SENTENCING UI NETWORK RECEIVERS
+-- ============================================================================
 
 -- Network receivers for sentencing UI
 net.Receive("ixPrisonerSentenceSubmit", function(len, client)

@@ -49,12 +49,12 @@ function ix.factions.BootstrapClasses()
     }
 
     -- Define high-ranking non-anchor classes (these are static, defined in Lua)
-    -- These are NOT rank 255 but are predefined important positions
+    -- Deputies are rank 254 (directly below their leader), others are rank 200
     local staticClasses = {
-        {faction = "administration", uniqueID = "deputy_mayor", name = "Deputy Mayor", pay = 150, rank = 200},
+        {faction = "administration", uniqueID = "deputy_mayor", name = "Deputy Mayor", pay = 150, rank = 254},
         {faction = "administration", uniqueID = "judge", name = "Judge", pay = 120, rank = 200},
-        {faction = "security", uniqueID = "deputy_commissioner", name = "Deputy Commissioner", pay = 120, rank = 200},
-        {faction = "minersunion", uniqueID = "vice_president", name = "Vice President", pay = 130, rank = 200},
+        {faction = "security", uniqueID = "deputy_commissioner", name = "Deputy Commissioner", pay = 120, rank = 254},
+        {faction = "minersunion", uniqueID = "vice_president", name = "Vice President", pay = 130, rank = 254},
     }
 
     -- Define default classes (rank 0) - entry point for each faction

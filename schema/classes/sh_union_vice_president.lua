@@ -6,6 +6,8 @@
 CLASS.name = "Vice President"
 CLASS.faction = FACTION_UNION
 CLASS.isDefault = false
+CLASS.isAnchor = false  -- Not a leader class
+CLASS.rank = 254        -- Directly below Union President (255)
 CLASS.description = "Second in command of the Miners Union."
 
 function CLASS:OnCanBe(client)

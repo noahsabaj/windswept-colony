@@ -8,6 +8,8 @@
 CLASS.name = "Deputy Commissioner"
 CLASS.faction = FACTION_SECURITY
 CLASS.isDefault = false
+CLASS.isAnchor = false  -- Not a leader class
+CLASS.rank = 254        -- Directly below Commissioner (255)
 CLASS.description = "The Commissioner's right hand. You command when they're absent."
 
 function CLASS:OnCanBe(client)

@@ -35,6 +35,76 @@ if SERVER then
     util.AddNetworkString("ixBallotClose")          -- Client->Server: Close ballot UI
 end
 
+-- Register log types (must be done after Helix initializes)
+function PLUGIN:InitializedPlugins()
+    ix.log.AddType("succession", function(client, ...)
+        local arg = {...}
+        return string.format("%s transferred leadership to %s.", client:Name(), arg[1])
+    end)
+
+    ix.log.AddType("successionNone", function(client, ...)
+        return string.format("%s resigned with no available successor.", client:Name())
+    end)
+
+    ix.log.AddType("successionAuto", function(client, ...)
+        local arg = {...}
+        return string.format("%s resigned; %s was auto-promoted.", client:Name(), arg[1])
+    end)
+
+    ix.log.AddType("successionVote", function(client, ...)
+        return string.format("%s resigned, triggering a succession vote.", client:Name())
+    end)
+
+    ix.log.AddType("classCreate", function(client, ...)
+        local arg = {...}
+        return string.format("%s created class '%s' at rank %d.", client:Name(), arg[1], arg[2])
+    end)
+
+    ix.log.AddType("classDelete", function(client, ...)
+        local arg = {...}
+        return string.format("%s deleted class '%s'.", client:Name(), arg[1])
+    end)
+
+    ix.log.AddType("classUpdate", function(client, ...)
+        local arg = {...}
+        return string.format("%s updated class '%s' (%s = %s).", client:Name(), arg[1], arg[2], tostring(arg[3]))
+    end)
+
+    ix.log.AddType("classAssign", function(client, ...)
+        local arg = {...}
+        return string.format("%s assigned %s to class '%s'.", client:Name(), arg[1], arg[2])
+    end)
+
+    ix.log.AddType("permGrant", function(client, ...)
+        local arg = {...}
+        return string.format("%s granted '%s' permission to class '%s'.", client:Name(), arg[1], arg[2])
+    end)
+
+    ix.log.AddType("permRevoke", function(client, ...)
+        local arg = {...}
+        return string.format("%s revoked '%s' permission from class '%s'.", client:Name(), arg[1], arg[2])
+    end)
+
+    ix.log.AddType("factionJoin", function(client, ...)
+        local arg = {...}
+        return string.format("%s joined %s as %s.", client:Name(), arg[1], arg[2])
+    end)
+
+    ix.log.AddType("factionRemove", function(client, ...)
+        local arg = {...}
+        return string.format("%s removed %s from the faction.", client:Name(), arg[1])
+    end)
+
+    ix.log.AddType("factionResign", function(client, ...)
+        local arg = {...}
+        return string.format("%s resigned from class '%s'.", client:Name(), arg[1])
+    end)
+
+    ix.log.AddType("voteDropout", function(client, ...)
+        return string.format("%s dropped out of the succession vote.", client:Name())
+    end)
+end
+
 -- Include server and client files
 ix.util.Include("sv_plugin.lua")
 ix.util.Include("cl_plugin.lua")

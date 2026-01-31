@@ -137,7 +137,8 @@ hook.Add("Think", "ixVoteCandidateTracking", function()
 end)
 
 -- Hook into permadeath for vote revocation
-hook.Add("ixCharacterPermakilled", "ixVotePermakill", function(character)
+-- Uses PreCharacterDeleted because CharacterDeleted fires after character is already removed
+hook.Add("PreCharacterDeleted", "ixVotePermakill", function(client, character)
     if not character then return end
     local charID = character:GetID()
 

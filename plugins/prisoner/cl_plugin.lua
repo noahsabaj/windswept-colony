@@ -331,6 +331,136 @@ end
 
 vgui.Register("ixPrisonCardPanel", PANEL, "DFrame")
 
+-- ============================================================================
+-- RESTRAINED PLAYER STATUS & ACTION HINTS
+-- ============================================================================
+
+-- Draw [RESTRAINED] status and action hints when looking at restrained player
+hook.Add("HUDDrawTargetID", "ixRestrainedTargetID", function()
+    local client = LocalPlayer()
+    local trace = client:GetEyeTrace()
+    local target = trace.Entity
+
+    -- Must be looking at a valid player
+    if not IsValid(target) or not target:IsPlayer() then return end
+
+    -- Must be within interaction range (96 units like Helix default)
+    if trace.HitPos:Distance(client:GetShootPos()) > 96 then return end
+
+    -- Must be restrained
+    if not target:IsRestricted() then return end
+
+    -- Get screen position (use EyePos for head level, then offset up a bit)
+    local worldPos = target:EyePos() + Vector(0, 0, 10)
+    local pos = worldPos:ToScreen()
+    if not pos.visible then return end
+
+    -- Draw [RESTRAINED] status
+    local statusText = "[RESTRAINED]"
+    local statusColor = Color(255, 150, 50)  -- Orange
+    draw.SimpleTextOutlined(statusText, "ixMediumFont", pos.x, pos.y, statusColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+
+    -- Draw [GAGGED] if gagged
+    local yOffset = 30
+    if target:GetNetVar("gagged") then
+        draw.SimpleTextOutlined("[GAGGED]", "ixSmallFont", pos.x, pos.y + yOffset, Color(200, 100, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+        yOffset = yOffset + 30
+    end
+
+    -- Don't show action hints if we're also restrained
+    if client:IsRestricted() then return end
+
+    -- Draw action hints
+    local gagText = target:GetNetVar("gagged") and "Ungag" or "Gag"
+
+    -- Check if we're currently dragging this target
+    local isDragging = client:GetNetVar("ixDragging") == target:EntIndex()
+
+    if isDragging then
+        draw.SimpleTextOutlined("Release LMB: Stop dragging", "ixSmallFont", pos.x, pos.y + yOffset, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+    else
+        draw.SimpleTextOutlined("E: Untie | R: " .. gagText, "ixSmallFont", pos.x, pos.y + yOffset, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+        -- Show drag hint only if holding hands and lowered
+        local weapon = client:GetActiveWeapon()
+        if IsValid(weapon) and weapon:GetClass() == "ix_hands" and not client:IsWepRaised() then
+            draw.SimpleTextOutlined("Hold LMB: Drag", "ixSmallFont", pos.x, pos.y + yOffset + 30, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+        end
+    end
+end)
+
+-- ============================================================================
+-- DRAG INPUT DETECTION
+-- ============================================================================
+
+local wasLMBDown = false
+local currentDragTarget = nil
+
+hook.Add("Think", "ixDragInput", function()
+    local client = LocalPlayer()
+    if not IsValid(client) then return end
+
+    -- Don't process input if UI is open
+    if vgui.CursorVisible() then
+        wasLMBDown = false
+        return
+    end
+
+    -- Can't drag if we're restrained
+    if client:IsRestricted() then
+        wasLMBDown = false
+        return
+    end
+
+    -- Must be holding ix_hands weapon
+    local weapon = client:GetActiveWeapon()
+    if not IsValid(weapon) or weapon:GetClass() ~= "ix_hands" then
+        wasLMBDown = false
+        return
+    end
+
+    -- Hands must be lowered (not raised)
+    if client:IsWepRaised() then
+        wasLMBDown = false
+        return
+    end
+
+    local lmbDown = input.IsMouseDown(MOUSE_LEFT)
+
+    -- Check if we're currently dragging
+    local currentlyDragging = client:GetNetVar("ixDragging")
+
+    if lmbDown then
+        if not wasLMBDown and not currentlyDragging then
+            -- Just pressed LMB - check if looking at restrained player
+            local trace = client:GetEyeTrace()
+            local target = trace.Entity
+
+            if IsValid(target) and target:IsPlayer() and target:IsRestricted() then
+                if trace.HitPos:Distance(client:GetShootPos()) <= 96 then
+                    -- Start dragging
+                    currentDragTarget = target
+                    net.Start("ixDragStart")
+                    net.WriteEntity(target)
+                    net.SendToServer()
+                end
+            end
+        end
+    else
+        if wasLMBDown and currentlyDragging then
+            -- Released LMB while dragging - stop
+            net.Start("ixDragStop")
+            net.SendToServer()
+            currentDragTarget = nil
+        end
+    end
+
+    wasLMBDown = lmbDown
+end)
+
+-- ============================================================================
+-- NETWORK RECEIVERS
+-- ============================================================================
+
 -- Network receivers
 net.Receive("ixPrisonerSentence", function()
     local target = net.ReadEntity()

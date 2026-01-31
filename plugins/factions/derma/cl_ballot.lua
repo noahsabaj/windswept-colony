@@ -12,9 +12,7 @@ local COLOR_CANDIDATE = Color(50, 55, 60)
 local COLOR_SELECTED = Color(60, 100, 60)
 
 function PANEL:Init()
-    self:SetSize(400, 450)
     self:SetTitle("")
-    self:Center()
     self:MakePopup()
     self:SetDraggable(true)
 
@@ -38,13 +36,23 @@ function PANEL:BuildUI()
         self.container:Remove()
     end
 
-    self.container = self:Add("DPanel")
-    self.container:Dock(FILL)
-    self.container:DockMargin(10, 40, 10, 10)
-    self.container.Paint = function() end
+    -- Calculate panel width based on content
+    local padding = 15
+    surface.SetFont("ixSmallFont")
+    local instructionsText = "Select all candidates you would accept as leader:"
+    local instructionsW = surface.GetTextSize(instructionsText)
+    local panelWidth = math.max(400, instructionsW + padding * 2 + 20)
 
     if not self.voteInfo then
-        -- No active vote
+        -- No active vote - small panel
+        self:SetSize(panelWidth, 120)
+        self:Center()
+
+        self.container = self:Add("DPanel")
+        self.container:Dock(FILL)
+        self.container:DockMargin(padding, 45, padding, padding)
+        self.container.Paint = function() end
+
         local label = self.container:Add("DLabel")
         label:Dock(FILL)
         label:SetText("No active votes in your faction.")
@@ -55,19 +63,26 @@ function PANEL:BuildUI()
     end
 
     if self.voteInfo.hasVoted then
-        -- Already voted
+        -- Already voted - small panel
+        self:SetSize(panelWidth, 140)
+        self:Center()
+
+        self.container = self:Add("DPanel")
+        self.container:Dock(FILL)
+        self.container:DockMargin(padding, 45, padding, padding)
+        self.container.Paint = function() end
+
         local label = self.container:Add("DLabel")
         label:Dock(TOP)
-        label:SetTall(50)
+        label:SetTall(40)
         label:SetText("You have already cast your ballot.")
         label:SetFont("ixMediumFont")
         label:SetTextColor(Color(100, 180, 100))
         label:SetContentAlignment(5)
 
-        -- Show time remaining
         local timeLabel = self.container:Add("DLabel")
         timeLabel:Dock(TOP)
-        timeLabel:SetTall(30)
+        timeLabel:SetTall(25)
         timeLabel:SetFont("ixSmallFont")
         timeLabel:SetTextColor(Color(180, 180, 180))
         timeLabel:SetContentAlignment(5)
@@ -85,10 +100,50 @@ function PANEL:BuildUI()
         return
     end
 
-    -- Header
+    -- Filter out invalid candidates (empty names, nil data)
+    local validCandidates = {}
+    if self.voteInfo.candidates then
+        for _, cand in ipairs(self.voteInfo.candidates) do
+            if cand and cand.name and cand.name ~= "" and cand.charID then
+                table.insert(validCandidates, cand)
+            end
+        end
+    end
+
+    -- Voting UI - calculate height based on valid candidates
+    local numCandidates = #validCandidates
+    local candidateHeight = 50
+    local candidatesListHeight = numCandidates * (candidateHeight + 5)
+
+    -- Calculate total height
+    local headerHeight = 35
+    local titleHeight = 35
+    local instructionsHeight = 30
+    local submitHeight = 40
+    local timeHeight = 25
+
+    local totalHeight = headerHeight + padding +
+                        titleHeight +
+                        instructionsHeight +
+                        padding +
+                        candidatesListHeight +
+                        padding +
+                        submitHeight +
+                        timeHeight +
+                        padding
+
+    self:SetSize(panelWidth, totalHeight)
+    self:Center()
+
+    self.container = self:Add("DPanel")
+    self.container:Dock(FILL)
+    self.container:DockMargin(padding, headerHeight + padding, padding, padding)
+    self.container.Paint = function() end
+
+    -- Header title
     local header = self.container:Add("DLabel")
     header:Dock(TOP)
-    header:SetTall(40)
+    header:SetTall(titleHeight)
     header:SetText("EMERGENCY SUCCESSION VOTE")
     header:SetFont("ixMediumFont")
     header:SetTextColor(color_white)
@@ -97,19 +152,18 @@ function PANEL:BuildUI()
     -- Instructions
     local instructions = self.container:Add("DLabel")
     instructions:Dock(TOP)
-    instructions:SetTall(40)
+    instructions:SetTall(instructionsHeight)
     instructions:SetText("Select all candidates you would accept as leader:")
     instructions:SetFont("ixSmallFont")
     instructions:SetTextColor(Color(200, 200, 200))
     instructions:SetContentAlignment(5)
 
-    -- Time remaining (add before candidate list)
+    -- Time remaining (at bottom)
     local timeLabel = self.container:Add("DLabel")
     timeLabel:Dock(BOTTOM)
-    timeLabel:DockMargin(0, 5, 0, 0)
-    timeLabel:SetTall(20)
+    timeLabel:SetTall(timeHeight)
     timeLabel:SetFont("ixSmallFont")
-    timeLabel:SetTextColor(Color(180, 180, 180))
+    timeLabel:SetTextColor(Color(150, 150, 150))
     timeLabel:SetContentAlignment(5)
     timeLabel.Think = function(pnl)
         if not self.voteInfo then return end
@@ -126,7 +180,8 @@ function PANEL:BuildUI()
     -- Submit button
     self.submitBtn = self.container:Add("DButton")
     self.submitBtn:Dock(BOTTOM)
-    self.submitBtn:SetTall(40)
+    self.submitBtn:DockMargin(0, padding, 0, 5)
+    self.submitBtn:SetTall(submitHeight)
     self.submitBtn:SetText("Submit Ballot")
     self.submitBtn:SetFont("ixMediumFont")
     self.submitBtn.Paint = function(pnl, w, h)
@@ -139,50 +194,49 @@ function PANEL:BuildUI()
         self:SubmitBallot()
     end
 
-    -- Candidate list
+    -- Candidate list (fills remaining space)
     self.candidateList = self.container:Add("DScrollPanel")
     self.candidateList:Dock(FILL)
-    self.candidateList:DockMargin(0, 10, 0, 10)
+    self.candidateList:DockMargin(0, padding, 0, 0)
 
-    if self.voteInfo.candidates then
-        for _, cand in ipairs(self.voteInfo.candidates) do
-            local candPanel = self.candidateList:Add("DButton")
-            candPanel:Dock(TOP)
-            candPanel:DockMargin(5, 5, 5, 0)
-            candPanel:SetTall(50)
-            candPanel:SetText("")
-            candPanel.charID = cand.charID
-            candPanel.selected = false
+    -- Use the filtered validCandidates list
+    for _, cand in ipairs(validCandidates) do
+        local candPanel = self.candidateList:Add("DButton")
+        candPanel:Dock(TOP)
+        candPanel:DockMargin(0, 0, 0, 5)
+        candPanel:SetTall(candidateHeight)
+        candPanel:SetText("")
+        candPanel.charID = cand.charID
+        candPanel.selected = false
 
-            candPanel.Paint = function(pnl, w, h)
-                local col = pnl.selected and COLOR_SELECTED or
-                            (pnl:IsHovered() and Color(60, 65, 70) or COLOR_CANDIDATE)
-                draw.RoundedBox(4, 0, 0, w, h, col)
+        candPanel.Paint = function(pnl, w, h)
+            local col = pnl.selected and COLOR_SELECTED or
+                        (pnl:IsHovered() and Color(60, 65, 70) or COLOR_CANDIDATE)
+            draw.RoundedBox(4, 0, 0, w, h, col)
 
-                -- Checkbox
-                local checkX = 15
-                local checkY = h/2 - 10
-                surface.SetDrawColor(80, 80, 90)
-                surface.DrawOutlinedRect(checkX, checkY, 20, 20)
+            -- Checkbox
+            local checkX = 15
+            local checkY = h/2 - 10
+            surface.SetDrawColor(80, 80, 90)
+            surface.DrawOutlinedRect(checkX, checkY, 20, 20)
 
-                if pnl.selected then
-                    draw.SimpleText("X", "ixMediumFont", checkX + 10, checkY + 10,
-                        Color(100, 200, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-                end
-
-                -- Name
-                draw.SimpleText(cand.name, "ixMediumFont", 50, h/2,
-                    color_white, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+            if pnl.selected then
+                draw.SimpleText("X", "ixMediumFont", checkX + 10, checkY + 10,
+                    Color(100, 200, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
             end
 
-            candPanel.DoClick = function(pnl)
-                pnl.selected = not pnl.selected
+            -- Name
+            draw.SimpleText(cand.name, "ixMediumFont", 50, h/2,
+                color_white, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+        end
 
-                if pnl.selected then
-                    self.selectedCandidates[pnl.charID] = true
-                else
-                    self.selectedCandidates[pnl.charID] = nil
-                end
+        candPanel.DoClick = function(pnl)
+            pnl.selected = not pnl.selected
+
+            if pnl.selected then
+                self.selectedCandidates[pnl.charID] = true
+            else
+                self.selectedCandidates[pnl.charID] = nil
             end
         end
     end

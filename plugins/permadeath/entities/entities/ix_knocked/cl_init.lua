@@ -139,25 +139,28 @@ hook.Add("HUDDrawTargetID", "ixKnockedTargetID", function()
         end
     end
 
-    draw.SimpleTextOutlined(text, "ixMediumFont", pos.x, pos.y - 30, color, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+    draw.SimpleTextOutlined(text, "ixMediumFont", pos.x, pos.y, color, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
 
     -- Add cremation progress if burning
     if isBurning then
         local duration = 240
         local progressText = string.format("Cremation: %d/%ds", math.floor(burnProgress), duration)
-        draw.SimpleTextOutlined(progressText, "ixSmallFont", pos.x, pos.y - 5, Color(255, 200, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+        draw.SimpleTextOutlined(progressText, "ixSmallFont", pos.x, pos.y + 30, Color(255, 200, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
     else
         -- Draw action hints (only when not burning - can't search a burning body)
-        local yOffset = 10
-        if knockedEnt:GetPermadead() then
-            draw.SimpleTextOutlined("E: Search body", "ixSmallFont", pos.x, pos.y + yOffset, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
-        else
-            draw.SimpleTextOutlined("E: Search body", "ixSmallFont", pos.x, pos.y + yOffset, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
-            draw.SimpleTextOutlined("Hold E: Attempt CPR", "ixSmallFont", pos.x, pos.y + yOffset + 25, Color(100, 200, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+        local yOffset = 30
+        draw.SimpleTextOutlined("E: Search body", "ixSmallFont", pos.x, pos.y + yOffset, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+
+        -- Show CPR hint only if not dead and holding hands lowered
+        if not knockedEnt:GetPermadead() then
+            local weapon = client:GetActiveWeapon()
+            if IsValid(weapon) and weapon:GetClass() == "ix_hands" and not client:IsWepRaised() then
+                draw.SimpleTextOutlined("Hold LMB: Attempt CPR", "ixSmallFont", pos.x, pos.y + yOffset + 30, Color(100, 200, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+            end
         end
     end
 
-    -- Draw hold progress bar if holding E on a knocked (not dead) target
+    -- Draw hold progress bar if holding LMB for CPR on a knocked (not dead) target
     if useKeyDownTime and useKeyTarget == knockedEnt and not knockedEnt:GetPermadead() then
         local plugin = ix.plugin.Get("permadeath")
         local holdTime = plugin and plugin.reviveHoldTime or 1.5
@@ -167,7 +170,7 @@ hook.Add("HUDDrawTargetID", "ixKnockedTargetID", function()
             local barWidth = 100
             local barHeight = 8
             local barX = pos.x - barWidth / 2
-            local barY = pos.y + 25
+            local barY = pos.y + 90  -- Below all text hints
 
             -- Background
             surface.SetDrawColor(0, 0, 0, 200)
@@ -185,17 +188,29 @@ hook.Add("HUDDrawTargetID", "ixKnockedTargetID", function()
 end)
 
 -- ============================================================================
--- INTERACTION HANDLING (Tap E = Loot, Hold E = Revive)
+-- INTERACTION HANDLING (E = Loot, Hold LMB with hands = CPR)
 -- ============================================================================
 
--- Think hook for tap vs hold E key detection
-hook.Add("Think", "ixKnockedInteraction", function()
+-- Track LMB state for CPR
+local wasLMBDown = false
+local cprTarget = nil
+local cprStartTime = nil
+local cprSent = false
+
+-- Think hook for CPR (Hold LMB with hands lowered)
+hook.Add("Think", "ixKnockedCPR", function()
     local client = LocalPlayer()
     if not IsValid(client) then return end
 
-    local isHoldingUse = client:KeyDown(IN_USE)
+    -- Don't process input if UI is open
+    if vgui.CursorVisible() then
+        wasLMBDown = false
+        cprTarget = nil
+        cprStartTime = nil
+        return
+    end
 
-    -- Trace to see what we're looking at (96 (96 units) is the Helix default interaction range)
+    -- Trace to see what we're looking at
     local data = {
         start = client:GetShootPos(),
         endpos = client:GetShootPos() + client:GetAimVector() * 96,
@@ -205,59 +220,65 @@ hook.Add("Think", "ixKnockedInteraction", function()
     local knockedEnt = GetKnockedEntity(trace.Entity)
 
     -- Check if looking at valid target within range
-    local validTarget = IsValid(knockedEnt)
+    local validTarget = IsValid(knockedEnt) and not knockedEnt:GetPermadead()
 
-    if isHoldingUse and validTarget then
-        if not useKeyDownTime then
-            -- Just started holding E
-            useKeyDownTime = RealTime()
-            useKeyTarget = knockedEnt
+    -- Must be holding ix_hands weapon and lowered for CPR
+    local weapon = client:GetActiveWeapon()
+    local hasHandsLowered = IsValid(weapon) and weapon:GetClass() == "ix_hands" and not client:IsWepRaised()
+
+    local lmbDown = input.IsMouseDown(MOUSE_LEFT)
+
+    if lmbDown and validTarget and hasHandsLowered then
+        if not wasLMBDown then
+            -- Just started holding LMB
+            cprStartTime = RealTime()
+            cprTarget = knockedEnt
+            cprSent = false
+            -- Update the shared variables for HUD drawing
+            useKeyDownTime = cprStartTime
+            useKeyTarget = cprTarget
             reviveSent = false
-        elseif useKeyTarget == knockedEnt then
+        elseif cprTarget == knockedEnt then
             -- Still holding on same target
             local plugin = ix.plugin.Get("permadeath")
             local holdTime = plugin and plugin.reviveHoldTime or 1.5
-            local heldDuration = RealTime() - useKeyDownTime
+            local heldDuration = RealTime() - cprStartTime
 
-            -- Check if held long enough and target can be revived (not dead)
-            if heldDuration >= holdTime and not knockedEnt:GetPermadead() and not reviveSent then
+            -- Check if held long enough
+            if heldDuration >= holdTime and not cprSent then
                 -- Threshold reached, send revive request
                 net.Start("ixKnockoutRevive")
                     net.WriteEntity(knockedEnt)
                 net.SendToServer()
 
-                reviveSent = true  -- Prevent spam
+                cprSent = true
+                reviveSent = true
             end
         else
             -- Changed target, reset
-            useKeyDownTime = RealTime()
-            useKeyTarget = knockedEnt
+            cprStartTime = RealTime()
+            cprTarget = knockedEnt
+            cprSent = false
+            useKeyDownTime = cprStartTime
+            useKeyTarget = cprTarget
             reviveSent = false
         end
-    elseif not isHoldingUse and useKeyDownTime then
-        -- Just released E key
-        local plugin = ix.plugin.Get("permadeath")
-        local holdTime = plugin and plugin.reviveHoldTime or 1.5
-        local heldDuration = RealTime() - useKeyDownTime
-
-        -- If quick press (before threshold) and didn't already send revive, send loot
-        if heldDuration < holdTime and IsValid(useKeyTarget) and not reviveSent then
-            net.Start("ixKnockoutLoot")
-                net.WriteEntity(useKeyTarget)
-            net.SendToServer()
+    else
+        if wasLMBDown or not validTarget or not hasHandsLowered then
+            -- Released LMB or lost target or switched weapon, reset
+            cprStartTime = nil
+            cprTarget = nil
+            cprSent = false
+            useKeyDownTime = nil
+            useKeyTarget = nil
+            reviveSent = false
         end
-
-        -- Reset state
-        useKeyDownTime = nil
-        useKeyTarget = nil
-        reviveSent = false
-    elseif not validTarget and useKeyDownTime then
-        -- Looked away or moved out of range, reset
-        useKeyDownTime = nil
-        useKeyTarget = nil
-        reviveSent = false
     end
+
+    wasLMBDown = lmbDown
 end)
+
+-- E key for looting only (handled by Helix PlayerUse, we just need to not block it)
 
 -- ============================================================================
 -- CREMATION VISUAL FEEDBACK (Body Darkening)

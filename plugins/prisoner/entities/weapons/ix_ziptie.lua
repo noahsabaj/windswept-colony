@@ -191,7 +191,26 @@ if SERVER then
         target:SetAction("@beingTied", 5)
         target:SetNetVar("tying", true)
 
+        -- Play initial tying sound
+        client:EmitSound("physics/metal/metal_solid_impact_soft3.wav", 50)
+
+        -- Play periodic tying sounds during the 5-second process
+        local timerName = "ixZipTie_" .. client:SteamID64()
+        timer.Create(timerName, 0.8, 6, function()
+            if IsValid(client) and IsValid(weapon) and weapon:GetTying() then
+                client:EmitSound("physics/metal/metal_solid_impact_soft3.wav", 50)
+            else
+                timer.Remove(timerName)
+            end
+        end)
+
         client:DoStaredAction(target, function()
+            -- Stop tying sound timer
+            timer.Remove(timerName)
+
+            -- Success sound - zip tie clicking tight
+            client:EmitSound("buttons/button14.wav", 60)
+
             -- Success - restrain the target
             target:SetRestricted(true)
             target:SetNetVar("tying", nil)
@@ -212,6 +231,9 @@ if SERVER then
 
             item:Remove()
         end, 5, function()
+            -- Stop tying sound timer
+            timer.Remove(timerName)
+
             -- Cancelled
             if IsValid(weapon) then
                 weapon:SetTying(false)

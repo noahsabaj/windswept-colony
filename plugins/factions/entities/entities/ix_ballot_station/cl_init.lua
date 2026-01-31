@@ -31,6 +31,9 @@ end
 
 -- HUD hint fallback (in case entity info system doesn't work)
 hook.Add("HUDPaint", "ixBallotStationHint", function()
+    -- Don't show hint if ballot UI is open
+    if IsValid(ix.gui.ballot) then return end
+
     local ply = LocalPlayer()
     local tr = ply:GetEyeTrace()
     local ent = tr.Entity
@@ -40,6 +43,6 @@ hook.Add("HUDPaint", "ixBallotStationHint", function()
 
     local text = "Press E to use Ballot Station"
 
-    draw.SimpleText(text, "ixSmallFont", ScrW() / 2, ScrH() * 0.6,
+    draw.SimpleText(text, "ixSmallFont", ScrW() / 2, ScrH() * 0.7,
         Color(255, 255, 255, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end)

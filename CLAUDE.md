@@ -353,6 +353,26 @@ local lineSpacing = ScreenScale(2)
 
 - **Helix font reference**: `ixBigFont` = 36px, `ixMediumFont` = 25px, `ixSmallFont` = scales with `ScreenScale(6)` minimum 17px. Always use these for consistency.
 
+- **HUD text line spacing**: When drawing multiple lines of HUD text (status indicators, action hints, etc.), use `y + 30` for consistent vertical spacing between lines. Progress bars should be placed at the next `+ 30` increment after all text to avoid overlap:
+```lua
+-- Standard HUD text + progress bar spacing pattern
+draw.SimpleTextOutlined("[STATUS]", "ixMediumFont", pos.x, pos.y, statusColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+draw.SimpleTextOutlined("E: Action", "ixSmallFont", pos.x, pos.y + 30, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+draw.SimpleTextOutlined("Hold LMB: Other", "ixSmallFont", pos.x, pos.y + 60, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+-- Progress bar at pos.y + 90 (next increment after last text line)
+local barY = pos.y + 90
+
+-- Or with yOffset for conditional lines:
+local yOffset = 30
+if showExtra then
+    draw.SimpleTextOutlined("Extra", "ixSmallFont", pos.x, pos.y + yOffset, color, ...)
+    yOffset = yOffset + 30
+end
+draw.SimpleTextOutlined("Next Line", "ixSmallFont", pos.x, pos.y + yOffset, color, ...)
+-- Progress bar after all text
+local barY = pos.y + yOffset + 30
+```
+
 - **Button width from text**: Measure the longest button label, add padding:
 ```lua
 surface.SetFont("ixSmallFont")
