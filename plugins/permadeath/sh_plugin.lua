@@ -94,11 +94,9 @@ function PLUGIN:CalculateRevivalChance(hasDefib)
     return success, actualChance
 end
 
--- Get random revival progress bar duration
+-- Get CPR revival progress bar duration (fixed 10 seconds)
 function PLUGIN:GetRevivalDuration()
-    local min = ix.config.Get("permadeathRevivalTimeMin", 3)
-    local max = ix.config.Get("permadeathRevivalTimeMax", 10)
-    return math.random(min, max)
+    return 10
 end
 
 -- Format time as MM:SS

@@ -258,8 +258,10 @@ function PLUGIN:ValidateKnockedInteraction(client, entity)
         return nil
     end
 
-    -- 96 units is Helix default interaction range
-    if client:GetPos():Distance(entity:GetPos()) > 96 then
+    -- Check distance to ragdoll (the visible/draggable body), not ix_knocked entity
+    -- The ix_knocked entity stays at the original knockout position, but the ragdoll can be dragged
+    local checkPos = IsValid(entity.ixRagdoll) and entity.ixRagdoll:GetPos() or entity:GetPos()
+    if client:GetPos():Distance(checkPos) > 96 then
         return nil
     end
 
@@ -416,9 +418,11 @@ function PLUGIN:RevivePlayer(knockedEntity, reviver, usedDefib, defibItem)
 
     -- If player is online, restore them
     if IsValid(owner) then
-        -- Move player back to entity position
-        owner:SetPos(knockedEntity:GetPos())
-        owner:SetEyeAngles(knockedEntity:GetAngles())
+        -- Move player to ragdoll position (where the body actually is after potential dragging)
+        local revivePos = IsValid(knockedEntity.ixRagdoll) and knockedEntity.ixRagdoll:GetPos() or knockedEntity:GetPos()
+        local reviveAng = IsValid(knockedEntity.ixRagdoll) and knockedEntity.ixRagdoll:GetAngles() or knockedEntity:GetAngles()
+        owner:SetPos(revivePos)
+        owner:SetEyeAngles(reviveAng)
 
         -- Restore player state
         owner:SetNoDraw(false)
@@ -428,6 +432,14 @@ function PLUGIN:RevivePlayer(knockedEntity, reviver, usedDefib, defibItem)
 
         -- Set revival health
         owner:SetHealth(revivalHealth)
+
+        -- Temporary no-collide to prevent clipping with reviver
+        owner:SetCollisionGroup(COLLISION_GROUP_WEAPON)
+        timer.Simple(1.5, function()
+            if IsValid(owner) then
+                owner:SetCollisionGroup(COLLISION_GROUP_PLAYER)
+            end
+        end)
 
         -- Clear muffled audio
         owner:SetDSP(0)
@@ -665,6 +677,14 @@ end
 -- Called when knockout timer expires
 function PLUGIN:OnKnockoutExpired(knockedEntity)
     print("[Permadeath] OnKnockoutExpired called")
+
+    -- Cancel any active revival attempt (CPR in progress)
+    local reviver = knockedEntity:GetCurrentReviver()
+    if IsValid(reviver) then
+        reviver:SetAction()  -- Clear action bar
+        reviver:NotifyLocalized("cprCanceledPatientDied")
+        knockedEntity:SetCurrentReviver(NULL)
+    end
 
     -- Immediately set permadead to prevent multiple calls from Think()
     knockedEntity:SetPermadead(true)
@@ -992,6 +1012,12 @@ net.Receive("ixKnockoutLoot", function(len, client)
     local plugin = ix.plugin.Get("permadeath")
     local entity = plugin:ValidateKnockedInteraction(client, net.ReadEntity())
     if not entity then return end
+
+    -- Block searching while actively performing CPR on this body
+    if entity:GetCurrentReviver() == client then
+        client:NotifyLocalized("cprCannotSearchDuring")
+        return
+    end
 
     entity:OpenInventory(client)
 end)

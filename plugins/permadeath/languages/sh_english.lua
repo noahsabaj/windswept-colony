@@ -17,6 +17,8 @@ LANGUAGE = {
     attemptRevival = "Attempt Revival",
     revivalFailed = "Revival attempt failed. The patient did not respond.",
     revivalSuccess = "Revival successful! The patient is regaining consciousness.",
+    cprCanceledPatientDied = "CPR canceled - This patient has died.",
+    cprCannotSearchDuring = "You cannot search while performing CPR.",
 
     -- Permadeath
     characterPermadead = "This character has died permanently and can no longer be used.",
