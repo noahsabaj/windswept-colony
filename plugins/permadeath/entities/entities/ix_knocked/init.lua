@@ -236,6 +236,9 @@ function ENT:Think()
         -- Check for cremation (burning)
         if self:IsRagdollOnFire() then
             self:HandleCremation()
+        else
+            -- Fire stopped - clear burn tracking so resuming doesn't count gap time
+            self.ixLastBurnThink = nil
         end
         self:NextThink(CurTime() + 0.5)
         return true
@@ -249,6 +252,9 @@ function ENT:Think()
             self:HalveTimer()
             self.ixLastFireDamage = CurTime()
         end
+    else
+        -- Fire stopped - clear burn tracking so resuming doesn't count gap time
+        self.ixLastBurnThink = nil
     end
 
     -- Check knockout timer expiration (for knocked but not dead bodies)
