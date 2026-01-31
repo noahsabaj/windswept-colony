@@ -131,6 +131,19 @@ function ENT:GetCremationDuration()
     return self:IsInCremationOven() and 60 or 240
 end
 
+-- Re-ignite the ragdoll (body is fuel - fire sustains until cremation complete)
+function ENT:ReigniteRagdoll()
+    local ragdoll = self.ixRagdoll
+    if not IsValid(ragdoll) then return end
+
+    -- Reset burn think time to prevent gap accumulation
+    -- (in case re-ignition doesn't immediately stick, e.g., body in water)
+    self.ixLastBurnThink = CurTime()
+
+    -- Use GMod native ignite - vFire will detect and take over if installed
+    ragdoll:Ignite(30)
+end
+
 -- Handle cremation progress tracking
 function ENT:HandleCremation()
     local curTime = CurTime()
@@ -236,9 +249,9 @@ function ENT:Think()
         -- Check for cremation (burning)
         if self:IsRagdollOnFire() then
             self:HandleCremation()
-        else
-            -- Fire stopped - clear burn tracking so resuming doesn't count gap time
-            self.ixLastBurnThink = nil
+        elseif self:GetBurnProgress() > 0 then
+            -- Fire went out but cremation started - body is fuel, re-ignite
+            self:ReigniteRagdoll()
         end
         self:NextThink(CurTime() + 0.5)
         return true
@@ -252,9 +265,9 @@ function ENT:Think()
             self:HalveTimer()
             self.ixLastFireDamage = CurTime()
         end
-    else
-        -- Fire stopped - clear burn tracking so resuming doesn't count gap time
-        self.ixLastBurnThink = nil
+    elseif self:GetBurnProgress() > 0 then
+        -- Fire went out but cremation started - body is fuel, re-ignite
+        self:ReigniteRagdoll()
     end
 
     -- Check knockout timer expiration (for knocked but not dead bodies)
