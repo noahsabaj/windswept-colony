@@ -31,6 +31,7 @@ LANGUAGE = {
     -- Looting
     searchBody = "Search Body",
     noInventory = "This body has no accessible inventory.",
+    bodyOnFire = "You cannot search a body that is on fire.",
 
     -- Config descriptions
     permadeathBaseTimeDesc = "Base knockout timer in seconds (5 minutes default).",

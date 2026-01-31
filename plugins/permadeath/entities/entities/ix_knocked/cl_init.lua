@@ -58,14 +58,16 @@ function ENT:OnPopulateEntityInfo(tooltip)
         cremationRow:SizeToContents()
     end
 
-    -- Instructions
-    local instructions = tooltip:AddRow("instructions")
-    if self:GetPermadead() then
-        instructions:SetText("E: Search body")
-    else
-        instructions:SetText("E: Search body | Hold E: Attempt CPR")
+    -- Instructions (no search when burning)
+    if not isBurning then
+        local instructions = tooltip:AddRow("instructions")
+        if self:GetPermadead() then
+            instructions:SetText("E: Search body")
+        else
+            instructions:SetText("E: Search body | Hold E: Attempt CPR")
+        end
+        instructions:SizeToContents()
     end
-    instructions:SizeToContents()
 end
 
 -- ============================================================================
@@ -140,20 +142,19 @@ hook.Add("HUDDrawTargetID", "ixKnockedTargetID", function()
     draw.SimpleTextOutlined(text, "ixMediumFont", pos.x, pos.y - 30, color, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
 
     -- Add cremation progress if burning
-    local yOffset = 10
     if isBurning then
         local duration = 240
         local progressText = string.format("Cremation: %d/%ds", math.floor(burnProgress), duration)
         draw.SimpleTextOutlined(progressText, "ixSmallFont", pos.x, pos.y - 5, Color(255, 200, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
-        yOffset = 20
-    end
-
-    -- Draw action hints
-    if knockedEnt:GetPermadead() then
-        draw.SimpleTextOutlined("E: Search body", "ixSmallFont", pos.x, pos.y + yOffset, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
     else
-        draw.SimpleTextOutlined("E: Search body", "ixSmallFont", pos.x, pos.y + yOffset, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
-        draw.SimpleTextOutlined("Hold E: Attempt CPR", "ixSmallFont", pos.x, pos.y + yOffset + 25, Color(100, 200, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+        -- Draw action hints (only when not burning - can't search a burning body)
+        local yOffset = 10
+        if knockedEnt:GetPermadead() then
+            draw.SimpleTextOutlined("E: Search body", "ixSmallFont", pos.x, pos.y + yOffset, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+        else
+            draw.SimpleTextOutlined("E: Search body", "ixSmallFont", pos.x, pos.y + yOffset, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+            draw.SimpleTextOutlined("Hold E: Attempt CPR", "ixSmallFont", pos.x, pos.y + yOffset + 25, Color(100, 200, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+        end
     end
 
     -- Draw hold progress bar if holding E on a knocked (not dead) target

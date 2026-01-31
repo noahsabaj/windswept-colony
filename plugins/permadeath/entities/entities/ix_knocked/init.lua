@@ -391,9 +391,11 @@ function ENT:GetEntityMenu(client)
         end
     end
 
-    -- Loot option (always available)
-    options[L("searchBody")] = function()
-        self:OpenInventory(client)
+    -- Loot option (not available when on fire)
+    if not self:IsRagdollOnFire() then
+        options[L("searchBody")] = function()
+            self:OpenInventory(client)
+        end
     end
 
     return options
@@ -414,6 +416,12 @@ local lootSounds = {
 }
 
 function ENT:OpenInventory(client)
+    -- Cannot search a body that is on fire
+    if self:IsRagdollOnFire() then
+        client:NotifyLocalized("bodyOnFire")
+        return
+    end
+
     local invID = self:GetInventoryID()
     if not invID or invID == 0 then
         client:NotifyLocalized("noInventory")
