@@ -128,6 +128,14 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 
 - **ITEM.isBag auto-opens "View"**: When `ITEM.isBag = true`, Helix auto-calls the "View" function on inventory open. Rename custom viewers to something else (e.g., "Browse") and keep "View" for the standard bag panel.
 
+- **ix.config.Add requires explicit type for arrays**: The config system auto-detects strings, numbers, booleans, colors, and vectors, but NOT plain arrays/tables. If you add a config with an array value like `ix.config.Add("myList", {"a", "b", "c"}, ...)`, it will fail with "attempted to add config with invalid type". Fix: explicitly specify `type = ix.type.array` in the data parameter:
+  ```lua
+  ix.config.Add("myList", {"a", "b", "c"}, "Description", nil, {
+      category = "myCategory",
+      type = ix.type.array  -- Required for arrays!
+  })
+  ```
+
 - **CanTransferItem hook name**: The hook is `CanTransferItem`, NOT `CanItemBeTransfered`. Wrong name = silent failure.
 
 - **Inventory sync overflow**: Storing >10KB in item data via `item:SetData()` causes "Trying to send an overflowed net message" during inventory sync. Fix: File-based storage in `data/` folder, store only ID reference in item.
