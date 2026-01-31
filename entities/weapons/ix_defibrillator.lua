@@ -323,9 +323,15 @@ if SERVER then
             return
         end
 
-        -- Handle knocked entity (ix_knocked)
+        -- Handle knocked entity (ix_knocked) - direct hit
         if target:GetClass() == "ix_knocked" then
             self:ShockKnockedPlayer(target)
+            return
+        end
+
+        -- Handle prop_ragdoll linked to ix_knocked (the visible body)
+        if target:GetClass() == "prop_ragdoll" and IsValid(target.ixKnockedEntity) then
+            self:ShockKnockedPlayer(target.ixKnockedEntity)
             return
         end
 

@@ -352,9 +352,13 @@ function PLUGIN:AttemptRevival(reviver, knockedEntity)
     -- Start the revival progress
     reviver:SetAction("@reviving", duration)
 
+    -- IMPORTANT: Pass the ragdoll to DoStaredAction, not the ix_knocked entity
+    -- The ix_knocked entity is invisible and hidden - player is looking at the ragdoll
+    local stareTarget = IsValid(knockedEntity.ixRagdoll) and knockedEntity.ixRagdoll or knockedEntity
+
     -- Use DoStaredAction for progress-based revival (must look at target)
     -- Signature: DoStaredAction(entity, callback, time, onCancel, distance)
-    reviver:DoStaredAction(knockedEntity, function()
+    reviver:DoStaredAction(stareTarget, function()
         -- Completed - attempt the revival (equipmentless, no defib)
         self:CompleteRevivalAttempt(reviver, knockedEntity, false, nil)
     end, duration, function()
