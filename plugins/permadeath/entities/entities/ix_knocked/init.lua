@@ -144,6 +144,39 @@ function ENT:ReigniteRagdoll()
     ragdoll:Ignite(30)
 end
 
+-- Sustain fire at consistent intensity (body is fuel)
+-- Call periodically to prevent fire from dying down
+function ENT:SustainFire()
+    local ragdoll = self.ixRagdoll
+    if not IsValid(ragdoll) then return end
+
+    local curTime = CurTime()
+
+    -- Only sustain every 5 seconds
+    if self.ixNextFireSustain and curTime < self.ixNextFireSustain then
+        return
+    end
+    self.ixNextFireSustain = curTime + 5
+
+    -- Check for vFire fires and boost their life
+    if ragdoll.fires and next(ragdoll.fires) then
+        for fire, _ in pairs(ragdoll.fires) do
+            if IsValid(fire) and fire.life then
+                -- Boost fire life to maintain intensity (vFire max state is 7, life ~50+ for inferno)
+                -- Keep it at a medium-high level for consistent burn
+                if fire.life < 30 then
+                    fire.life = 30
+                end
+                -- Also add feed (fuel) so fire sustains itself
+                fire.feed = (fire.feed or 0) + 20
+            end
+        end
+    else
+        -- Native GMod fire - refresh ignite to prevent dying
+        ragdoll:Ignite(30)
+    end
+end
+
 -- Handle cremation progress tracking
 function ENT:HandleCremation()
     local curTime = CurTime()
@@ -159,6 +192,9 @@ function ENT:HandleCremation()
 
     -- Update networked progress (for client-side darkening)
     self:SetBurnProgress(burnProgress)
+
+    -- Sustain fire at consistent intensity (body is fuel)
+    self:SustainFire()
 
     -- Play burning sounds periodically
     if not self.ixNextBurnSound or curTime >= self.ixNextBurnSound then
