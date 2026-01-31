@@ -283,17 +283,18 @@ function ENT:Think()
     -- (burial, cremation, disposal, etc.)
     if self:GetPermadead() then
         -- Check for cremation (burning)
+        -- Note: SustainFire() in HandleCremation keeps fire alive, so if fire
+        -- goes out it means it was actively extinguished - don't auto-reignite
         if self:IsRagdollOnFire() then
             self:HandleCremation()
-        elseif self:GetBurnProgress() > 0 then
-            -- Fire went out but cremation started - body is fuel, re-ignite
-            self:ReigniteRagdoll()
         end
         self:NextThink(CurTime() + 0.5)
         return true
     end
 
     -- Check for cremation on knocked (alive but unconscious) bodies
+    -- Note: SustainFire() keeps fire alive, so if fire goes out it was
+    -- actively extinguished - don't auto-reignite, progress is preserved
     if self:IsRagdollOnFire() then
         self:HandleCremation()
         -- Fire also halves knockout timer periodically
@@ -301,9 +302,6 @@ function ENT:Think()
             self:HalveTimer()
             self.ixLastFireDamage = CurTime()
         end
-    elseif self:GetBurnProgress() > 0 then
-        -- Fire went out but cremation started - body is fuel, re-ignite
-        self:ReigniteRagdoll()
     end
 
     -- Check knockout timer expiration (for knocked but not dead bodies)
