@@ -27,14 +27,36 @@ function ENT:OnPopulateEntityInfo(tooltip)
     local title = tooltip:AddRow("name")
     title:SetImportant()
 
+    local burnProgress = self:GetBurnProgress()
+    local isBurning = burnProgress and burnProgress > 0
+
     if self:GetPermadead() then
-        title:SetText("[DEAD]")
-        title:SetBackgroundColor(Color(139, 0, 0))
+        if isBurning then
+            title:SetText("[BURNING]")
+            title:SetBackgroundColor(Color(200, 100, 0))
+        else
+            title:SetText("[DEAD]")
+            title:SetBackgroundColor(Color(139, 0, 0))
+        end
     else
-        title:SetText("[KNOCKED OUT]")
-        title:SetBackgroundColor(Color(139, 69, 19))
+        if isBurning then
+            title:SetText("[KNOCKED OUT - BURNING]")
+            title:SetBackgroundColor(Color(200, 100, 0))
+        else
+            title:SetText("[KNOCKED OUT]")
+            title:SetBackgroundColor(Color(139, 69, 19))
+        end
     end
     title:SizeToContents()
+
+    -- Cremation progress (if burning)
+    if isBurning then
+        local duration = 240
+        local cremationRow = tooltip:AddRow("cremation")
+        cremationRow:SetText(string.format("Cremation: %d/%ds", math.floor(burnProgress), duration))
+        cremationRow:SetBackgroundColor(Color(150, 75, 0))
+        cremationRow:SizeToContents()
+    end
 
     -- Instructions
     local instructions = tooltip:AddRow("instructions")
@@ -93,17 +115,45 @@ hook.Add("HUDDrawTargetID", "ixKnockedTargetID", function()
     if not pos.visible then return end
 
     -- Draw status (no name - fog of war, check their ID if you want to know who they are)
-    local text = knockedEnt:GetPermadead() and "[DEAD]" or "[KNOCKED OUT]"
-    local color = knockedEnt:GetPermadead() and Color(200, 50, 50) or Color(200, 150, 50)
+    local burnProgress = knockedEnt:GetBurnProgress()
+    local isBurning = burnProgress and burnProgress > 0
 
-    draw.SimpleTextOutlined(text, "ixMediumFont", pos.x, pos.y - 20, color, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+    local text, color
+    if knockedEnt:GetPermadead() then
+        if isBurning then
+            text = "[BURNING]"
+            color = Color(255, 150, 50)
+        else
+            text = "[DEAD]"
+            color = Color(200, 50, 50)
+        end
+    else
+        if isBurning then
+            text = "[KNOCKED OUT - BURNING]"
+            color = Color(255, 150, 50)
+        else
+            text = "[KNOCKED OUT]"
+            color = Color(200, 150, 50)
+        end
+    end
+
+    draw.SimpleTextOutlined(text, "ixMediumFont", pos.x, pos.y - 30, color, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+
+    -- Add cremation progress if burning
+    local yOffset = 10
+    if isBurning then
+        local duration = 240
+        local progressText = string.format("Cremation: %d/%ds", math.floor(burnProgress), duration)
+        draw.SimpleTextOutlined(progressText, "ixSmallFont", pos.x, pos.y - 5, Color(255, 200, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+        yOffset = 20
+    end
 
     -- Draw action hints
     if knockedEnt:GetPermadead() then
-        draw.SimpleTextOutlined("E: Search body", "ixSmallFont", pos.x, pos.y, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+        draw.SimpleTextOutlined("E: Search body", "ixSmallFont", pos.x, pos.y + yOffset, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
     else
-        draw.SimpleTextOutlined("E: Search body", "ixSmallFont", pos.x, pos.y, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
-        draw.SimpleTextOutlined("Hold E: Attempt CPR", "ixSmallFont", pos.x, pos.y + 15, Color(100, 200, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+        draw.SimpleTextOutlined("E: Search body", "ixSmallFont", pos.x, pos.y + yOffset, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+        draw.SimpleTextOutlined("Hold E: Attempt CPR", "ixSmallFont", pos.x, pos.y + yOffset + 25, Color(100, 200, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
     end
 
     -- Draw hold progress bar if holding E on a knocked (not dead) target
@@ -205,5 +255,33 @@ hook.Add("Think", "ixKnockedInteraction", function()
         useKeyDownTime = nil
         useKeyTarget = nil
         reviveSent = false
+    end
+end)
+
+-- ============================================================================
+-- CREMATION VISUAL FEEDBACK (Body Darkening)
+-- ============================================================================
+
+-- Darken burning ragdolls based on cremation progress
+hook.Add("PreDrawOpaqueRenderables", "ixKnockedBurnDarkening", function()
+    for _, ragdoll in ipairs(ents.FindByClass("prop_ragdoll")) do
+        if IsValid(ragdoll) then
+            local knockedEnt = ragdoll:GetNetVar("ixKnockedEntity")
+            if IsValid(knockedEnt) then
+                local burnProgress = knockedEnt:GetBurnProgress()
+                if burnProgress and burnProgress > 0 then
+                    local duration = 240 -- Standard cremation time
+                    local progress = math.Clamp(burnProgress / duration, 0, 1)
+                    local darkness = 255 - (progress * 225) -- 255 -> 30
+                    ragdoll:SetColor(Color(darkness, darkness, darkness))
+                else
+                    -- Reset color if not burning
+                    local curColor = ragdoll:GetColor()
+                    if curColor.r ~= 255 or curColor.g ~= 255 or curColor.b ~= 255 then
+                        ragdoll:SetColor(Color(255, 255, 255))
+                    end
+                end
+            end
+        end
     end
 end)

@@ -42,6 +42,10 @@ ix.log.AddType("suicide", function(client, charName)
     return string.format("%s's character '%s' took their own life", client:Name(), charName)
 end, FLAG_DANGER)
 
+ix.log.AddType("cremation", function(client, charName)
+    return string.format("Body of '%s' was cremated", charName)
+end, FLAG_WARNING)
+
 -- ============================================================================
 -- DAMAGE INTERCEPTION (using EntityTakeDamage hook)
 -- ============================================================================
@@ -55,6 +59,12 @@ end
 -- Intercept lethal damage and convert to knockout
 -- EntityTakeDamage allows us to modify/cancel damage before it's applied
 function PLUGIN:EntityTakeDamage(entity, dmgInfo)
+    -- Forward damage from prop_ragdoll to its linked ix_knocked entity
+    if entity:GetClass() == "prop_ragdoll" and IsValid(entity.ixKnockedEntity) then
+        entity.ixKnockedEntity:OnTakeDamage(dmgInfo)
+        return
+    end
+
     -- Only handle player damage
     if not entity:IsPlayer() then return end
 
@@ -92,13 +102,19 @@ function PLUGIN:EntityTakeDamage(entity, dmgInfo)
         local headshotChance = ix.config.Get("permadeathHeadshotChance", 50) / 100
         if math.random() < headshotChance then
             -- Lost the coin flip - instant permadeath
-            print("[Permadeath] Headshot execution!")
+            -- Create the knocked entity first so there's a body to leave behind
+            local pos = client:GetPos()
+            local ang = Angle(0, client:EyeAngles().y, 0)
+            local entity = self:CreateKnockedEntity(client, character, pos, ang, 0)
+
+            if entity then
+                self:HideKnockedPlayer(client, entity)
+            end
+
             self:ApplyPermadeath(client, character, "headshot_execution")
             client.ixProcessingLethalDamage = nil
             return
         end
-        -- Won the coin flip - proceed to normal knockout
-        print("[Permadeath] Survived headshot coin flip")
     end
 
     -- Create knockout state instead of death
@@ -139,6 +155,32 @@ function PLUGIN:CollectBodygroups(client)
     return bodygroups
 end
 
+-- Collect all SubMaterials from a player (clothing system)
+function PLUGIN:CollectSubMaterials(client)
+    local submaterials = {}
+    local materials = client:GetMaterials()
+    for i = 0, #materials - 1 do
+        local submat = client:GetSubMaterial(i)
+        if submat and submat ~= "" then
+            submaterials[i] = submat
+        end
+    end
+    return submaterials
+end
+
+-- Check if a player entity is on fire (supports both vFire and GMod native)
+function PLUGIN:IsPlayerOnFire(client)
+    if not IsValid(client) then return false end
+
+    -- Check vFire (player.fires table)
+    if client.fires and next(client.fires) then
+        return true
+    end
+
+    -- Fallback to GMod native
+    return client:IsOnFire()
+end
+
 -- Create and configure an ix_knocked entity
 function PLUGIN:CreateKnockedEntity(client, character, pos, ang, duration)
     local entity = ents.Create("ix_knocked")
@@ -169,13 +211,23 @@ function PLUGIN:CreateKnockedEntity(client, character, pos, ang, duration)
 
     -- Create the visible ragdoll
     local bodygroups = self:CollectBodygroups(client)
-    entity:CreateRagdoll(client:GetModel(), client:GetSkin(), bodygroups)
+    local submaterials = self:CollectSubMaterials(client)
+    entity:CreateRagdoll(client:GetModel(), client:GetSkin(), bodygroups, submaterials)
 
     -- Store references
     client.ixKnockedEntity = entity
     entity.ixOwner = client
     entity.ixSteamID64 = client:SteamID64()
     self.knockedEntities[entity.ixSteamID64] = entity
+
+    -- Transfer cremation progress from alive player (if any)
+    if client.ixCremationProgress and client.ixCremationProgress > 0 then
+        entity:SetBurnProgress(client.ixCremationProgress)
+        entity.ixLastBurnThink = CurTime()
+        -- Clear from player
+        client.ixCremationProgress = nil
+        client.ixLastFireThink = nil
+    end
 
     return entity
 end
@@ -290,6 +342,9 @@ function PLUGIN:AttemptRevival(reviver, knockedEntity)
     -- Lock the entity to this reviver
     knockedEntity:SetCurrentReviver(reviver)
 
+    -- Track revival attempt time to prevent Use() from triggering loot during/after CPR
+    knockedEntity.ixLastReviveAttempt = CurTime()
+
     -- Random progress duration (3-10 seconds by default)
     -- This is equipmentless CPR-style revival (no defib)
     local duration = self:GetRevivalDuration()
@@ -314,6 +369,9 @@ end
 function PLUGIN:CompleteRevivalAttempt(reviver, knockedEntity, hasDefib, defibItem)
     -- Clear the reviver lock
     knockedEntity:SetCurrentReviver(NULL)
+
+    -- Update revival attempt timestamp to prevent immediate loot after CPR
+    knockedEntity.ixLastReviveAttempt = CurTime()
 
     -- Calculate success using probabilistic squared
     -- hasDefib is false for hold-E revival (CPR-style, low chance)
@@ -382,6 +440,20 @@ function PLUGIN:RevivePlayer(knockedEntity, reviver, usedDefib, defibItem)
 
         -- Clear knockout entity reference
         owner.ixKnockedEntity = nil
+
+        -- Handle cremation state on revival
+        if not self:IsPlayerOnFire(owner) then
+            -- Not on fire after revival = reset cremation (body heals)
+            owner.ixCremationProgress = nil
+            owner.ixLastFireThink = nil
+        else
+            -- Still on fire after revival - transfer progress back from entity
+            local burnProgress = knockedEntity:GetBurnProgress()
+            if burnProgress and burnProgress > 0 then
+                owner.ixCremationProgress = burnProgress
+                owner.ixLastFireThink = CurTime()
+            end
+        end
     end
 
     -- Consume defib charge if used
@@ -512,6 +584,17 @@ function PLUGIN:ApplyPermadeath(client, character, reason)
     ix.log.Add(client, "permadeath", character:GetName(), reason)
 
     if IsValid(client) then
+        -- Bots don't get memorial screens - just kick them from the server
+        if client:IsBot() then
+            -- Delete the bot's character
+            local charID = character:GetID()
+            ix.char.loaded[charID] = nil
+
+            -- Kick the bot from the server
+            client:Kick("Permadeath")
+            return
+        end
+
         -- Gather memorial data BEFORE deleting character
         local charName = character:GetName()
         local model = character:GetModel()
@@ -752,7 +835,8 @@ function PLUGIN:RestoreKnockoutState(client, character, remainingTime)
         -- Ensure ragdoll exists (may have been removed)
         if not IsValid(existingEntity.ixRagdoll) then
             local bodygroups = self:CollectBodygroups(client)
-            existingEntity:CreateRagdoll(client:GetModel(), client:GetSkin(), bodygroups)
+            local submaterials = self:CollectSubMaterials(client)
+            existingEntity:CreateRagdoll(client:GetModel(), client:GetSkin(), bodygroups, submaterials)
         end
 
         -- Recalculate timer
@@ -809,6 +893,38 @@ function PLUGIN:InitializedPlugins()
             if currentHealth < capHealth then
                 local newHealth = math.min(currentHealth + healRate, capHealth)
                 client:SetHealth(newHealth)
+            end
+        end
+    end)
+
+    -- Alive player cremation tracking
+    timer.Create("ixAliveFireTracking", 0.5, 0, function()
+        for _, client in player.Iterator() do
+            if not IsValid(client) then continue end
+            if not client:Alive() then continue end
+            if IsValid(client.ixKnockedEntity) then continue end -- They're knocked, entity handles it
+
+            local isOnFire = self:IsPlayerOnFire(client)
+
+            if isOnFire then
+                -- Initialize or continue tracking
+                if not client.ixCremationProgress then
+                    client.ixCremationProgress = 0
+                end
+                if not client.ixLastFireThink then
+                    client.ixLastFireThink = CurTime()
+                end
+
+                -- Accumulate burn time
+                local delta = CurTime() - client.ixLastFireThink
+                client.ixCremationProgress = client.ixCremationProgress + delta
+                client.ixLastFireThink = CurTime()
+            else
+                -- Fire extinguished while alive = RESET (body heals)
+                if client.ixCremationProgress and client.ixCremationProgress > 0 then
+                    client.ixCremationProgress = 0
+                    client.ixLastFireThink = nil
+                end
             end
         end
     end)

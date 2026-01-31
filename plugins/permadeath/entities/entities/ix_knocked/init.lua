@@ -22,7 +22,7 @@ function ENT:Initialize()
 end
 
 -- Create the ragdoll visual for this knocked entity
-function ENT:CreateRagdoll(model, skin, bodygroups)
+function ENT:CreateRagdoll(model, skin, bodygroups, submaterials)
     -- Remove existing ragdoll if any
     if IsValid(self.ixRagdoll) then
         self.ixRagdoll:Remove()
@@ -45,6 +45,17 @@ function ENT:CreateRagdoll(model, skin, bodygroups)
     ragdoll:Spawn()
     ragdoll:Activate()
     ragdoll:SetCollisionGroup(COLLISION_GROUP_WEAPON)
+
+    -- CRITICAL: Prevent Citizen Clothing Overhaul addon from randomizing our ragdoll's clothing
+    -- The addon checks this flag before applying random outfits to prop_ragdoll entities
+    ragdoll._ClothingHandled = true
+
+    -- Copy SubMaterials (clothing system)
+    if submaterials then
+        for i, mat in pairs(submaterials) do
+            ragdoll:SetSubMaterial(i, mat)
+        end
+    end
 
     -- Link ragdoll to this entity (server-side)
     ragdoll.ixKnockedEntity = self
@@ -91,6 +102,106 @@ function ENT:CreateRagdoll(model, skin, bodygroups)
     return ragdoll
 end
 
+-- ============================================================================
+-- CREMATION SYSTEM
+-- ============================================================================
+
+-- Check if ragdoll is on fire (supports both vFire and GMod native)
+function ENT:IsRagdollOnFire()
+    local ragdoll = self.ixRagdoll
+    if not IsValid(ragdoll) then return false end
+
+    -- Check vFire (ragdoll.fires table)
+    if ragdoll.fires and next(ragdoll.fires) then
+        return true
+    end
+
+    -- Fallback to GMod native
+    return ragdoll:IsOnFire()
+end
+
+-- Check if inside cremation oven (future feature)
+function ENT:IsInCremationOven()
+    -- TODO: Implement cremation oven proximity detection
+    return false
+end
+
+-- Get cremation duration based on location
+function ENT:GetCremationDuration()
+    return self:IsInCremationOven() and 60 or 240
+end
+
+-- Handle cremation progress tracking
+function ENT:HandleCremation()
+    local curTime = CurTime()
+
+    -- Initialize burn tracking
+    if not self.ixBurnStartTime then
+        self.ixBurnStartTime = curTime
+    end
+
+    -- Calculate burn progress
+    local burnProgress = self:GetBurnProgress() + (curTime - (self.ixLastBurnThink or curTime))
+    self.ixLastBurnThink = curTime
+
+    -- Update networked progress (for client-side darkening)
+    self:SetBurnProgress(burnProgress)
+
+    -- Play burning sounds periodically
+    if not self.ixNextBurnSound or curTime >= self.ixNextBurnSound then
+        local ragdoll = self.ixRagdoll
+        if IsValid(ragdoll) then
+            sound.Play("ambient/fire/mtov_flame2.wav", ragdoll:GetPos(), 60, math.random(90, 110), 0.7)
+        end
+        self.ixNextBurnSound = curTime + math.random(4, 6)
+    end
+
+    -- Check if cremation complete
+    if burnProgress >= self:GetCremationDuration() then
+        self:CompleteCremation()
+    end
+end
+
+-- Handle cremation completion
+function ENT:CompleteCremation()
+    local charName = self:GetCharacterName() or "Unknown"
+    local pos = IsValid(self.ixRagdoll) and self.ixRagdoll:GetPos() or self:GetPos()
+
+    -- Log cremation
+    ix.log.Add(nil, "cremation", charName)
+
+    -- Destroy inventory (items burn with body)
+    local invID = self:GetInventoryID()
+    if invID and invID > 0 then
+        -- Remove from memory
+        ix.item.inventories[invID] = nil
+
+        -- Delete items from database
+        local itemQuery = mysql:Delete("ix_items")
+            itemQuery:Where("inventory_id", invID)
+        itemQuery:Execute()
+
+        -- Delete inventory from database
+        local invQuery = mysql:Delete("ix_inventories")
+            invQuery:Where("inventory_id", invID)
+        invQuery:Execute()
+    end
+
+    -- Mark inventory as already cleaned so OnRemove doesn't try again
+    self:SetInventoryID(0)
+
+    -- Spawn Human Remains item
+    ix.item.Spawn("human_remains", pos, function(item, entity)
+        if item then
+            -- Store original character name as data (but not displayed - fog of war)
+            item:SetData("originalCharacter", charName)
+        end
+    end)
+
+    -- Remove this entity (OnRemove handles ragdoll cleanup)
+    self:Remove()
+end
+
 -- Set the player model and create the ragdoll
 -- Note: NetworkVar "KnockedModel" (String) handles networking via SetupDataTables
 function ENT:SetKnockedModel(model)
@@ -119,30 +230,33 @@ end
 -- ============================================================================
 
 function ENT:Think()
-    -- Handle permadead decay timer
+    -- Dead bodies persist indefinitely until players dispose of them
+    -- (burial, cremation, disposal, etc.)
     if self:GetPermadead() then
-        -- Check decay timer (1 hour = 3600 seconds)
-        local decayTime = 3600
-        if self.ixPermadeadTime and (CurTime() - self.ixPermadeadTime) >= decayTime then
-            print("[Permadeath] Body decay timer expired, removing body")
-            self:Remove()  -- OnRemove handles inventory cleanup
-            return
+        -- Check for cremation (burning)
+        if self:IsRagdollOnFire() then
+            self:HandleCremation()
         end
-
-        self:NextThink(CurTime() + 10)  -- Check every 10 seconds once permadead
+        self:NextThink(CurTime() + 0.5)
         return true
     end
 
-    -- Check timer expiration
+    -- Check for cremation on knocked (alive but unconscious) bodies
+    if self:IsRagdollOnFire() then
+        self:HandleCremation()
+        -- Fire also halves knockout timer periodically
+        if not self.ixLastFireDamage or CurTime() - self.ixLastFireDamage >= 2 then
+            self:HalveTimer()
+            self.ixLastFireDamage = CurTime()
+        end
+    end
+
+    -- Check knockout timer expiration (for knocked but not dead bodies)
     local remaining = self:GetRemainingTime()
     if remaining <= 0 then
-        print("[Permadeath] Entity timer expired! Remaining: " .. remaining)
         local plugin = ix.plugin.Get("permadeath")
         if plugin then
-            print("[Permadeath] Calling OnKnockoutExpired")
             plugin:OnKnockoutExpired(self)
-        else
-            print("[Permadeath] ERROR: Could not get permadeath plugin!")
         end
     end
 
@@ -180,17 +294,21 @@ function ENT:OnTakeDamage(dmgInfo)
     local plugin = ix.plugin.Get("permadeath")
     if not plugin then return end
 
-    -- Determine if headshot via damage position relative to head height
-    -- Note: dmgInfo:GetHitGroup() doesn't work for entities, only for players
+    -- Determine if headshot via damage position relative to ragdoll head bone
     local isHeadshot = false
     local damagePos = dmgInfo:GetDamagePosition()
 
-    if damagePos and damagePos ~= Vector(0, 0, 0) then
-        -- Calculate head position (approximately 60 units above entity origin for standing models)
-        local headPos = self:GetPos() + Vector(0, 0, 60)
-        local distToHead = damagePos:Distance(headPos)
-        -- Consider it a headshot if damage is within 15 units of head position
-        isHeadshot = distToHead < 15
+    if damagePos and damagePos ~= Vector(0, 0, 0) and IsValid(self.ixRagdoll) then
+        -- Get the actual head bone position from the ragdoll
+        local headBone = self.ixRagdoll:LookupBone("ValveBiped.Bip01_Head1")
+        if headBone then
+            local headPos = self.ixRagdoll:GetBonePosition(headBone)
+            if headPos then
+                local distToHead = damagePos:Distance(headPos)
+                -- Consider it a headshot if damage is within 12 units of head bone
+                isHeadshot = distToHead < 12
+            end
+        end
     end
 
     if isHeadshot then
@@ -234,6 +352,16 @@ end
 -- This Use function is kept as a fallback and for compatibility
 function ENT:Use(activator, caller)
     if not IsValid(activator) or not activator:IsPlayer() then return end
+
+    -- Block Use for 2 seconds after revival attempt to prevent CPR from triggering loot
+    if self.ixLastReviveAttempt and CurTime() - self.ixLastReviveAttempt < 2 then
+        return
+    end
+
+    -- Also block if this player has an active DoStaredAction
+    if activator:GetAction() and activator:GetAction() ~= "" then
+        return
+    end
 
     -- Default Use action is to loot (matches E tap behavior)
     -- Revival requires holding E (handled via client-side detection)
