@@ -19,6 +19,7 @@ FACTION.name = "Medical"
 FACTION.description = "Redrock City Medical Department. You provide medical care at Redrock City. Your Chief Medical Officer is appointed by the Mayor."
 FACTION.color = Color(200, 200, 200) -- Light gray
 FACTION.isDefault = false
+FACTION.subordinateOf = "administration"  -- Mayor appoints CMO
 
 -- Medical models (more uniformed appearance)
 FACTION.models = {

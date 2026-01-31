@@ -92,7 +92,7 @@ hook.Add("HUDPaint", "ixWindsweptDoorHints", function()
     elseif weaponClass == "ix_lockpick" then
         hints = {"RMB on locked door: Pick lock"}
     elseif weaponClass == "ix_lockbreaker" then
-        hints = {"RMB on lock: Destroy lock (20s, LOUD)"}
+        hints = {"RMB on lock: Destroy lock"}
     end
 
     if #hints == 0 then return end

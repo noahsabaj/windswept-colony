@@ -379,7 +379,6 @@ if CLIENT then
 
         -- Text
         draw.SimpleText("Breaking Lock...", "ixSmallFont", w / 2, y - 20, Color(255, 150, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
-        draw.SimpleText("LOUD - Others can hear this!", "ixSmallFont", w / 2, y + barH + 10, Color(255, 100, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
         draw.SimpleText("LMB to cancel", "ixSmallFont", w / 2, y + barH + 30, Color(150, 150, 150), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
     end
 end

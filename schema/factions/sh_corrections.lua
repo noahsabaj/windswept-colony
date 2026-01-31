@@ -18,6 +18,7 @@ FACTION.name = "Corrections"
 FACTION.description = "Redrock City Corrections Department. You maintain order at Skarn Prison. Your Director is appointed by the Commissioner."
 FACTION.color = Color(200, 200, 200) -- Light gray
 FACTION.isDefault = false
+FACTION.subordinateOf = "security"  -- Commissioner appoints Warden
 
 -- Corrections models (more uniformed appearance)
 FACTION.models = {

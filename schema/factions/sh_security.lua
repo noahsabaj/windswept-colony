@@ -21,6 +21,7 @@ FACTION.name = "Security"
 FACTION.description = "Redrock City Security Department. You keep the peace. Your Commissioner is elected. Your loyalty is... complicated."
 FACTION.color = Color(200, 200, 200) -- Light gray
 FACTION.isDefault = false
+FACTION.subordinateOf = "confederation"  -- CEG oversees security
 
 -- Security models (more uniformed appearance)
 FACTION.models = {

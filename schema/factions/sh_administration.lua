@@ -20,6 +20,7 @@ FACTION.name = "Administration"
 FACTION.description = "The city government. You manage, legislate, and administrate. Your Mayor is elected by the people."
 FACTION.color = Color(200, 200, 200) -- Light gray
 FACTION.isDefault = false
+FACTION.subordinateOf = "confederation"  -- CEG oversees city administration
 
 -- Administration models (more formal appearance)
 FACTION.models = {

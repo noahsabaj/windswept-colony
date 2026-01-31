@@ -78,6 +78,8 @@ windswept/
 
 - All characters are created **factionless** by default (no faction assignment). Personal IDs are given to ALL new characters via the `OnCharacterCreated` hook in `sv_schema.lua`. Players join factions (Medical, Security, Corrections, Miners Union, etc.) through in-game faction transfers (`/PlyTransfer`) after their character exists. Factionless characters appear in the "Unaffiliated" section of the scoreboard and use `TEAM_UNASSIGNED` (0) in Source Engine. Citizenship is an RP concept tracked by players, not a faction.
 
+- **UI is colorblind (anti-metagaming)**: All game UI systems use uniform gray `Color(200, 200, 200)` for ALL players regardless of faction. Scoreboard headers, tooltips, character info panels, menu buttons - everything is the same color. There are NO faction colors anywhere in the code. If factions want "colors" that's purely an in-character roleplay thing ("We wear red armbands"), not something the game systems know about.
+
 ## Game Systems
 
 - Currency: CEG Dollar, written as "$50" or "50 dollars". The dollar is the standard currency used throughout CEG-controlled space.
@@ -151,6 +153,16 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 - **item:GetInventory() doesn't exist**: Helix items don't have a direct `GetInventory()` method. To get an item's inventory, go through the owner: `client:GetCharacter():GetInventory()`.
 
 - **WeaponEquip hook fires during Give()**: When calling `client:Give("weapon_class")`, the `WeaponEquip` hook fires immediately during that call, not after. If you're tracking equipped items with variables like `client.ixItem = item`, set them BEFORE `Give()`, not after, or the hook won't see them.
+
+- **PLUGIN global not available in net.Receive handlers**: The `PLUGIN` variable is only defined during plugin file load. In `net.Receive()` callbacks (which execute later), `PLUGIN` is nil. Fix: Store a local reference at load time:
+  ```lua
+  -- At top of sv_plugin.lua, after network strings
+  local myPlugin = PLUGIN
+
+  net.Receive("ixMyMessage", function(len, client)
+      myPlugin:DoSomething()  -- Use the stored reference, not PLUGIN
+  end)
+  ```
 
 ### SWEP/Weapon Development
 

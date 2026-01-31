@@ -18,6 +18,7 @@ FACTION.name = "Fire Brigade"
 FACTION.description = "Redrock City Fire Brigade. You provide firefighting and rescue services at Redrock City. Your Fire Chief is appointed by the Mayor."
 FACTION.color = Color(200, 200, 200) -- Light gray
 FACTION.isDefault = false
+FACTION.subordinateOf = "administration"  -- Mayor appoints Fire Chief
 
 -- Fire Brigade models (more uniformed appearance)
 FACTION.models = {

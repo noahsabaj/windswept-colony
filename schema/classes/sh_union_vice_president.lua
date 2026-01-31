@@ -12,4 +12,4 @@ function CLASS:OnCanBe(client)
     return false, "This position must be appointed by the Union President."
 end
 
-CLASS_VICE_PRESIDENT = CLASS.index
+CLASS_UNION_VICE_PRESIDENT = CLASS.index

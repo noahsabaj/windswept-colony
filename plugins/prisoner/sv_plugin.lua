@@ -20,6 +20,10 @@ util.AddNetworkString("ixPrisonerRelease")
 util.AddNetworkString("ixPrisonerAdjust")
 util.AddNetworkString("ixPrisonCardView")
 
+-- Store reference to plugin for use in net.Receive handlers
+-- (PLUGIN global is only available during initial load)
+local prisonerPlugin = PLUGIN
+
 -- Give Hands Up weapon to all players on spawn
 function PLUGIN:PostPlayerLoadout(client)
     print("[Prisoner] PostPlayerLoadout called for " .. client:Name())
@@ -447,7 +451,7 @@ net.Receive("ixPrisonerSentenceSubmit", function(len, client)
     end
 
     -- Sentence the player
-    PLUGIN:SentencePlayer(target, client, duration, reason)
+    prisonerPlugin:SentencePlayer(target, client, duration, reason)
 end)
 
 net.Receive("ixPrisonerRelease", function(len, client)
@@ -465,7 +469,7 @@ net.Receive("ixPrisonerRelease", function(len, client)
         return
     end
 
-    PLUGIN:ReleasePlayer(target)
+    prisonerPlugin:ReleasePlayer(target)
     client:Notify("You have released " .. target:Name() .. " from prison.")
 end)
 
@@ -485,7 +489,7 @@ net.Receive("ixPrisonerAdjust", function(len, client)
         return
     end
 
-    if PLUGIN:AdjustSentence(target, client, adjustment) then
+    if prisonerPlugin:AdjustSentence(target, client, adjustment) then
         local action = adjustment > 0 and "added" or "removed"
         client:Notify("You have " .. action .. " " .. math.abs(adjustment) .. " seconds to " .. target:Name() .. "'s sentence.")
     end
