@@ -168,16 +168,21 @@ function PLUGIN:CollectSubMaterials(client)
     return submaterials
 end
 
--- Check if a player entity is on fire (supports both vFire and GMod native)
+-- Check if a player entity is on fire (supports windswept_fire, vFire, and GMod native)
 function PLUGIN:IsPlayerOnFire(client)
     if not IsValid(client) then return false end
 
-    -- Check vFire (player.fires table)
+    -- Prefer ws_fire API if available
+    if ws_fire and ws_fire.IsOnFire then
+        return ws_fire.IsOnFire(client)
+    end
+
+    -- Fallback: Check .fires table (works with vFire and windswept_fire)
     if client.fires and next(client.fires) then
         return true
     end
 
-    -- Fallback to GMod native
+    -- Final fallback to GMod native
     return client:IsOnFire()
 end
 
@@ -831,11 +836,16 @@ end
 -- Restore knockout state for player who reconnected while knocked
 function PLUGIN:RestoreKnockoutState(client, character, remainingTime)
     -- Check if there's an existing entity for this character
-    local existingEntity = nil
-    for _, ent in ipairs(ents.FindByClass("ix_knocked")) do
-        if ent:GetCharacterID() == character:GetID() then
-            existingEntity = ent
-            break
+    -- Use knockedEntities table lookup instead of ents.FindByClass iteration
+    local existingEntity = self.knockedEntities[client:SteamID64()]
+
+    -- Fallback: if not in table, search by character ID (handles edge cases)
+    if not IsValid(existingEntity) then
+        for steamID, ent in pairs(self.knockedEntities) do
+            if IsValid(ent) and ent:GetCharacterID() == character:GetID() then
+                existingEntity = ent
+                break
+            end
         end
     end
 
@@ -921,8 +931,8 @@ function PLUGIN:InitializedPlugins()
         end
     end)
 
-    -- Alive player cremation tracking
-    timer.Create("ixAliveFireTracking", 0.5, 0, function()
+    -- Alive player cremation tracking (1.5s interval - cremation is not time-critical)
+    timer.Create("ixAliveFireTracking", 1.5, 0, function()
         for _, client in player.Iterator() do
             if not IsValid(client) then continue end
             if not client:Alive() then continue end

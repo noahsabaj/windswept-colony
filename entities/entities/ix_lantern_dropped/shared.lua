@@ -208,11 +208,15 @@ if CLIENT then
                 dlight.b = self.LightColor.b
                 dlight.Brightness = self.LightBrightness
                 dlight.Size = self.LightSize
-                dlight.DieTime = CurTime() + 0.1
+                dlight.DieTime = CurTime() + 0.5  -- Longer lifespan reduces recreation overhead
                 dlight.Style = self.LightStyle
                 dlight.nomodel = true
             end
         end
+
+        -- Throttle to 20x/sec instead of every frame (60x/sec)
+        self:NextThink(CurTime() + 0.05)
+        return true
     end
 
     function ENT:Draw()

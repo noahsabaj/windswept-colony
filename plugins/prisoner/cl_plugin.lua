@@ -394,6 +394,9 @@ end)
 
 local wasLMBDown = false
 local currentDragTarget = nil
+local cachedDraggingState = nil  -- Cache to avoid GetNetVar every frame
+local lastDragCheckTime = 0
+local DRAG_CHECK_INTERVAL = 0.1  -- Only check NetVar every 0.1 seconds
 
 hook.Add("Think", "ixDragInput", function()
     local client = LocalPlayer()
@@ -426,11 +429,15 @@ hook.Add("Think", "ixDragInput", function()
 
     local lmbDown = input.IsMouseDown(MOUSE_LEFT)
 
-    -- Check if we're currently dragging
-    local currentlyDragging = client:GetNetVar("ixDragging")
+    -- Throttle NetVar lookup - only check periodically or on input change
+    local now = CurTime()
+    if lmbDown ~= wasLMBDown or now - lastDragCheckTime > DRAG_CHECK_INTERVAL then
+        cachedDraggingState = client:GetNetVar("ixDragging")
+        lastDragCheckTime = now
+    end
 
     if lmbDown then
-        if not wasLMBDown and not currentlyDragging then
+        if not wasLMBDown and not cachedDraggingState then
             -- Just pressed LMB - check if looking at restrained player
             local trace = client:GetEyeTrace()
             local target = trace.Entity
@@ -442,15 +449,17 @@ hook.Add("Think", "ixDragInput", function()
                     net.Start("ixDragStart")
                     net.WriteEntity(target)
                     net.SendToServer()
+                    cachedDraggingState = target:EntIndex()  -- Optimistic update
                 end
             end
         end
     else
-        if wasLMBDown and currentlyDragging then
+        if wasLMBDown and cachedDraggingState then
             -- Released LMB while dragging - stop
             net.Start("ixDragStop")
             net.SendToServer()
             currentDragTarget = nil
+            cachedDraggingState = nil  -- Optimistic update
         end
     end
 

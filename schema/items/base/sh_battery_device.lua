@@ -69,25 +69,28 @@ end
 -- Find the best battery in inventory
 -- For requireFullBattery devices: finds any 100up battery
 -- For normal devices: finds highest charge battery
+-- Optimized: Uses GetItemsByUniqueID to avoid full inventory scan
 function ITEM:FindBestBatteryInInventory(inventory)
+    local batteries = inventory:GetItemsByUniqueID("battery", false)  -- false = don't check bags
+    if #batteries == 0 then return nil, -1 end
+
     local bestBattery = nil
     local bestCharge = -1
 
-    for _, invItem in pairs(inventory:GetItems()) do
-        if invItem.uniqueID == "battery" then
-            local charge = invItem:GetData("charge", 100)
+    for i = 1, #batteries do
+        local invItem = batteries[i]
+        local charge = invItem:GetData("charge", 100)
 
-            if self.requireFullBattery then
-                -- Only accept full batteries
-                if charge == 100 then
-                    return invItem, 100
-                end
-            else
-                -- Accept any, prefer highest
-                if charge > bestCharge then
-                    bestCharge = charge
-                    bestBattery = invItem
-                end
+        if self.requireFullBattery then
+            -- Only accept full batteries - return immediately when found
+            if charge == 100 then
+                return invItem, 100
+            end
+        else
+            -- Accept any, prefer highest
+            if charge > bestCharge then
+                bestCharge = charge
+                bestBattery = invItem
             end
         end
     end
@@ -96,15 +99,16 @@ function ITEM:FindBestBatteryInInventory(inventory)
 end
 
 -- Alias for defibrillator compatibility
+-- Optimized: Uses GetItemsByUniqueID and early exit
 function ITEM:FindFullBatteryInInventory(inventory)
-    for _, invItem in pairs(inventory:GetItems()) do
-        if invItem.uniqueID == "battery" then
-            local charge = invItem:GetData("charge", 100)
-            if charge == 100 then
-                return invItem
-            end
+    local batteries = inventory:GetItemsByUniqueID("battery", false)
+
+    for i = 1, #batteries do
+        if batteries[i]:GetData("charge", 100) == 100 then
+            return batteries[i]
         end
     end
+
     return nil
 end
 

@@ -83,24 +83,18 @@ do
         local listenerChar = listener:GetCharacter()
         if not listenerChar then return false end
 
-        local inventory = listenerChar:GetInventory()
-        if not inventory then return false end
+        -- Quick check: if listener has no active radio, skip everything
+        -- This cache is set when radios are toggled on/off (only one radio can be active)
+        if not listenerChar:GetData("ixHasActiveRadio") then return false end
 
         local speakerChar = speaker:GetCharacter()
         if not speakerChar then return false end
 
+        -- Check frequencies match
         local speakerFreq = speakerChar:GetData("frequency", "100.0")
+        local listenerFreq = listenerChar:GetData("frequency", "100.0")
 
-        for _, radio in pairs(inventory:GetItemsByUniqueID("handheld_radio", true)) do
-            if radio:GetData("enabled", false) then
-                local listenerFreq = listenerChar:GetData("frequency", "100.0")
-                if speakerFreq == listenerFreq then
-                    return true
-                end
-            end
-        end
-
-        return false
+        return speakerFreq == listenerFreq
     end
 
     -- Custom OnChatAdd: pass nil chatType so unrecognized speakers show as "Unknown"

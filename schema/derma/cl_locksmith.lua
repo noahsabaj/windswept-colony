@@ -41,14 +41,23 @@ function PANEL:SetStation(station)
 end
 
 function PANEL:RefreshInventory()
-    -- Refresh item lists in all tabs
-    if self.blankLockList then self:PopulateBlankLocks(self.blankLockList) end
-    if self.blankKeyList then self:PopulateBlankKeys(self.blankKeyList) end
-    if self.sourceList then self:PopulateSources(self.sourceList) end
-    if self.lockListForKeying then self:PopulateLocks(self.lockListForKeying) end
-    if self.keyListForKeying then self:PopulateKeys(self.keyListForKeying) end
-    if self.renameList then self:PopulateRenamable(self.renameList) end
-    if self.viewLockList then self:PopulateLocks(self.viewLockList) end
+    -- Cache inventory items ONCE instead of 6+ GetItems() calls
+    local character = LocalPlayer():GetCharacter()
+    if not character then return end
+
+    local inventory = character:GetInventory()
+    if not inventory then return end
+
+    local cachedItems = inventory:GetItems()
+
+    -- Refresh item lists in all tabs using cached items
+    if self.blankLockList then self:PopulateBlankLocks(self.blankLockList, cachedItems) end
+    if self.blankKeyList then self:PopulateBlankKeys(self.blankKeyList, cachedItems) end
+    if self.sourceList then self:PopulateSources(self.sourceList, cachedItems) end
+    if self.lockListForKeying then self:PopulateLocks(self.lockListForKeying, cachedItems) end
+    if self.keyListForKeying then self:PopulateKeys(self.keyListForKeying, cachedItems) end
+    if self.renameList then self:PopulateRenamable(self.renameList, cachedItems) end
+    if self.viewLockList then self:PopulateLocks(self.viewLockList, cachedItems) end
 end
 
 -- ============================================================================
@@ -99,16 +108,20 @@ function PANEL:CreateProgramLockTab()
     self.tabs:AddSheet("Program Lock", panel, "icon16/lock_add.png")
 end
 
-function PANEL:PopulateBlankLocks(listView)
+function PANEL:PopulateBlankLocks(listView, cachedItems)
     listView:Clear()
 
-    local character = LocalPlayer():GetCharacter()
-    if not character then return end
+    -- Use cached items if provided, otherwise fetch (fallback for direct calls)
+    local items = cachedItems
+    if not items then
+        local character = LocalPlayer():GetCharacter()
+        if not character then return end
+        local inventory = character:GetInventory()
+        if not inventory then return end
+        items = inventory:GetItems()
+    end
 
-    local inventory = character:GetInventory()
-    if not inventory then return end
-
-    for _, item in pairs(inventory:GetItems()) do
+    for _, item in pairs(items) do
         if item.uniqueID == "lock_blank" then
             local quantity = item:GetData("quantity", 1)
             local line = listView:AddLine("Blank Lock (x" .. quantity .. ")")
@@ -178,16 +191,19 @@ function PANEL:CreateProgramKeyTab()
     self.tabs:AddSheet("Program Key", panel, "icon16/key_add.png")
 end
 
-function PANEL:PopulateBlankKeys(listView)
+function PANEL:PopulateBlankKeys(listView, cachedItems)
     listView:Clear()
 
-    local character = LocalPlayer():GetCharacter()
-    if not character then return end
+    local items = cachedItems
+    if not items then
+        local character = LocalPlayer():GetCharacter()
+        if not character then return end
+        local inventory = character:GetInventory()
+        if not inventory then return end
+        items = inventory:GetItems()
+    end
 
-    local inventory = character:GetInventory()
-    if not inventory then return end
-
-    for _, item in pairs(inventory:GetItems()) do
+    for _, item in pairs(items) do
         if item.uniqueID == "key_blank" then
             local quantity = item:GetData("quantity", 1)
             local line = listView:AddLine("Blank Key (x" .. quantity .. ")")
@@ -196,16 +212,19 @@ function PANEL:PopulateBlankKeys(listView)
     end
 end
 
-function PANEL:PopulateSources(listView)
+function PANEL:PopulateSources(listView, cachedItems)
     listView:Clear()
 
-    local character = LocalPlayer():GetCharacter()
-    if not character then return end
+    local items = cachedItems
+    if not items then
+        local character = LocalPlayer():GetCharacter()
+        if not character then return end
+        local inventory = character:GetInventory()
+        if not inventory then return end
+        items = inventory:GetItems()
+    end
 
-    local inventory = character:GetInventory()
-    if not inventory then return end
-
-    for _, item in pairs(inventory:GetItems()) do
+    for _, item in pairs(items) do
         if item.uniqueID == "lock" then
             local keyings = item:GetData("keyings", {})
             if #keyings > 0 then
@@ -287,16 +306,19 @@ function PANEL:CreateAddKeyingTab()
     self.tabs:AddSheet("Add Keying", panel, "icon16/link_add.png")
 end
 
-function PANEL:PopulateLocks(listView)
+function PANEL:PopulateLocks(listView, cachedItems)
     listView:Clear()
 
-    local character = LocalPlayer():GetCharacter()
-    if not character then return end
+    local items = cachedItems
+    if not items then
+        local character = LocalPlayer():GetCharacter()
+        if not character then return end
+        local inventory = character:GetInventory()
+        if not inventory then return end
+        items = inventory:GetItems()
+    end
 
-    local inventory = character:GetInventory()
-    if not inventory then return end
-
-    for _, item in pairs(inventory:GetItems()) do
+    for _, item in pairs(items) do
         if item.uniqueID == "lock" then
             local keyings = item:GetData("keyings", {})
             local name = item:GetData("lockName", "")
@@ -307,16 +329,19 @@ function PANEL:PopulateLocks(listView)
     end
 end
 
-function PANEL:PopulateKeys(listView)
+function PANEL:PopulateKeys(listView, cachedItems)
     listView:Clear()
 
-    local character = LocalPlayer():GetCharacter()
-    if not character then return end
+    local items = cachedItems
+    if not items then
+        local character = LocalPlayer():GetCharacter()
+        if not character then return end
+        local inventory = character:GetInventory()
+        if not inventory then return end
+        items = inventory:GetItems()
+    end
 
-    local inventory = character:GetInventory()
-    if not inventory then return end
-
-    for _, item in pairs(inventory:GetItems()) do
+    for _, item in pairs(items) do
         if item.uniqueID == "key" then
             local keying = item:GetData("keying", "")
             if keying ~= "" then
@@ -390,16 +415,19 @@ function PANEL:CreateRenameTab()
     self.tabs:AddSheet("Rename", panel, "icon16/pencil.png")
 end
 
-function PANEL:PopulateRenamable(listView)
+function PANEL:PopulateRenamable(listView, cachedItems)
     listView:Clear()
 
-    local character = LocalPlayer():GetCharacter()
-    if not character then return end
+    local items = cachedItems
+    if not items then
+        local character = LocalPlayer():GetCharacter()
+        if not character then return end
+        local inventory = character:GetInventory()
+        if not inventory then return end
+        items = inventory:GetItems()
+    end
 
-    local inventory = character:GetInventory()
-    if not inventory then return end
-
-    for _, item in pairs(inventory:GetItems()) do
+    for _, item in pairs(items) do
         if item.uniqueID == "lock" then
             local name = item:GetData("lockName", "")
             if name == "" then

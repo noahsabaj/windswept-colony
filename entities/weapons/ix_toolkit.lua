@@ -103,6 +103,16 @@ function SWEP:GetTargetDoor()
     local owner = self:GetOwner()
     if not IsValid(owner) then return nil end
 
+    -- Cache trace result on server to avoid TraceLine every frame during work
+    -- (Think() calls this repeatedly while working)
+    if SERVER and self:IsWorking() then
+        local now = CurTime()
+        if self._lastTraceTime and (now - self._lastTraceTime) < 0.1 then
+            return self._cachedDoor
+        end
+        self._lastTraceTime = now
+    end
+
     local tr = util.TraceLine({
         start = owner:GetShootPos(),
         endpos = owner:GetShootPos() + owner:GetAimVector() * self.MaxUseDistance,
@@ -110,13 +120,18 @@ function SWEP:GetTargetDoor()
     })
 
     local ent = tr.Entity
-    if not IsValid(ent) then return nil end
+    if not IsValid(ent) then
+        self._cachedDoor = nil
+        return nil
+    end
 
     -- Check if it's our managed door
     if ent.ixIsWindsweptDoor then
+        self._cachedDoor = ent
         return ent
     end
 
+    self._cachedDoor = nil
     return nil
 end
 

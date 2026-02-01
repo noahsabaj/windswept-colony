@@ -106,17 +106,22 @@ end
 -- CREMATION SYSTEM
 -- ============================================================================
 
--- Check if ragdoll is on fire (supports both vFire and GMod native)
+-- Check if ragdoll is on fire (supports windswept_fire, vFire, and GMod native)
 function ENT:IsRagdollOnFire()
     local ragdoll = self.ixRagdoll
     if not IsValid(ragdoll) then return false end
 
-    -- Check vFire (ragdoll.fires table)
+    -- Prefer ws_fire API if available
+    if ws_fire and ws_fire.IsOnFire then
+        return ws_fire.IsOnFire(ragdoll)
+    end
+
+    -- Fallback: Check .fires table (works with vFire and windswept_fire)
     if ragdoll.fires and next(ragdoll.fires) then
         return true
     end
 
-    -- Fallback to GMod native
+    -- Final fallback to GMod native
     return ragdoll:IsOnFire()
 end
 
@@ -146,6 +151,7 @@ end
 
 -- Sustain fire at consistent intensity (body is fuel)
 -- Call periodically to prevent fire from dying down
+-- Supports windswept_fire, vFire, and GMod native fire
 function ENT:SustainFire()
     local ragdoll = self.ixRagdoll
     if not IsValid(ragdoll) then return end
@@ -158,17 +164,19 @@ function ENT:SustainFire()
     end
     self.ixNextFireSustain = curTime + 5
 
-    -- Check for vFire fires and boost their life
+    -- Check for fires via .fires table (works with vFire and windswept_fire)
     if ragdoll.fires and next(ragdoll.fires) then
         for fire, _ in pairs(ragdoll.fires) do
-            if IsValid(fire) and fire.life then
-                -- Boost fire life to maintain intensity (vFire max state is 7, life ~50+ for inferno)
-                -- Keep it at a medium-high level for consistent burn
-                if fire.life < 30 then
+            if IsValid(fire) then
+                -- Boost fire life to maintain intensity
+                -- Both vFire and windswept_fire expose .life and .feed as direct properties
+                if fire.life and fire.life < 30 then
                     fire.life = 30
                 end
                 -- Also add feed (fuel) so fire sustains itself
-                fire.feed = (fire.feed or 0) + 20
+                if fire.feed ~= nil then
+                    fire.feed = (fire.feed or 0) + 20
+                end
             end
         end
     else

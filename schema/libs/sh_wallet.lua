@@ -59,48 +59,57 @@ if SERVER then
     -- Priority: specialized wallet -> general (both) wallet
     function ix.wallet.FindBestWallet(client, currencyType)
         local wallets = ix.wallet.GetWallets(client)
+        if #wallets == 0 then return nil end
 
-        -- First pass: find specialized and general wallets
+        -- Cache item definition lookup (avoid repeated table access)
+        local itemClass = currencyType == "cash" and "cash" or "coins"
+        local itemDef = ix.item.list[itemClass]
+        if not itemDef then return nil end
+
+        local itemWidth = itemDef.width or 1
+        local itemHeight = itemDef.height or 1
+
+        -- First pass: find specialized and general wallets with pre-calculated money
         local specialized = {}
         local general = {}
 
         for _, wallet in ipairs(wallets) do
+            -- Cache money amount during categorization (avoids recalculating during sort)
+            wallet.cachedMoney = ix.wallet.GetWalletMoney(wallet.inventory)
+
             if wallet.designation == currencyType then
-                table.insert(specialized, wallet)
+                specialized[#specialized + 1] = wallet
             elseif wallet.designation == "both" then
-                table.insert(general, wallet)
+                general[#general + 1] = wallet
             end
         end
 
-        -- Sort by money amount (descending - most money first)
+        -- Sort by cached money amount (descending - most money first)
+        -- Only sort if more than 1 wallet in category
         local function sortByMoney(a, b)
-            return ix.wallet.GetWalletMoney(a.inventory) > ix.wallet.GetWalletMoney(b.inventory)
+            return a.cachedMoney > b.cachedMoney
         end
 
-        table.sort(specialized, sortByMoney)
-        table.sort(general, sortByMoney)
+        if #specialized > 1 then
+            table.sort(specialized, sortByMoney)
+        end
+        if #general > 1 then
+            table.sort(general, sortByMoney)
+        end
 
         -- Try specialized first (coins-only for coins, cash-only for cash)
-        for _, wallet in ipairs(specialized) do
-            local itemClass = currencyType == "cash" and "cash" or "coins"
-            local itemDef = ix.item.list[itemClass]
-            if itemDef then
-                local x, y = wallet.inventory:FindEmptySlot(itemDef.width or 1, itemDef.height or 1)
-                if x and y then
-                    return wallet.inventory
-                end
+        for i = 1, #specialized do
+            local x, y = specialized[i].inventory:FindEmptySlot(itemWidth, itemHeight)
+            if x and y then
+                return specialized[i].inventory
             end
         end
 
         -- Then try general (both) wallets
-        for _, wallet in ipairs(general) do
-            local itemClass = currencyType == "cash" and "cash" or "coins"
-            local itemDef = ix.item.list[itemClass]
-            if itemDef then
-                local x, y = wallet.inventory:FindEmptySlot(itemDef.width or 1, itemDef.height or 1)
-                if x and y then
-                    return wallet.inventory
-                end
+        for i = 1, #general do
+            local x, y = general[i].inventory:FindEmptySlot(itemWidth, itemHeight)
+            if x and y then
+                return general[i].inventory
             end
         end
 

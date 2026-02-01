@@ -32,7 +32,18 @@ end
 
 -- Auto-off when dropped
 function ITEM.postHooks.drop(item, status)
-    item:SetData("enabled", false)
+    if item:GetData("enabled") then
+        item:SetData("enabled", false)
+
+        -- Update cache for radio CanHear optimization
+        local owner = item:GetOwner()
+        if IsValid(owner) then
+            local character = owner:GetCharacter()
+            if character then
+                character:SetData("ixHasActiveRadio", false)
+            end
+        end
+    end
 end
 
 -- Frequency tuning function
@@ -62,8 +73,12 @@ ITEM.functions.Toggle = {
         end
 
         if canToggle then
-            itemTable:SetData("enabled", not itemTable:GetData("enabled", false))
+            local newState = not itemTable:GetData("enabled", false)
+            itemTable:SetData("enabled", newState)
             itemTable.player:EmitSound("buttons/lever7.wav", 50, math.random(170, 180), 0.25)
+
+            -- Update cache for radio CanHear optimization (avoids inventory scan per message)
+            character:SetData("ixHasActiveRadio", newState)
         else
             itemTable.player:NotifyLocalized("radioAlreadyOn")
         end

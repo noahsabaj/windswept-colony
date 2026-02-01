@@ -23,23 +23,44 @@ function ENT:Draw()
 end
 
 -- Draw usage hint when looking at it
+-- Throttled eye trace to reduce per-frame overhead
+local locksmithHintCache = {
+    ent = nil,
+    text = nil,
+    lastCheck = 0
+}
+local LOCKSMITH_HINT_INTERVAL = 0.1  -- Check every 0.1 seconds
+
 hook.Add("HUDPaint", "ixLocksmithHint", function()
-    local ply = LocalPlayer()
-    local tr = ply:GetEyeTrace()
-    local ent = tr.Entity
+    local now = CurTime()
 
-    if not IsValid(ent) then return end
-    if ent:GetClass() ~= "ix_auto_locksmith" then return end
-    if ply:GetPos():Distance(ent:GetPos()) > 150 then return end
+    -- Throttle eye trace check
+    if now - locksmithHintCache.lastCheck >= LOCKSMITH_HINT_INTERVAL then
+        locksmithHintCache.lastCheck = now
 
-    local scrW, scrH = ScrW(), ScrH()
-    local text = "Press E to use Locksmith"
+        local ply = LocalPlayer()
+        local tr = ply:GetEyeTrace()
+        local ent = tr.Entity
 
-    if ent:GetInUse() and ent:GetUser() ~= ply then
-        text = "Machine is in use"
+        if not IsValid(ent) or ent:GetClass() ~= "ix_auto_locksmith" or ply:GetPos():DistToSqr(ent:GetPos()) > (150 * 150) then
+            locksmithHintCache.ent = nil
+            locksmithHintCache.text = nil
+            return
+        end
+
+        locksmithHintCache.ent = ent
+        if ent:GetInUse() and ent:GetUser() ~= ply then
+            locksmithHintCache.text = "Machine is in use"
+        else
+            locksmithHintCache.text = "Press E to use Locksmith"
+        end
     end
 
-    draw.SimpleText(text, "ixSmallFont", scrW / 2, scrH * 0.6, Color(255, 255, 255, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+    -- Draw cached result
+    if locksmithHintCache.ent and locksmithHintCache.text then
+        local scrW, scrH = ScrW(), ScrH()
+        draw.SimpleText(locksmithHintCache.text, "ixSmallFont", scrW / 2, scrH * 0.6, Color(255, 255, 255, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+    end
 end)
 
 -- Open locksmith UI when server tells us to

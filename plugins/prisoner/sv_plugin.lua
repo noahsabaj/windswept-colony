@@ -26,6 +26,9 @@ util.AddNetworkString("ixDragStop")
 -- (PLUGIN global is only available during initial load)
 local prisonerPlugin = PLUGIN
 
+-- Track active drags for efficient Think iteration (avoid scanning all players)
+PLUGIN.activeDrags = PLUGIN.activeDrags or {}
+
 -- Give Hands Up weapon to all players on spawn
 function PLUGIN:PostPlayerLoadout(client)
     print("[Prisoner] PostPlayerLoadout called for " .. client:Name())
@@ -469,6 +472,9 @@ function PLUGIN:StartDrag(dragger, target)
     dragger:SetNetVar("ixDragging", target:EntIndex())
     target:SetNetVar("ixDraggedBy", dragger:EntIndex())
 
+    -- Track in active drags table for efficient Think iteration
+    self.activeDrags[dragger] = target
+
     -- Store original speeds to restore later
     dragger.ixOriginalRunSpeed = dragger:GetRunSpeed()
     target.ixOriginalWalkSpeed = target:GetWalkSpeed()
@@ -496,6 +502,9 @@ function PLUGIN:StopDrag(dragger)
 
     local target = Entity(targetIndex)
 
+    -- Remove from active drags tracking
+    self.activeDrags[dragger] = nil
+
     -- Restore dragger speed
     if dragger.ixOriginalRunSpeed then
         dragger:SetRunSpeed(dragger.ixOriginalRunSpeed)
@@ -519,33 +528,32 @@ function PLUGIN:StopDrag(dragger)
 end
 
 -- Think hook for drag physics
+-- Optimized: only iterate active drags instead of all players
 function PLUGIN:Think()
-    for _, dragger in player.Iterator() do
-        local targetIndex = dragger:GetNetVar("ixDragging")
-        if targetIndex then
-            local target = Entity(targetIndex)
+    for dragger, target in pairs(self.activeDrags) do
+        -- Validate dragger still valid
+        if not IsValid(dragger) then
+            self.activeDrags[dragger] = nil
+        -- Validate target still valid and restrained
+        elseif not IsValid(target) or not target:IsPlayer() or not target:IsRestricted() then
+            self:StopDrag(dragger)
+        -- Check dragger still has hands equipped and lowered
+        elseif not IsValid(dragger:GetActiveWeapon()) or dragger:GetActiveWeapon():GetClass() ~= "ix_hands" then
+            self:StopDrag(dragger)
+        elseif dragger:IsWepRaised() then
+            self:StopDrag(dragger)
+        else
+            local distance = dragger:GetPos():Distance(target:GetPos())
 
-            -- Validate drag still valid
-            if not IsValid(target) or not target:IsPlayer() or not target:IsRestricted() then
+            -- Break drag if too far (150 units)
+            if distance > 150 then
                 self:StopDrag(dragger)
-            -- Check dragger still has hands equipped and lowered
-            elseif not IsValid(dragger:GetActiveWeapon()) or dragger:GetActiveWeapon():GetClass() ~= "ix_hands" then
-                self:StopDrag(dragger)
-            elseif dragger:IsWepRaised() then
-                self:StopDrag(dragger)
-            else
-                local distance = dragger:GetPos():Distance(target:GetPos())
-
-                -- Break drag if too far (150 units)
-                if distance > 150 then
-                    self:StopDrag(dragger)
-                    dragger:Notify("You lost your grip.")
-                elseif distance > 48 then
-                    -- Pull target toward dragger
-                    local direction = (dragger:GetPos() - target:GetPos()):GetNormalized()
-                    local pullStrength = math.Clamp((distance - 48) * 3, 50, 200)
-                    target:SetVelocity(direction * pullStrength)
-                end
+                dragger:Notify("You lost your grip.")
+            elseif distance > 48 then
+                -- Pull target toward dragger
+                local direction = (dragger:GetPos() - target:GetPos()):GetNormalized()
+                local pullStrength = math.Clamp((distance - 48) * 3, 50, 200)
+                target:SetVelocity(direction * pullStrength)
             end
         end
     end

@@ -166,30 +166,46 @@ end
 -- ============================================================================
 
 local PULSE_DISTANCE = 192
+local PULSE_DISTANCE_SQR = PULSE_DISTANCE * PULSE_DISTANCE
+
+-- Cache for nearby doors (refreshed periodically, not every frame)
+local cachedDoors = {}
+local lastDoorCacheTime = 0
+local DOOR_CACHE_INTERVAL = 0.2  -- Refresh every 0.2 seconds
+
+-- Pre-create color to avoid allocation in render loop
+local pulseColor = Color(100, 200, 100, 100)
 
 hook.Add("PostDrawTranslucentRenderables", "ixPhysicalDoorPulse", function()
     local ply = LocalPlayer()
     local weapon = ply:GetActiveWeapon()
 
+    -- Early exit BEFORE any expensive operations
     if not IsValid(weapon) then return end
+    if weapon:GetClass() ~= "ix_toolkit" then return end
 
-    local weaponClass = weapon:GetClass()
-
-    -- Only show pulse for toolkit (for lock removal)
-    if weaponClass ~= "ix_toolkit" then return end
-
-    -- Find nearby doors
-    for _, ent in ipairs(ents.FindInSphere(ply:GetPos(), PULSE_DISTANCE)) do
-        if ent:GetClass() == "ix_physical_door" then
-            -- Draw pulsating effect around lock position
+    -- Refresh door cache periodically instead of every frame
+    local now = CurTime()
+    if now - lastDoorCacheTime > DOOR_CACHE_INTERVAL then
+        lastDoorCacheTime = now
+        cachedDoors = {}
+        for _, ent in ipairs(ents.FindByClass("ix_physical_door")) do
             if ent:HasLock() and not ent:GetLocked() then
-                -- Lock is removable (unlocked)
-                local lockPos = ent:GetPos() + Vector(0, 0, 40)  -- Approximate lock height
-                local pulse = math.sin(CurTime() * 4) * 0.5 + 0.5
-
-                render.SetColorMaterial()
-                render.DrawSphere(lockPos, 8 + pulse * 4, 16, 16, Color(100, 200, 100, 100 * pulse))
+                table.insert(cachedDoors, ent)
             end
+        end
+    end
+
+    -- Draw pulse for cached doors within range
+    local plyPos = ply:GetPos()
+    local pulse = math.sin(now * 4) * 0.5 + 0.5
+    pulseColor.a = 100 * pulse
+
+    for _, ent in ipairs(cachedDoors) do
+        if IsValid(ent) and plyPos:DistToSqr(ent:GetPos()) <= PULSE_DISTANCE_SQR then
+            local lockPos = ent:GetPos() + Vector(0, 0, 40)
+            render.SetColorMaterial()
+            render.DrawSphere(lockPos, 8 + pulse * 4, 16, 16, pulseColor)
         end
     end
 end)

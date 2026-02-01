@@ -118,18 +118,21 @@ hook.Add("Think", "ixVoteCandidateTracking", function()
     if CurTime() - ix.factions.lastTrackTime < 1 then return end
     ix.factions.lastTrackTime = CurTime()
 
+    -- Build char ID -> true lookup table once per tick (O(n) instead of O(n*m) for candidate checks)
+    local onlineCharIDs = {}
+    for _, ply in player.Iterator() do
+        local char = ply:GetCharacter()
+        if char then
+            onlineCharIDs[char:GetID()] = true
+        end
+    end
+
     for voteID, vote in pairs(ix.factions.activeVotes) do
         if vote.candidates then
             for _, cand in ipairs(vote.candidates) do
-                if not cand.dropped then
-                    -- Check if candidate is online
-                    for _, ply in player.Iterator() do
-                        local char = ply:GetCharacter()
-                        if char and char:GetID() == cand.char_id then
-                            cand.online_time = (cand.online_time or 0) + 1
-                            break
-                        end
-                    end
+                if not cand.dropped and onlineCharIDs[cand.char_id] then
+                    -- O(1) lookup instead of iterating all players per candidate
+                    cand.online_time = (cand.online_time or 0) + 1
                 end
             end
         end

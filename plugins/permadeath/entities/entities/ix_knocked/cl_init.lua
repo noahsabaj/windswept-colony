@@ -330,9 +330,21 @@ end)
 -- CREMATION VISUAL FEEDBACK (Body Darkening)
 -- ============================================================================
 
+-- Cache ragdoll lookup (ents.FindByClass is expensive every frame)
+local cachedRagdolls = {}
+local lastRagdollUpdate = 0
+local RAGDOLL_CACHE_INTERVAL = 0.5 -- Update every 0.5 seconds
+
 -- Darken burning ragdolls based on cremation progress
 hook.Add("PreDrawOpaqueRenderables", "ixKnockedBurnDarkening", function()
-    for _, ragdoll in ipairs(ents.FindByClass("prop_ragdoll")) do
+    -- Update ragdoll cache periodically instead of every frame
+    local curTime = RealTime()
+    if curTime - lastRagdollUpdate > RAGDOLL_CACHE_INTERVAL then
+        cachedRagdolls = ents.FindByClass("prop_ragdoll")
+        lastRagdollUpdate = curTime
+    end
+
+    for _, ragdoll in ipairs(cachedRagdolls) do
         if IsValid(ragdoll) then
             local knockedEnt = ragdoll:GetNetVar("ixKnockedEntity")
             if IsValid(knockedEnt) then

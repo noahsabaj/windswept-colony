@@ -44,6 +44,8 @@ function Schema:WeaponEquip(weapon, client)
                 if item.uniqueID == "ladder" and item:GetData("equipped") and not item.linkedToWeapon then
                     item.linkedToWeapon = true
                     client.ixLadderItem = item
+                    -- Register for efficient ladder tracking
+                    Schema.equippedLadderPlayers[client] = true
                     if IsValid(weapon) then
                         weapon.ixItem = item
                     end
@@ -58,22 +60,34 @@ function Schema:WeaponEquip(weapon, client)
     end
 end
 
+-- Track players with equipped ladders for efficient checking
+-- (avoids iterating ALL players every 0.5s)
+Schema.equippedLadderPlayers = Schema.equippedLadderPlayers or {}
+
 -- Monitor equipped ladder items - if weapon disappears, item was deployed
 timer.Create("ixLadderDeployCheck", 0.5, 0, function()
-    for _, client in player.Iterator() do
-        local item = client.ixLadderItem
-        if item and item:GetData("equipped") then
-            -- Item is marked as equipped but check if weapon still exists
-            if not client:HasWeapon("weapon_ladder_yl") then
-                -- Weapon was stripped (ladder deployed) - remove item from inventory
-                local character = client:GetCharacter()
-                if character then
-                    local inventory = character:GetInventory()
-                    if inventory then
-                        inventory:Remove(item:GetID())
+    for client, _ in pairs(Schema.equippedLadderPlayers) do
+        if not IsValid(client) then
+            Schema.equippedLadderPlayers[client] = nil
+        else
+            local item = client.ixLadderItem
+            if item and item:GetData("equipped") then
+                -- Item is marked as equipped but check if weapon still exists
+                if not client:HasWeapon("weapon_ladder_yl") then
+                    -- Weapon was stripped (ladder deployed) - remove item from inventory
+                    local character = client:GetCharacter()
+                    if character then
+                        local inventory = character:GetInventory()
+                        if inventory then
+                            inventory:Remove(item:GetID())
+                        end
                     end
+                    client.ixLadderItem = nil
+                    Schema.equippedLadderPlayers[client] = nil
                 end
-                client.ixLadderItem = nil
+            else
+                -- No longer has equipped ladder item
+                Schema.equippedLadderPlayers[client] = nil
             end
         end
     end

@@ -285,22 +285,47 @@ end
 
 if CLIENT then
     -- Helper function to find the camera item from player's inventory
+    -- Cached to avoid inventory scan every frame
     function SWEP:GetCameraItem()
+        -- Check cache validity (refresh every 0.5s or if item became invalid)
+        local now = CurTime()
+        if self._cameraItemCache and self._cameraItemCacheTime and (now - self._cameraItemCacheTime) < 0.5 then
+            return self._cameraItemCache
+        end
+
         local owner = self:GetOwner()
-        if not IsValid(owner) then return nil end
+        if not IsValid(owner) then
+            self._cameraItemCache = nil
+            self._cameraItemCacheTime = now
+            return nil
+        end
 
         local character = owner:GetCharacter()
-        if not character then return nil end
+        if not character then
+            self._cameraItemCache = nil
+            self._cameraItemCacheTime = now
+            return nil
+        end
 
         local inventory = character:GetInventory()
-        if not inventory then return nil end
+        if not inventory then
+            self._cameraItemCache = nil
+            self._cameraItemCacheTime = now
+            return nil
+        end
 
-        for _, item in pairs(inventory:GetItems()) do
-            if item.uniqueID == "camera" and item:GetData("equipped") then
+        -- Use GetItemsByUniqueID for faster filtering
+        local cameras = inventory:GetItemsByUniqueID("camera", true)
+        for _, item in ipairs(cameras) do
+            if item:GetData("equipped") then
+                self._cameraItemCache = item
+                self._cameraItemCacheTime = now
                 return item
             end
         end
 
+        self._cameraItemCache = nil
+        self._cameraItemCacheTime = now
         return nil
     end
 

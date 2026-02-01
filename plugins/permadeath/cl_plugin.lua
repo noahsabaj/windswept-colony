@@ -110,6 +110,7 @@ hook.Add("Think", "ixSuicideGesture", function()
 end)
 
 -- Vignette effect for suicide gesture
+-- Optimized: reduced from 11 iterations (44 rects) to 4 iterations (16 rects)
 hook.Add("HUDPaint", "ixSuicideVignette", function()
     if suicideState == "idle" then return end
 
@@ -128,12 +129,13 @@ hook.Add("HUDPaint", "ixSuicideVignette", function()
 
     -- Draw vignette (darkening around edges)
     local scrW, scrH = ScrW(), ScrH()
+    local minDim = math.min(scrW, scrH) * 0.3
 
-    -- Draw gradient from edges (simple approach: multiple rectangles with varying alpha)
-    for i = 0, 10 do
-        local frac = i / 10
+    -- Draw gradient from edges (4 steps instead of 11 - visually similar, much faster)
+    for i = 0, 3 do
+        local frac = i / 3
         local edgeAlpha = alpha * frac
-        local inset = (1 - frac) * math.min(scrW, scrH) * 0.3
+        local inset = (1 - frac) * minDim
 
         surface.SetDrawColor(0, 0, 0, edgeAlpha)
         -- Top
