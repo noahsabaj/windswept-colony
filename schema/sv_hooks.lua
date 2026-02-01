@@ -137,3 +137,77 @@ function Schema:AdjustCreationPayload(client, payload, newPayload)
     newPayload.data = newPayload.data or {}
     newPayload.data.physical = physicalData
 end
+
+-- ============================================================================
+-- WALLET-AWARE SALARY SYSTEM
+-- ============================================================================
+
+-- Override salary payment to route through wallets
+hook.Add("CharacterLoaded", "ixWalletSalary", function(character)
+    local client = character:GetPlayer()
+    if not IsValid(client) then return end
+
+    local faction = ix.faction.indices[character:GetFaction()]
+    if not faction or not faction.pay or faction.pay <= 0 then return end
+
+    -- Remove Helix's default salary timer
+    local uniqueID = "ixSalary" .. client:SteamID64()
+    timer.Remove(uniqueID)
+
+    -- Create our own timer that uses wallet routing
+    local walletSalaryID = "ixWalletSalary" .. client:SteamID64()
+    timer.Create(walletSalaryID, faction.payTime or 300, 0, function()
+        if not IsValid(client) then
+            timer.Remove(walletSalaryID)
+            return
+        end
+
+        local char = client:GetCharacter()
+        if not char then return end
+
+        if hook.Run("CanPlayerEarnSalary", client, faction) == false then
+            return
+        end
+
+        local pay = hook.Run("GetSalaryAmount", client, faction) or faction.pay
+
+        -- Use wallet-aware routing
+        if ix.currency.AddToInventoryWithWallet(client, pay) then
+            client:NotifyLocalized("salary", ix.currency.Get(pay))
+        else
+            client:NotifyLocalized("inventoryFull")
+        end
+    end)
+end)
+
+-- Clean up timer on character unload
+hook.Add("CharacterDisconnected", "ixWalletSalaryCleanup", function(client, character)
+    if IsValid(client) then
+        timer.Remove("ixWalletSalary" .. client:SteamID64())
+    end
+end)
+
+-- ============================================================================
+-- WALLET-AWARE MONEY PICKUP
+-- ============================================================================
+
+-- Override money entity pickup to use wallet routing
+-- Store original function and override
+local originalHandlePickup = ix.currency.HandlePickup
+
+ix.currency.HandlePickup = function(client, entity)
+    if not IsValid(client) or not IsValid(entity) then return end
+
+    local amount = entity:GetAmount() -- This is in dollars
+    local cents = amount * 100
+
+    -- Use wallet-aware routing
+    if ix.currency.AddToInventoryWithWallet(client, cents) then
+        entity:Remove()
+
+        -- Play pickup sound
+        client:EmitSound("physics/body/body_medium_impact_soft" .. math.random(1, 7) .. ".wav", 75, 100, 0.5)
+    else
+        client:NotifyLocalized("inventoryFull")
+    end
+end
