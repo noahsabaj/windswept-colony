@@ -35,8 +35,10 @@ if SERVER then
     util.AddNetworkString("ixBallotClose")          -- Client->Server: Close ballot UI
 end
 
--- Register log types (must be done after Helix initializes)
+-- Register log types (must be done after Helix initializes, server-only)
 function PLUGIN:InitializedPlugins()
+    if not SERVER then return end
+
     ix.log.AddType("succession", function(client, ...)
         local arg = {...}
         return string.format("%s transferred leadership to %s.", client:Name(), arg[1])
