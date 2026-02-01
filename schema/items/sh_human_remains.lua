@@ -73,6 +73,13 @@ function ITEM:GetName()
     return self:GetData("customName", "Human Remains")
 end
 
+-- Ash cannot be burned further - immune to fire damage
+function ITEM:OnEntityTakeDamage(entity, damageInfo)
+    if damageInfo:IsDamageType(DMG_BURN) then
+        return false -- Block fire damage
+    end
+end
+
 function ITEM:PopulateTooltip(tooltip)
     local customName = self:GetData("customName")
     if customName then
