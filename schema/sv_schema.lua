@@ -21,6 +21,8 @@ ix.util.Include("sv_migration.lua")
 util.AddNetworkString("ixMoneyDestroy")
 util.AddNetworkString("ixMoneyGive")
 util.AddNetworkString("ixWalletGive")
+util.AddNetworkString("ixCurrencySplit")        -- Server→Client: open split dialog
+util.AddNetworkString("ixCurrencySplitConfirm") -- Client→Server: confirm split amount
 
 -- Money destroy handler
 net.Receive("ixMoneyDestroy", function(len, client)
@@ -275,6 +277,61 @@ net.Receive("ixWalletGive", function(len, client)
 
     client:NotifyLocalized("gaveMoneyTo", moneyStr, target:Nick())
     target:NotifyLocalized("receivedMoneyFrom", moneyStr, client:Nick())
+end)
+
+-- Currency split handler
+net.Receive("ixCurrencySplitConfirm", function(len, client)
+    local itemID = net.ReadUInt(32)
+    local splitAmount = net.ReadUInt(16)
+
+    -- Validate item
+    local item = ix.item.instances[itemID]
+    if not item or not item.isCurrency then return end
+
+    -- Validate ownership
+    local character = client:GetCharacter()
+    if not character then return end
+
+    local inventory = character:GetInventory()
+    if not inventory then return end
+
+    -- Check item ownership (in main inventory or owned bag)
+    local itemInvID = item.invID
+    if itemInvID ~= inventory:GetID() then
+        local itemInv = ix.item.inventories[itemInvID]
+        if not itemInv or itemInv:GetOwner() ~= character:GetID() then
+            return
+        end
+    end
+
+    -- Validate split amount
+    local currentQty = item:GetData("quantity", 1)
+    if splitAmount <= 0 or splitAmount >= currentQty then
+        client:Notify("Invalid split amount.")
+        return
+    end
+
+    -- Get the inventory the item is in (could be main inventory or a bag)
+    local targetInv = ix.item.inventories[itemInvID]
+    if not targetInv then return end
+
+    -- Try to add new stack to the same inventory
+    local success = targetInv:Add(item.uniqueID, 1, {
+        quantity = splitAmount
+    })
+
+    if success then
+        -- Reduce original stack
+        item:SetData("quantity", currentQty - splitAmount)
+
+        if item.currencyValue == 100 then
+            client:Notify("Split off $" .. splitAmount .. " into a new stack.")
+        else
+            client:Notify("Split off " .. splitAmount .. "¢ into a new stack.")
+        end
+    else
+        client:Notify("No room in inventory for new stack.")
+    end
 end)
 
 -- Disable faction whitelist requirements
