@@ -278,7 +278,53 @@ hook.Add("Think", "ixKnockedCPR", function()
     wasLMBDown = lmbDown
 end)
 
--- E key for looting only (handled by Helix PlayerUse, we just need to not block it)
+-- ============================================================================
+-- E KEY FOR LOOTING (via net message, since Helix blocks PlayerUse for entities with GetEntityMenu)
+-- ============================================================================
+
+local wasUseDown = false
+local lastLootTime = 0
+
+hook.Add("Think", "ixKnockedLoot", function()
+    local client = LocalPlayer()
+    if not IsValid(client) then return end
+
+    -- Don't process input if UI is open
+    if vgui.CursorVisible() then
+        wasUseDown = false
+        return
+    end
+
+    local useDown = input.IsKeyDown(KEY_E)
+
+    -- Edge detection: only trigger on press, not hold
+    if useDown and not wasUseDown then
+        -- Rate limit to prevent spam
+        if RealTime() - lastLootTime < 0.5 then
+            wasUseDown = useDown
+            return
+        end
+
+        -- Trace to see what we're looking at
+        local data = {
+            start = client:GetShootPos(),
+            endpos = client:GetShootPos() + client:GetAimVector() * 96,
+            filter = client
+        }
+        local trace = util.TraceLine(data)
+        local knockedEnt = GetKnockedEntity(trace.Entity)
+
+        if IsValid(knockedEnt) then
+            -- Send loot request
+            net.Start("ixKnockoutLoot")
+                net.WriteEntity(knockedEnt)
+            net.SendToServer()
+            lastLootTime = RealTime()
+        end
+    end
+
+    wasUseDown = useDown
+end)
 
 -- ============================================================================
 -- CREMATION VISUAL FEEDBACK (Body Darkening)
