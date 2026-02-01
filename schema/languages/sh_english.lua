@@ -271,4 +271,7 @@ LANGUAGE = {
     emptiedWallet = "Emptied %d item(s) from wallet.",
     walletEmptyFailed = "Could not empty %d item(s) - no space available.",
     walletEmpty = "Wallet is empty.",
+    walletOnlyCurrency = "Only cash, coins, and ID cards can be stored in wallets.",
+    walletCashOnly = "This wallet only accepts cash.",
+    walletCoinsOnly = "This wallet only accepts coins.",
 }

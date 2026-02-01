@@ -12,6 +12,10 @@ ITEM.invHeight = 10
 -- Wallet designation: "both", "cash", or "coins"
 -- Stored in item data as "designation"
 
+if SERVER then
+    util.AddNetworkString("ixBagDrop")
+end
+
 function ITEM:GetDescription()
     local desc = self.description
     local designation = self:GetData("designation", "both")
@@ -50,28 +54,232 @@ function ITEM:GetDescription()
     return desc
 end
 
--- Called when inventory is created for this bag
-function ITEM:OnInstanced(invID, x, y, data, invType)
-    if SERVER then
-        local inventory = ix.item.inventories[invID]
-        if inventory then
-            inventory.vars = inventory.vars or {}
-            inventory.vars.isWallet = true
+-- ============================================================================
+-- BAG SYSTEM (required for inventory to work)
+-- ============================================================================
+
+-- Called when a new instance of this item has been made
+function ITEM:OnInstanced(invID, x, y)
+    local inventory = ix.item.inventories[invID]
+
+    ix.inventory.New(inventory and inventory.owner or 0, self.uniqueID, function(inv)
+        local client = inv:GetOwner()
+
+        inv.vars.isBag = self.uniqueID
+        inv.vars.isWallet = true
+        self:SetData("id", inv:GetID())
+
+        if IsValid(client) then
+            inv:AddReceiver(client)
         end
+    end)
+end
+
+function ITEM:GetInventory()
+    local index = self:GetData("id")
+    if index then
+        return ix.item.inventories[index]
     end
 end
 
--- Called when sending inventory data
-function ITEM:OnSendData(client)
-    local invID = self:GetData("id")
-    if invID then
-        local inv = ix.item.inventories[invID]
-        if inv then
-            inv.vars = inv.vars or {}
-            inv.vars.isWallet = true
+ITEM.GetInv = ITEM.GetInventory
+
+-- Called when the item first appears for a client
+function ITEM:OnSendData()
+    local index = self:GetData("id")
+
+    if index then
+        local inventory = ix.item.inventories[index]
+
+        if inventory then
+            inventory.vars.isBag = self.uniqueID
+            inventory.vars.isWallet = true
+            inventory:Sync(self.player)
+            inventory:AddReceiver(self.player)
+        else
+            local owner = self.player:GetCharacter():GetID()
+
+            ix.inventory.Restore(self:GetData("id"), self.invWidth, self.invHeight, function(inv)
+                inv.vars.isBag = self.uniqueID
+                inv.vars.isWallet = true
+                inv:SetOwner(owner, true)
+
+                if not inv.owner then
+                    return
+                end
+
+                for client, character in ix.util.GetCharacters() do
+                    if character:GetID() == inv.owner then
+                        inv:AddReceiver(client)
+                        break
+                    end
+                end
+            end)
         end
+    else
+        ix.inventory.New(self.player:GetCharacter():GetID(), self.uniqueID, function(inv)
+            inv.vars.isWallet = true
+            self:SetData("id", inv:GetID())
+        end)
     end
 end
+
+function ITEM.postHooks.drop(item, result)
+    local index = item:GetData("id")
+
+    local query = mysql:Update("ix_inventories")
+        query:Update("character_id", 0)
+        query:Where("inventory_id", index)
+    query:Execute()
+
+    if SERVER then
+        net.Start("ixBagDrop")
+            net.WriteUInt(index, 32)
+        net.Send(item.player)
+    end
+end
+
+function ITEM:OnRemoved()
+    local index = self:GetData("id")
+
+    if index then
+        local query = mysql:Delete("ix_items")
+            query:Where("inventory_id", index)
+        query:Execute()
+
+        query = mysql:Delete("ix_inventories")
+            query:Where("inventory_id", index)
+        query:Execute()
+    end
+end
+
+function ITEM:CanTransfer(oldInventory, newInventory)
+    local index = self:GetData("id")
+
+    if newInventory then
+        -- Bags can't go into other bags
+        if newInventory.vars and newInventory.vars.isBag then
+            return false
+        end
+
+        local index2 = newInventory:GetID()
+
+        if index == index2 then
+            return false
+        end
+
+        -- Check for circular references
+        local bagInv = self:GetInventory()
+        if bagInv then
+            for k, _ in bagInv:Iter() do
+                if k:GetData("id") == index2 then
+                    return false
+                end
+            end
+        end
+    end
+
+    return not newInventory or newInventory:GetID() ~= oldInventory:GetID() or newInventory.vars.isBag
+end
+
+function ITEM:OnTransferred(curInv, inventory)
+    local bagInventory = self:GetInventory()
+    if not bagInventory then return end
+
+    if isfunction(curInv.GetOwner) then
+        local owner = curInv:GetOwner()
+        if IsValid(owner) then
+            bagInventory:RemoveReceiver(owner)
+        end
+    end
+
+    if isfunction(inventory.GetOwner) then
+        local owner = inventory:GetOwner()
+        if IsValid(owner) then
+            bagInventory:AddReceiver(owner)
+            bagInventory:SetOwner(owner)
+        end
+    else
+        bagInventory:SetOwner(nil)
+    end
+end
+
+function ITEM:OnRegistered()
+    ix.inventory.Register(self.uniqueID, self.invWidth, self.invHeight, true)
+end
+
+-- ============================================================================
+-- CLIENT VISUALS
+-- ============================================================================
+
+if CLIENT then
+    function ITEM:PaintOver(item, w, h)
+        local panel = ix.gui["inv" .. item:GetData("id", "")]
+
+        if IsValid(panel) and vgui.GetHoveredPanel() == self then
+            panel:SetHighlighted(true)
+        elseif IsValid(panel) then
+            panel:SetHighlighted(false)
+        end
+    end
+
+    net.Receive("ixBagDrop", function()
+        local index = net.ReadUInt(32)
+        local panel = ix.gui["inv"..index]
+
+        if panel and panel:IsVisible() then
+            panel:Close()
+        end
+    end)
+end
+
+-- ============================================================================
+-- COMBINE (drag items onto wallet)
+-- ============================================================================
+
+ITEM.functions.combine = {
+    OnRun = function(item, data)
+        local targetItem = ix.item.instances[data[1]]
+        if not targetItem then return false end
+
+        -- Only allow cash, coins, and personal_id
+        if targetItem.uniqueID ~= "cash" and targetItem.uniqueID ~= "coins" and targetItem.uniqueID ~= "personal_id" then
+            if item.player then
+                item.player:NotifyLocalized("walletOnlyCurrency")
+            end
+            return false
+        end
+
+        -- Check designation for currency
+        if targetItem.isCurrency then
+            local designation = item:GetData("designation", "both")
+            if designation == "cash" and targetItem.uniqueID ~= "cash" then
+                if item.player then
+                    item.player:NotifyLocalized("walletCashOnly")
+                end
+                return false
+            elseif designation == "coins" and targetItem.uniqueID ~= "coins" then
+                if item.player then
+                    item.player:NotifyLocalized("walletCoinsOnly")
+                end
+                return false
+            end
+        end
+
+        targetItem:Transfer(item:GetData("id"), nil, nil, item.player)
+        return false
+    end,
+    OnCanRun = function(item, data)
+        local index = item:GetData("id", "")
+        if index then
+            local inventory = ix.item.inventories[index]
+            if inventory then
+                return true
+            end
+        end
+        return false
+    end
+}
 
 -- View function for Helix auto-bag-open (opens standard inventory panel)
 -- This is what Helix calls automatically when "openBags" option is enabled
