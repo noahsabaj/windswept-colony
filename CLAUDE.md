@@ -14,12 +14,22 @@ windswept/
 │   ├── sh_schema.lua        # Main shared entry point (includes libs here!)
 │   ├── cl_schema.lua        # Client entry point
 │   ├── sv_schema.lua        # Server entry point
+│   ├── sv_netstrings.lua    # Centralized network string registry
 │   ├── sh_hooks.lua         # Shared hooks
 │   ├── cl_hooks.lua         # Client hooks
 │   ├── sv_hooks.lua         # Server hooks
 │   ├── factions/            # Faction definitions
 │   ├── classes/             # Class definitions
-│   ├── items/               # Item definitions
+│   ├── items/               # Item definitions (domain-organized)
+│   │   ├── base/            # Base classes (base_battery_device, base_currency)
+│   │   ├── currency/        # Cash, coins, wallet
+│   │   ├── documents/       # Personal ID, photos, photo album
+│   │   ├── doors/           # Door items (wood, metal, gate)
+│   │   ├── equipment/       # Battery, flashlight, lantern, camera, etc.
+│   │   ├── locks/           # Keys, locks, keyring, lockpick, toolkit
+│   │   ├── materials/       # Crafting materials (metal sheets, wood planks)
+│   │   ├── misc/            # Human remains, ladder, rations
+│   │   └── weapons/         # Ammo, melee weapons, battering ram
 │   ├── attributes/          # Character attributes
 │   ├── derma/               # Custom UI panels
 │   ├── libs/                # Custom libraries (MUST be included in sh_schema.lua)
@@ -31,10 +41,11 @@ windswept/
 │   └── meta/                # Metatable extensions
 ├── plugins/                 # Modular features
 │   ├── permadeath/          # Knockout/death/revival system
+│   ├── factions/            # Faction management, elections, classes
 │   └── prisoner/            # Arrest/detention system
 ├── entities/
 │   ├── entities/            # Custom entities
-│   └── weapons/             # Custom weapons
+│   └── weapons/             # Custom weapons (SWEPs)
 └── gamemode/                # Helix gamemode loader
 ```
 
@@ -86,6 +97,16 @@ windswept/
 
 - For the battery system, "up" stands for "units of power", so a 100up battery has 100 units of power. Device drain rates vary: flashlight ~0.083up/sec (20 min per battery), lantern ~0.167up/sec (10 min per battery). Batteries are universal across all devices (defibrillator, flashlight, camera, lantern, etc.).
 
+- **Network String Registry** (`schema/sv_netstrings.lua`): All schema and entity network strings are centralized here. This file is included by sv_schema.lua and registers 51 strings for:
+  - Currency system (ixMoneyDestroy, ixMoneyGive, ixCurrencySplit, etc.)
+  - Photo system (ixPhotoRename, ixPhotoRequest, ixPhotoAlbumView, etc.)
+  - Door system (ixDoorsSync, ixDoorInstall, etc.)
+  - Lock system (ixLockInstall, ixLockpickStart, ixKeyringLock, etc.)
+  - Equipment (ixFlashlightSetLight, ixLanternSetLight, ixCameraRequestPhoto, etc.)
+  - Locksmith machine (ixLocksmithOpen, ixLocksmithProgramLock, etc.)
+
+  Plugin strings remain in their plugins: permadeath (10), factions (13), prisoner (10).
+
 - **Door & Lock System**: Physical lock and key system replacing Helix's door ownership. Key points:
   - **Brush-based doors are ignored**: Doors with models starting with `*` (func_door, func_door_rotating) are skipped by the entire system - detection, tools, battering ram, everything. Only `prop_door_rotating` doors are managed.
   - **Double door linking**: After spawning, doors are linked via `ixPartner` based on `targetname`/`slavename` keyvalues. This enables Helix's `GetDoorPartner()` to work for lock sync and breach sync.
@@ -93,6 +114,73 @@ windswept/
   - **Breach = permanent destruction**: `ix.doors.BreachDoor()` permanently destroys the door with debris gibs and particle effects. The door is gone - frame is empty until a new door is installed. No restore, no respawn.
   - **Battering ram hit counter persists**: When a door is hit, the hit counter (`ixBatteringRamRequired`, `ixBatteringRamHits`) persists until the door is **repaired** or **destroyed**. No time-based reset. Saved to persistence file.
   - **Repair resets damage**: `ix.doors.RepairDoor()` resets health AND clears the battering ram hit counter.
+
+## Item Base Classes
+
+### base_battery_device (`schema/items/base/sh_battery_device.lua`)
+
+For battery-powered equipment. Provides battery management, equip/unequip, UI rendering.
+
+**Configuration options:**
+```lua
+ITEM.maxBatteries = 1          -- Battery slots (1-4)
+ITEM.weaponClass = "ix_flashlight"  -- SWEP class to give on equip
+ITEM.playerItemKey = "ixFlashlightItem"  -- Key to store item ref on player
+ITEM.equipSound = "items/flashlight1.wav"
+ITEM.notifyPrefix = "flashlight"  -- For localized notifications
+ITEM.requireFullBattery = false   -- Defib requires 100up batteries
+ITEM.hasLightToggle = false       -- Show "Toggle Light" in menu
+```
+
+**Example child item (flashlight):**
+```lua
+ITEM.name = "Flashlight"
+ITEM.model = "models/shaky/weapons/flashlight/w_flashlight.mdl"
+ITEM.base = "base_battery_device"
+ITEM.width = 1
+ITEM.height = 2
+
+ITEM.maxBatteries = 1
+ITEM.weaponClass = "ix_flashlight"
+ITEM.playerItemKey = "ixFlashlightItem"
+ITEM.hasLightToggle = true
+```
+
+**Provided functions:** `GetBatteries()`, `SetBatteries()`, `GetTotalCharge()`, `HasCharge()`, `ConsumeBattery()`, `AutoEjectDepleted()`, `AutoLoadFromInventory()`, `PaintOver()`, `PopulateTooltip()`
+
+**Provided item functions:** LoadBattery, EjectBattery, Equip, Unequip, ToggleLight (if enabled)
+
+### base_currency (`schema/items/base/sh_base_currency.lua`)
+
+For stackable currency items. Provides split, merge, give, and optional destroy.
+
+**Configuration options:**
+```lua
+ITEM.currencyValue = 100  -- Cents per unit (100 for dollars, 1 for cents)
+ITEM.unitName = "dollar"
+ITEM.unitNamePlural = "dollars"
+ITEM.unitSymbol = "$"
+ITEM.symbolPrefix = true  -- true = "$50", false = "50¢"
+ITEM.canDestroy = false   -- Whether destroy option appears
+```
+
+**Example child item (cash):**
+```lua
+ITEM.name = "Cash"
+ITEM.model = "models/props/cs_assault/Dollar.mdl"
+ITEM.base = "base_currency"
+
+ITEM.currencyValue = 100
+ITEM.unitName = "dollar"
+ITEM.unitNamePlural = "dollars"
+ITEM.unitSymbol = "$"
+ITEM.symbolPrefix = true
+ITEM.canDestroy = true
+```
+
+**Provided functions:** `GetQuantity()`, `FormatAmount()`, `GetName()`, `GetDescription()`, `CanTransfer()`
+
+**Provided item functions:** Split, MergeAll, MergeWith, Give, Destroy (if canDestroy=true)
 
 ## Workflows
 
@@ -312,6 +400,31 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 ### Code Organization
 
 - **Plugins vs schema folders**: Plugins are for **cohesive gameplay systems** (prisoner, permadeath) where related code lives together. General items and weapons that aren't part of a specific system go in `schema/items/` and `entities/weapons/`, not in their own plugin. Don't create a plugin just to hold one item.
+
+- **Item folder structure**: Items are organized into domain-based subdirectories under `schema/items/`:
+  - `base/` - Base classes that other items inherit from
+  - `currency/` - Money items (cash, coins, wallet)
+  - `documents/` - ID cards, photos, albums
+  - `doors/` - Installable door items
+  - `equipment/` - Tools and devices (flashlight, camera, etc.)
+  - `locks/` - Lock system items (keys, locks, lockpick, toolkit)
+  - `materials/` - Crafting materials
+  - `misc/` - Miscellaneous items
+  - `weapons/` - Ammo and weapon items
+
+  Helix auto-loads items recursively from all subdirectories, so no code changes are needed when moving files.
+
+- **Network string centralization**: All schema and entity network strings are registered in `schema/sv_netstrings.lua`. Plugin network strings (permadeath, factions, prisoner) remain in their respective plugins for modularity.
+  - **Never add `util.AddNetworkString()` to entity or item files** - add them to sv_netstrings.lua instead
+  - **Naming convention**: Use `ixCamelCase` (e.g., `ixFlashlightSetLight`), NOT underscores (`ix_flashlight_SetLight`)
+  - Third-party libs (netstream2) keep their own strings
+  - GMod has a 4096 network string limit - centralizing prevents duplicates and makes auditing easy
+
+- **Base class pattern for items**: When multiple items share significant logic, extract a base class to `schema/items/base/`:
+  - `base_battery_device.lua` - For battery-powered equipment (flashlight, lantern, camera, defibrillator)
+  - `base_currency.lua` - For stackable currency (cash, coins)
+
+  Child items become pure configuration (~15-30 lines) instead of duplicating hundreds of lines of logic. See examples below.
 
 ### Derma/UI Development
 
