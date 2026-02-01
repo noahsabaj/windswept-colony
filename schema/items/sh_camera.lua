@@ -12,140 +12,26 @@
 ITEM.name = "Camera"
 ITEM.description = "A camera for taking photographs. Requires battery and film."
 ITEM.model = "models/weapons/infra/w_camera.mdl"
+ITEM.base = "base_battery_device"
 ITEM.width = 2
 ITEM.height = 2
 ITEM.category = "Equipment"
 ITEM.noBusiness = true
 
--- Slot configuration
+-- Battery device configuration
 ITEM.maxBatteries = 1
-ITEM.maxFilm = 1
+ITEM.weaponClass = "ix_camera"
+ITEM.playerItemKey = "ixCameraItem"
+ITEM.equipSound = "items/flashlight1.wav"
+ITEM.notifyPrefix = "camera"
+ITEM.hasLightToggle = false
 
--- Battery drain per photo
+-- Camera-specific configuration
+ITEM.maxFilm = 1
 ITEM.batteryDrainPerPhoto = 2
 
 -- ============================================================================
--- BATTERY HELPER FUNCTIONS (same as flashlight)
--- ============================================================================
-
-function ITEM:GetBatteries()
-    return self:GetData("batteries", {})
-end
-
-function ITEM:SetBatteries(batteries)
-    self:SetData("batteries", batteries)
-end
-
-function ITEM:GetBatteryCount()
-    return #self:GetBatteries()
-end
-
-function ITEM:HasBattery()
-    return self:GetBatteryCount() > 0
-end
-
-function ITEM:GetFirstBatteryCharge()
-    local batteries = self:GetBatteries()
-    return batteries[1] or 0
-end
-
-function ITEM:HasSufficientCharge()
-    return self:GetFirstBatteryCharge() >= self.batteryDrainPerPhoto
-end
-
-function ITEM:DrainBattery(amount)
-    local batteries = self:GetBatteries()
-    if #batteries == 0 then return false end
-
-    batteries[1] = math.max(0, batteries[1] - amount)
-    self:SetBatteries(batteries)
-
-    return true
-end
-
--- Find the highest charged battery in inventory
-function ITEM:FindBestBatteryInInventory(inventory)
-    local bestBattery = nil
-    local bestCharge = -1
-
-    for _, invItem in pairs(inventory:GetItems()) do
-        if invItem.uniqueID == "battery" then
-            local charge = invItem:GetData("charge", 100)
-            if charge > bestCharge then
-                bestCharge = charge
-                bestBattery = invItem
-            end
-        end
-    end
-
-    return bestBattery, bestCharge
-end
-
--- Auto-eject depleted batteries if enabled
-function ITEM:AutoEjectDepleted(client)
-    if not ix.option.Get(client, "batteryAutoEject", true) then
-        return false
-    end
-
-    local batteries = self:GetBatteries()
-    local character = client:GetCharacter()
-    if not character then return false end
-
-    local inventory = character:GetInventory()
-    if not inventory then return false end
-
-    local ejected = false
-
-    for i = #batteries, 1, -1 do
-        if batteries[i] <= 0 then
-            if inventory:FindEmptySlot(1, 1) then
-                inventory:Add("battery", 1, {charge = 0})
-                table.remove(batteries, i)
-                ejected = true
-            end
-        end
-    end
-
-    if ejected then
-        self:SetBatteries(batteries)
-        client:NotifyLocalized("cameraBatteryEjected")
-    end
-
-    return ejected
-end
-
--- Auto-load battery from inventory if enabled
-function ITEM:AutoLoadFromInventory(client)
-    if not ix.option.Get(client, "batteryAutoLoad", true) then
-        return false
-    end
-
-    local batteries = self:GetBatteries()
-    if #batteries >= self.maxBatteries then
-        return false
-    end
-
-    local character = client:GetCharacter()
-    if not character then return false end
-
-    local inventory = character:GetInventory()
-    if not inventory then return false end
-
-    local bestBattery, bestCharge = self:FindBestBatteryInInventory(inventory)
-    if not bestBattery or bestCharge <= 0 then
-        return false
-    end
-
-    table.insert(batteries, bestCharge)
-    self:SetBatteries(batteries)
-    bestBattery:Remove()
-
-    client:NotifyLocalized("cameraAutoLoaded", bestCharge)
-    return true
-end
-
--- ============================================================================
--- FILM HELPER FUNCTIONS
+-- FILM HELPER FUNCTIONS (camera-specific)
 -- ============================================================================
 
 function ITEM:GetFilm()
@@ -173,7 +59,6 @@ function ITEM:ConsumeFilmShot()
     film.shots = film.shots - 1
 
     if film.shots <= 0 then
-        -- Film exhausted - remove it
         self:SetFilm(nil)
         return true, true  -- success, film exhausted
     else
@@ -182,8 +67,22 @@ function ITEM:ConsumeFilmShot()
     end
 end
 
+function ITEM:HasSufficientCharge()
+    return self:GetFirstBatteryCharge() >= self.batteryDrainPerPhoto
+end
+
+function ITEM:DrainBattery(amount)
+    local batteries = self:GetBatteries()
+    if #batteries == 0 then return false end
+
+    batteries[1] = math.max(0, batteries[1] - amount)
+    self:SetBatteries(batteries)
+
+    return true
+end
+
 -- ============================================================================
--- CLIENT VISUALS
+-- CLIENT VISUALS (override to show both battery and film)
 -- ============================================================================
 
 if CLIENT then
@@ -205,11 +104,9 @@ if CLIENT then
         if #batteries > 0 then
             local charge = batteries[1]
 
-            -- Background bar
             surface.SetDrawColor(30, 30, 30, 200)
             surface.DrawRect(4, barY - barHeight - 2, w - 8, barHeight)
 
-            -- Charge fill
             local chargeWidth = ((w - 8) / 100) * charge
             local color
             if charge >= 50 then
@@ -229,11 +126,9 @@ if CLIENT then
 
         -- Draw film indicator (bottom)
         if film then
-            -- Background bar
             surface.SetDrawColor(30, 30, 30, 200)
             surface.DrawRect(4, barY, w - 8, barHeight)
 
-            -- Film shots fill (cyan/blue color)
             local shotWidth = ((w - 8) / 10) * film.shots
             surface.SetDrawColor(50, 150, 200)
             surface.DrawRect(4, barY, shotWidth, barHeight)
@@ -286,125 +181,7 @@ if CLIENT then
 end
 
 -- ============================================================================
--- ITEM FUNCTIONS - BATTERY
--- ============================================================================
-
-ITEM.functions.LoadBattery = {
-    name = "Load Battery",
-    tip = "Insert a battery into the camera.",
-    icon = "icon16/lightning_add.png",
-    isMulti = true,
-    multiOptions = function(item, client)
-        local options = {}
-        local character = client:GetCharacter()
-        if not character then return options end
-
-        local inventory = character:GetInventory()
-        if not inventory then return options end
-
-        local filterEmpty = ix.option.Get(client, "batteryFilterEmpty", true)
-
-        for _, invItem in pairs(inventory:GetItems()) do
-            if invItem.uniqueID == "battery" then
-                local charge = invItem:GetData("charge", 100)
-                if not filterEmpty or charge > 0 then
-                    table.insert(options, {
-                        name = string.format("Battery (%dup)", charge),
-                        data = {batteryID = invItem:GetID()}
-                    })
-                end
-            end
-        end
-
-        table.sort(options, function(a, b)
-            return tonumber(string.match(a.name, "%((%d+)up%)")) > tonumber(string.match(b.name, "%((%d+)up%)"))
-        end)
-
-        return options
-    end,
-    OnRun = function(item, data)
-        local client = item.player
-        local batteryID = data and data.batteryID
-
-        if not batteryID then return false end
-
-        local batteryItem = ix.item.instances[batteryID]
-        if not batteryItem or batteryItem.uniqueID ~= "battery" then
-            return false
-        end
-
-        local batteries = item:GetBatteries()
-        if #batteries >= item.maxBatteries then
-            client:NotifyLocalized("cameraSlotFull")
-            return false
-        end
-
-        local charge = batteryItem:GetData("charge", 100)
-        table.insert(batteries, charge)
-        item:SetBatteries(batteries)
-        batteryItem:Remove()
-
-        client:NotifyLocalized("cameraBatteryLoaded", charge)
-        client:EmitSound("items/battery_pickup.wav", 50)
-
-        return false
-    end,
-    OnCanRun = function(item)
-        if item:GetBatteryCount() >= item.maxBatteries then return false end
-        if IsValid(item.entity) then return false end
-
-        local client = item.player
-        if not IsValid(client) then return false end
-
-        local character = client:GetCharacter()
-        if not character then return false end
-
-        local inventory = character:GetInventory()
-        if not inventory then return false end
-
-        for _, invItem in pairs(inventory:GetItems()) do
-            if invItem.uniqueID == "battery" then
-                return true
-            end
-        end
-
-        return false
-    end
-}
-
-ITEM.functions.EjectBattery = {
-    name = "Eject Battery",
-    tip = "Remove the battery from the camera.",
-    icon = "icon16/lightning_delete.png",
-    OnRun = function(item)
-        local client = item.player
-        local batteries = item:GetBatteries()
-
-        if #batteries == 0 then
-            return false
-        end
-
-        local charge = table.remove(batteries, 1)
-        item:SetBatteries(batteries)
-
-        local character = client:GetCharacter()
-        local inventory = character:GetInventory()
-        inventory:Add("battery", 1, {charge = charge})
-
-        client:NotifyLocalized("cameraBatteryEjected")
-        client:EmitSound("items/battery_pickup.wav", 50, 90)
-
-        return false
-    end,
-    OnCanRun = function(item)
-        if not item:HasBattery() then return false end
-        if IsValid(item.entity) then return false end
-        return true
-    end
-}
-
--- ============================================================================
--- ITEM FUNCTIONS - FILM
+-- ITEM FUNCTIONS - FILM (camera-specific)
 -- ============================================================================
 
 ITEM.functions.LoadFilm = {
@@ -426,15 +203,14 @@ ITEM.functions.LoadFilm = {
                 if shots > 0 then
                     table.insert(options, {
                         name = string.format("Film Pack (%d shots)", shots),
-                        data = {filmID = invItem:GetID()}
+                        data = {filmID = invItem:GetID(), shots = shots}
                     })
                 end
             end
         end
 
-        -- Sort by shots (highest first)
         table.sort(options, function(a, b)
-            return tonumber(string.match(a.name, "%((%d+) shots%)")) > tonumber(string.match(b.name, "%((%d+) shots%)"))
+            return (a.data.shots or 0) > (b.data.shots or 0)
         end)
 
         return options
@@ -465,7 +241,6 @@ ITEM.functions.LoadFilm = {
         return false
     end,
     OnCanRun = function(item)
-        -- Can't load if already has film
         if item:HasFilm() then return false end
         if IsValid(item.entity) then return false end
 
@@ -490,125 +265,3 @@ ITEM.functions.LoadFilm = {
         return false
     end
 }
-
--- NOTE: No EjectFilm function - film must be used up
-
--- ============================================================================
--- ITEM FUNCTIONS - EQUIP/UNEQUIP
--- ============================================================================
-
-ITEM.functions.Equip = {
-    name = "Equip",
-    tip = "Hold the camera in your hands.",
-    icon = "icon16/tick.png",
-    OnRun = function(item)
-        local client = item.player
-
-        -- Unequip any existing camera from this player
-        if client.ixCameraItem and client.ixCameraItem ~= item then
-            local oldItem = client.ixCameraItem
-            oldItem:SetData("equipped", nil)
-        end
-
-        -- Strip existing camera SWEP if any
-        if client:HasWeapon("ix_camera") then
-            client:StripWeapon("ix_camera")
-        end
-
-        -- Give the SWEP
-        local weapon = client:Give("ix_camera")
-        if IsValid(weapon) then
-            weapon.ixItem = item
-            client:SelectWeapon("ix_camera")
-        end
-
-        client.ixCameraItem = item
-        item:SetData("equipped", true)
-
-        client:EmitSound("items/flashlight1.wav", 50)
-
-        return false
-    end,
-    OnCanRun = function(item)
-        if IsValid(item.entity) then return false end
-        if item:GetData("equipped") then return false end
-        return true
-    end
-}
-
-ITEM.functions.Unequip = {
-    name = "Unequip",
-    tip = "Put the camera away.",
-    icon = "icon16/cross.png",
-    OnRun = function(item)
-        local client = item.player
-
-        if client:HasWeapon("ix_camera") then
-            client:StripWeapon("ix_camera")
-        end
-
-        client.ixCameraItem = nil
-        item:SetData("equipped", nil)
-
-        client:EmitSound("items/flashlight1.wav", 50, 90)
-
-        return false
-    end,
-    OnCanRun = function(item)
-        return item:GetData("equipped") == true
-    end
-}
-
--- ============================================================================
--- HOOKS
--- ============================================================================
-
-function ITEM.postHooks.drop(item, result)
-    if item:GetData("equipped") then
-        local client = item:GetOwner()
-        if IsValid(client) then
-            if client:HasWeapon("ix_camera") then
-                client:StripWeapon("ix_camera")
-            end
-            client.ixCameraItem = nil
-        end
-        item:SetData("equipped", nil)
-    end
-end
-
-function ITEM:OnTransferred(oldInventory, newInventory)
-    if self:GetData("equipped") then
-        local oldOwner = oldInventory and oldInventory.GetOwner and oldInventory:GetOwner()
-        if IsValid(oldOwner) then
-            if oldOwner:HasWeapon("ix_camera") then
-                oldOwner:StripWeapon("ix_camera")
-            end
-            oldOwner.ixCameraItem = nil
-        end
-        self:SetData("equipped", nil)
-    end
-end
-
-function ITEM:CanTransfer(oldInventory, newInventory)
-    if newInventory and self:GetData("equipped") then
-        local owner = self:GetOwner()
-        if IsValid(owner) then
-            owner:NotifyLocalized("cameraEquipped")
-        end
-        return false
-    end
-    return true
-end
-
-function ITEM:OnLoadout()
-    if self:GetData("equipped") then
-        local client = self.player
-        if not IsValid(client) then return end
-
-        local weapon = client:Give("ix_camera", true)
-        if IsValid(weapon) then
-            weapon.ixItem = self
-            client.ixCameraItem = self
-        end
-    end
-end
