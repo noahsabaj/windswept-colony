@@ -128,7 +128,7 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 
 - **HOOKS_CACHE execution order**: Helix hook execution order: (1) HOOKS_CACHE plugin hooks, (2) Schema hooks, (3) Regular hook.Add hooks. To run before a Helix plugin, inject into HOOKS_CACHE directly. See ix_camera.lua lines 220-265.
 
-- **ITEM.isBag auto-opens "View"**: When `ITEM.isBag = true`, Helix auto-calls the "View" function on inventory open. Rename custom viewers to something else (e.g., "Browse") and keep "View" for the standard bag panel.
+- **ITEM.isBag requires View function**: When `ITEM.isBag = true`, Helix auto-calls `item.functions.View.OnClick(item)` on inventory open. You MUST define `ITEM.functions.View` with an `OnClick` handler, or you'll get "attempt to index field 'View' (a nil value)". See `sh_wallet.lua` or `sh_photo_album.lua` for the standard pattern that creates an `ixInventory` panel.
 
 - **ix.config.Add requires explicit type for arrays**: The config system auto-detects strings, numbers, booleans, colors, and vectors, but NOT plain arrays/tables. If you add a config with an array value like `ix.config.Add("myList", {"a", "b", "c"}, ...)`, it will fail with "attempted to add config with invalid type". Fix: explicitly specify `type = ix.type.array` in the data parameter:
   ```lua
