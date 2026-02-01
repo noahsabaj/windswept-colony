@@ -12,6 +12,7 @@ resource.AddWorkshop("2840031720")  -- TFA Base (required for TFA weapons)
 resource.AddWorkshop("3478998917")  -- TFA INS2 Weapons Pack (Model 10 revolver, etc.)
 resource.AddWorkshop("1376312181")  -- TFA INS2 KA-BAR Combat Knife
 resource.AddWorkshop("3624686503")  -- Citizen Clothing Overhaul
+resource.AddWorkshop("741923773")   -- Assorted Coins
 
 -- Database migrations
 ix.util.Include("sv_migration.lua")

@@ -1,6 +1,6 @@
 ITEM.name = "Coins"
 ITEM.description = "CEG cents."
-ITEM.model = "models/props_junk/cardboard_box004a.mdl"
+ITEM.model = "models/stevencz/Other/coin/c001.mdl"
 ITEM.width = 1
 ITEM.height = 1
 ITEM.category = "Currency"

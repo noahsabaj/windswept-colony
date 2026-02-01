@@ -1,6 +1,6 @@
 ITEM.name = "Cash"
 ITEM.description = "CEG Dollar bills."
-ITEM.model = "models/props_junk/cardboard_box004a.mdl"
+ITEM.model = "models/props/cs_assault/Dollar.mdl"
 ITEM.width = 1
 ITEM.height = 1
 ITEM.category = "Currency"
