@@ -51,6 +51,10 @@ windswept/
 │   ├── entities/            # Custom entities
 │   └── weapons/             # Custom weapons (SWEPs)
 └── gamemode/                # Helix gamemode loader
+
+# NOTE: Custom addons are in garrysmod/addons/, NOT in the gamemode folder
+garrysmod/addons/
+└── windswept_fire/          # Performance-optimized fire system (forked from vFire)
 ```
 
 ## Reference Codebases
@@ -118,6 +122,15 @@ windswept/
   - Locksmith machine (ixLocksmithOpen, ixLocksmithProgramLock, etc.)
 
   Plugin strings remain in their plugins: permadeath (10), factions (13), prisoner (10).
+
+- **Fire System** (`garrysmod/addons/windswept_fire/`): Performance-optimized fire system forked from vFire. Used for cremation in the permadeath system. Key points:
+  - **Location**: Must be in `garrysmod/addons/`, NOT in the gamemode folder. GMod auto-loads addons from this location.
+  - **Attribution**: Particle effects (.pcf) and scorch textures (.vtf) are from vFire by Vioxtar/Cumberly (Workshop ID: 1525218777). Lua code is a complete rewrite.
+  - **API**: `ws_fire.Create(pos, opts)`, `ws_fire.CreateOnEntity(ent, opts)`, `ws_fire.Extinguish(ent)`, `ws_fire.IsOnFire(ent)`
+  - **Compatibility**: Maintains `.fires` table on entities and `.life`/`.feed` properties for permadeath integration.
+  - **Performance**: Cluster-level rendering (1 particle system per cluster vs per-fire), spatial hashing for O(1) neighbor lookups, batched Think processing.
+  - **entityflame override**: Kills GMod's ugly native fire so only our particles render.
+  - **Smoke effect**: `ws_fire_smoke` triggers when fire is extinguished (water, life=0, API call).
 
 - **Door & Lock System**: Physical lock and key system replacing Helix's door ownership. Key points:
   - **Brush-based doors are ignored**: Doors with models starting with `*` (func_door, func_door_rotating) are skipped by the entire system - detection, tools, battering ram, everything. Only `prop_door_rotating` doors are managed.
@@ -460,6 +473,10 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 - **Legacy workshop format (_legacy.bin)**: Some older workshop addons use `_legacy.bin` files instead of `.gma`. The gmad.exe tool cannot extract these. Fix: Use GMPublisher (https://github.com/WilliamVenner/gmpublisher) - open the legacy.bin file and extract from there.
 
 ### Code Organization
+
+- **Custom addons go in `garrysmod/addons/`**: GMod only auto-loads addons from `garrysmod/addons/`, NOT from inside gamemode folders. If you put an addon in `gamemodes/windswept/addons/`, it won't load. Example: `windswept_fire` must be at `garrysmod/addons/windswept_fire/`, not `gamemodes/windswept/addons/windswept_fire/`.
+
+- **Autorun files load alphabetically**: GMod loads `lua/autorun/*.lua` files in alphabetical order. If `api.lua` depends on `init.lua` creating a global table, but "a" comes before "i", you get nil errors. Fix: prefix files with numbers to control order: `00_init.lua`, `01_assets.lua`, `02_api.lua`.
 
 - **Plugins vs schema folders**: Plugins are for **cohesive gameplay systems** (prisoner, permadeath) where related code lives together. General items and weapons that aren't part of a specific system go in `schema/items/` and `entities/weapons/`, not in their own plugin. Don't create a plugin just to hold one item.
 
