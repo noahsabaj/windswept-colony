@@ -6,8 +6,8 @@ ITEM.height = 1
 ITEM.category = "Containers"
 ITEM.price = 200 -- $2.00 in cents
 ITEM.isBag = true
-ITEM.invWidth = 10
-ITEM.invHeight = 10
+ITEM.invWidth = 5
+ITEM.invHeight = 5
 
 -- Wallet designation: "both", "cash", or "coins"
 -- Stored in item data as "designation"
