@@ -73,6 +73,50 @@ function ITEM:OnSendData(client)
     end
 end
 
+-- View function for Helix auto-bag-open (opens standard inventory panel)
+-- This is what Helix calls automatically when "openBags" option is enabled
+ITEM.functions.View = {
+    name = "View",
+    tip = "Open the wallet to view contents.",
+    icon = "icon16/folder.png",
+    OnClick = function(item)
+        local index = item:GetData("id", "")
+
+        if index then
+            local panel = ix.gui["inv"..index]
+            local inventory = ix.item.inventories[index]
+            local parent = IsValid(ix.gui.menuInventoryContainer) and ix.gui.menuInventoryContainer or ix.gui.openedStorage
+
+            if IsValid(panel) then
+                panel:Remove()
+            end
+
+            if inventory and inventory.slots then
+                panel = vgui.Create("ixInventory", IsValid(parent) and parent or nil)
+                panel:SetInventory(inventory)
+                panel:ShowCloseButton(true)
+                panel:SetTitle(item:GetName())
+
+                if parent ~= ix.gui.menuInventoryContainer then
+                    panel:Center()
+                    if parent == ix.gui.openedStorage then
+                        panel:MakePopup()
+                    end
+                else
+                    panel:MoveToFront()
+                end
+
+                ix.gui["inv"..index] = panel
+            end
+        end
+
+        return false
+    end,
+    OnCanRun = function(item)
+        return not IsValid(item.entity) and item:GetData("id") and not IsValid(ix.gui["inv" .. item:GetData("id", "")])
+    end
+}
+
 -- Set designation: All Currency
 ITEM.functions["Set: All Currency"] = {
     name = "Set: All Currency",
