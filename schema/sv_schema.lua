@@ -19,6 +19,8 @@ ix.util.Include("sv_migration.lua")
 
 -- Network strings for wallet/money system
 util.AddNetworkString("ixMoneyDestroy")
+util.AddNetworkString("ixMoneyGive")
+util.AddNetworkString("ixWalletGive")
 
 -- Money destroy handler
 net.Receive("ixMoneyDestroy", function(len, client)
@@ -71,6 +73,208 @@ net.Receive("ixMoneyDestroy", function(len, client)
             client:NotifyLocalized("destroyedCoins", amount .. "¢")
         end
     end
+end)
+
+-- Money give handler
+net.Receive("ixMoneyGive", function(len, client)
+    local itemID = net.ReadUInt(32)
+    local amount = net.ReadUInt(32)
+    local target = net.ReadEntity()
+
+    -- Validate item
+    local item = ix.item.instances[itemID]
+    if not item or not item.isCurrency then return end
+
+    -- Validate giver
+    local character = client:GetCharacter()
+    if not character then return end
+
+    local inventory = character:GetInventory()
+    if not inventory then return end
+
+    -- Check item ownership (in main inventory or owned bag)
+    local itemInvID = item:GetInventory()
+    if itemInvID ~= inventory:GetID() then
+        local itemInv = ix.item.inventories[itemInvID]
+        if not itemInv or itemInv:GetOwner() ~= character:GetID() then
+            return
+        end
+    end
+
+    -- Validate target
+    if not IsValid(target) or not target:IsPlayer() then
+        client:NotifyLocalized("targetNotValid")
+        return
+    end
+
+    -- Check range
+    if client:GetPos():DistToSqr(target:GetPos()) > (100 * 100) then
+        client:NotifyLocalized("targetTooFar")
+        return
+    end
+
+    -- Check target is alive
+    if not target:Alive() then
+        client:NotifyLocalized("targetNotAlive")
+        return
+    end
+
+    -- Check target is not knocked
+    local targetChar = target:GetCharacter()
+    if not targetChar then
+        client:NotifyLocalized("targetNotValid")
+        return
+    end
+
+    if target:GetNetVar("ixKnocked", false) then
+        client:NotifyLocalized("targetKnocked")
+        return
+    end
+
+    -- Check target is not zip tied
+    if target:GetNetVar("ixRestricted", false) then
+        client:NotifyLocalized("targetRestrained")
+        return
+    end
+
+    -- Validate amount
+    local currentQty = item:GetData("quantity", 1)
+    amount = math.min(amount, currentQty)
+    if amount <= 0 then return end
+
+    -- Calculate cents to give
+    local centsToGive = amount * item.currencyValue
+
+    -- Try to add to target's inventory (use wallet routing if available)
+    local targetInv = targetChar:GetInventory()
+    if not targetInv then
+        client:NotifyLocalized("targetNoInventory")
+        return
+    end
+
+    -- Use wallet-aware routing if available, otherwise fallback to standard
+    local success
+    if ix.currency.AddToInventoryWithWallet then
+        success = ix.currency.AddToInventoryWithWallet(target, centsToGive)
+    else
+        success = ix.currency.AddToInventory(targetInv, centsToGive)
+    end
+
+    if not success then
+        client:NotifyLocalized("targetInventoryFull")
+        return
+    end
+
+    -- Remove from giver
+    if amount >= currentQty then
+        item:Remove()
+    else
+        item:SetData("quantity", currentQty - amount)
+    end
+
+    -- Notify both parties
+    local moneyStr = item.currencyValue == 100 and ("$" .. amount) or (amount .. "¢")
+    client:NotifyLocalized("gaveMoneyTo", moneyStr, target:Nick())
+    target:NotifyLocalized("receivedMoneyFrom", moneyStr, client:Nick())
+end)
+
+-- Wallet give handler
+net.Receive("ixWalletGive", function(len, client)
+    local walletItemID = net.ReadUInt(32)
+    local cents = net.ReadUInt(32)
+    local target = net.ReadEntity()
+
+    -- Validate wallet item
+    local walletItem = ix.item.instances[walletItemID]
+    if not walletItem or walletItem.uniqueID ~= "wallet" then return end
+
+    -- Validate ownership
+    local character = client:GetCharacter()
+    if not character then return end
+
+    local inventory = character:GetInventory()
+    if not inventory then return end
+
+    -- Check wallet is in player's main inventory
+    if walletItem:GetInventory() ~= inventory:GetID() then return end
+
+    -- Get wallet inventory
+    local walletInvID = walletItem:GetData("id")
+    if not walletInvID then return end
+
+    local walletInv = ix.item.inventories[walletInvID]
+    if not walletInv then return end
+
+    -- Validate target
+    if not IsValid(target) or not target:IsPlayer() then
+        client:NotifyLocalized("targetNotValid")
+        return
+    end
+
+    if client:GetPos():DistToSqr(target:GetPos()) > (100 * 100) then
+        client:NotifyLocalized("targetTooFar")
+        return
+    end
+
+    if not target:Alive() then
+        client:NotifyLocalized("targetNotAlive")
+        return
+    end
+
+    local targetChar = target:GetCharacter()
+    if not targetChar then
+        client:NotifyLocalized("targetNotValid")
+        return
+    end
+
+    if target:GetNetVar("ixKnocked", false) then
+        client:NotifyLocalized("targetKnocked")
+        return
+    end
+
+    if target:GetNetVar("ixRestricted", false) then
+        client:NotifyLocalized("targetRestrained")
+        return
+    end
+
+    -- Calculate available money in wallet
+    local available = ix.wallet and ix.wallet.GetWalletMoney and ix.wallet.GetWalletMoney(walletInv) or 0
+    cents = math.min(cents, available)
+
+    if cents <= 0 then
+        client:NotifyLocalized("walletEmpty")
+        return
+    end
+
+    -- Remove from wallet
+    if not ix.currency.RemoveFromInventory(walletInv, cents) then
+        client:NotifyLocalized("walletEmpty")
+        return
+    end
+
+    -- Give to target (using wallet routing if available)
+    local success
+    if ix.currency.AddToInventoryWithWallet then
+        success = ix.currency.AddToInventoryWithWallet(target, cents)
+    else
+        local targetInv = targetChar:GetInventory()
+        success = targetInv and ix.currency.AddToInventory(targetInv, cents)
+    end
+
+    if not success then
+        -- Refund if target can't receive
+        ix.currency.AddToInventory(walletInv, cents)
+        client:NotifyLocalized("targetInventoryFull")
+        return
+    end
+
+    -- Notify both parties
+    local dollars = math.floor(cents / 100)
+    local remainingCents = cents % 100
+    local moneyStr = string.format("$%d.%02d", dollars, remainingCents)
+
+    client:NotifyLocalized("gaveMoneyTo", moneyStr, target:Nick())
+    target:NotifyLocalized("receivedMoneyFrom", moneyStr, client:Nick())
 end)
 
 -- Disable faction whitelist requirements

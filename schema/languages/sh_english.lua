@@ -254,4 +254,21 @@ LANGUAGE = {
     -- Money System
     destroyedCash = "You destroyed %s.",
     destroyedCoins = "You destroyed %s.",
+    noTargetInFront = "No one in front of you.",
+    targetNotValid = "Target is not valid.",
+    targetTooFar = "Target is too far away.",
+    targetNotAlive = "Target is not alive.",
+    targetKnocked = "Target is unconscious.",
+    targetRestrained = "Target is restrained.",
+    targetNoInventory = "Target has no inventory.",
+    targetInventoryFull = "Target's inventory is full.",
+    gaveMoneyTo = "You gave %s to %s.",
+    receivedMoneyFrom = "You received %s from %s.",
+
+    -- Wallet System
+    movedMoneyInto = "Moved %s into wallet.",
+    noMoneyToMove = "No compatible money to move.",
+    emptiedWallet = "Emptied %d item(s) from wallet.",
+    walletEmptyFailed = "Could not empty %d item(s) - no space available.",
+    walletEmpty = "Wallet is empty.",
 }

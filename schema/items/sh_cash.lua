@@ -181,3 +181,48 @@ ITEM.functions.Destroy = {
         return true
     end
 }
+
+ITEM.functions.Give = {
+    name = "Give",
+    tip = "Give cash to the person you're looking at.",
+    icon = "icon16/user_go.png",
+    OnRun = function(item)
+        return false -- Handled via net message
+    end,
+    OnClick = function(item)
+        local client = LocalPlayer()
+        local target = Schema:GetLookAtPlayer(client, 100)
+
+        if not IsValid(target) then
+            client:NotifyLocalized("noTargetInFront")
+            return false
+        end
+
+        local quantity = item:GetData("quantity", 1)
+
+        Derma_StringRequest(
+            "Give Cash",
+            "How many dollars do you want to give to " .. target:Nick() .. "?",
+            tostring(quantity),
+            function(text)
+                local amount = tonumber(text)
+                if not amount or amount <= 0 then return end
+
+                net.Start("ixMoneyGive")
+                    net.WriteUInt(item:GetID(), 32)
+                    net.WriteUInt(math.floor(amount), 32)
+                    net.WriteEntity(target)
+                net.SendToServer()
+            end,
+            nil,
+            "Give",
+            "Cancel"
+        )
+
+        return false
+    end,
+    OnCanRun = function(item)
+        if IsValid(item.entity) then return false end
+        return CLIENT -- Only show on client
+    end
+}

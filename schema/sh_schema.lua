@@ -14,6 +14,9 @@ ix.util.Include("libs/sh_physical.lua")
 -- Include door frame management library (for physical lock & key system)
 ix.util.Include("libs/sh_doors.lua")
 
+-- Include wallet system library (for currency routing to wallets)
+ix.util.Include("libs/sh_wallet.lua")
+
 -- Schema Configuration
 Schema.colony = Schema.colony or {}
 Schema.colony.name = "Redrock City"
@@ -34,6 +37,24 @@ Schema.elections.positions = {
     "Commissioner",
     "Union President"
 }
+
+-- Get the player the client is looking at within range
+function Schema:GetLookAtPlayer(client, maxRange)
+    maxRange = maxRange or 100
+
+    local trace = util.TraceLine({
+        start = client:EyePos(),
+        endpos = client:EyePos() + client:GetAimVector() * maxRange,
+        filter = client
+    })
+
+    local target = trace.Entity
+    if IsValid(target) and target:IsPlayer() then
+        return target
+    end
+
+    return nil
+end
 
 -- Include other schema files
 ix.util.Include("cl_schema.lua")
