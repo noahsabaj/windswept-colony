@@ -143,14 +143,16 @@ end
 -- ============================================================================
 
 -- Override salary payment to route through wallets
-hook.Add("CharacterLoaded", "ixWalletSalary", function(character)
-    local client = character:GetPlayer()
-    if not IsValid(client) then return end
+-- IMPORTANT: Must use PlayerLoadedCharacter, NOT CharacterLoaded!
+-- CharacterLoaded runs BEFORE Helix creates its salary timer in PlayerLoadedCharacter,
+-- so timer.Remove() would fail. PlayerLoadedCharacter runs AFTER Helix's GM function.
+hook.Add("PlayerLoadedCharacter", "ixWalletSalary", function(client, character, lastChar)
+    if not IsValid(client) or not character then return end
 
     local faction = ix.faction.indices[character:GetFaction()]
     if not faction or not faction.pay or faction.pay <= 0 then return end
 
-    -- Remove Helix's default salary timer
+    -- Remove Helix's default salary timer (created by GM:PlayerLoadedCharacter before this hook)
     local uniqueID = "ixSalary" .. client:SteamID64()
     timer.Remove(uniqueID)
 

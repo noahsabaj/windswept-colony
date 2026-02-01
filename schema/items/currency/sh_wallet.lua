@@ -6,6 +6,7 @@ ITEM.height = 1
 ITEM.category = "Containers"
 ITEM.price = 200 -- $2.00 in cents
 ITEM.isBag = true
+ITEM.isCurrency = false -- Override base_currency; wallet is a container, not currency
 ITEM.invWidth = 5
 ITEM.invHeight = 5
 

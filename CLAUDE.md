@@ -22,7 +22,8 @@ windswept/
 │   ├── factions/            # Faction definitions
 │   ├── classes/             # Class definitions
 │   ├── items/               # Item definitions (domain-organized)
-│   │   ├── base/            # Base classes (base_battery_device, base_currency)
+│   │   ├── base/            # Base classes (sh_base_*.lua files)
+│   │   ├── clothing/        # Clothing outfits (casual, work, uniforms)
 │   │   ├── currency/        # Cash, coins, wallet
 │   │   ├── documents/       # Personal ID, photos, photo album
 │   │   ├── doors/           # Door items (wood, metal, gate)
@@ -36,8 +37,10 @@ windswept/
 │   ├── libs/                # Custom libraries (MUST be included in sh_schema.lua)
 │   │   ├── sh_birthdata.lua # Birth date/age system
 │   │   ├── sh_physical.lua  # Physical appearance system
+│   │   ├── sh_doors.lua     # Door system library
+│   │   ├── sh_wallet.lua    # Wallet/currency library
 │   │   └── thirdparty/      # Third-party libs
-|   |       └── sh_netstream2.lua
+│   │       └── sh_netstream2.lua
 │   ├── languages/           # Localization
 │   └── meta/                # Metatable extensions
 ├── plugins/                 # Modular features
@@ -106,7 +109,7 @@ windswept/
   - `BATTERY_FULL_CHARGE` - 100up
   - Helper functions: `ix.constants.WithinRange()`, `ix.constants.CanInteract()`
 
-- **Network String Registry** (`schema/sv_netstrings.lua`): All schema and entity network strings are centralized here. This file is included by sv_schema.lua and registers 51 strings for:
+- **Network String Registry** (`schema/sv_netstrings.lua`): All schema and entity network strings are centralized here. This file is included by sv_schema.lua and registers 60 strings for:
   - Currency system (ixMoneyDestroy, ixMoneyGive, ixCurrencySplit, etc.)
   - Photo system (ixPhotoRename, ixPhotoRequest, ixPhotoAlbumView, etc.)
   - Door system (ixDoorsSync, ixDoorInstall, etc.)
@@ -155,11 +158,11 @@ ITEM.playerItemKey = "ixFlashlightItem"
 ITEM.hasLightToggle = true
 ```
 
-**Provided functions:** `GetBatteries()`, `SetBatteries()`, `GetTotalCharge()`, `HasCharge()`, `ConsumeBattery()`, `AutoEjectDepleted()`, `AutoLoadFromInventory()`, `PaintOver()`, `PopulateTooltip()`
+**Provided functions:** `GetBatteries()`, `SetBatteries()`, `GetBatteryCount()`, `HasBattery()`, `HasUsableCharge()`, `GetFirstBatteryCharge()`, `FindBestBatteryInInventory()`, `AutoEjectDepleted()`, `AutoLoadFromInventory()`, `PaintOver()`, `PopulateTooltip()`
 
 **Provided item functions:** LoadBattery, EjectBattery, Equip, Unequip, ToggleLight (if enabled)
 
-### base_currency (`schema/items/base/sh_base_currency.lua`)
+### base_currency (`schema/items/base/sh_currency.lua`)
 
 For stackable currency items. Provides split, merge, give, and optional destroy.
 
@@ -223,7 +226,7 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 
 - **Weapon equip data key is "equip" not "equipped"**: The base_weapons item uses `item:GetData("equip")` and `item:SetData("equip", true/nil)`. Do NOT use `"equipped"` - that's a different key used by some custom items (like Personal ID). Using the wrong key causes `CanTransfer` to block operations with "You cannot move a weapon that is currently equipped!"
 
-- **HOOKS_CACHE execution order**: Helix hook execution order: (1) HOOKS_CACHE plugin hooks, (2) Schema hooks, (3) Regular hook.Add hooks. To run before a Helix plugin, inject into HOOKS_CACHE directly. See ix_camera.lua lines 220-265.
+- **HOOKS_CACHE execution order**: Helix hook execution order: (1) HOOKS_CACHE plugin hooks, (2) Schema hooks, (3) Regular hook.Add hooks. To run before a Helix plugin, inject into HOOKS_CACHE directly. See ix_camera.lua lines 225-269.
 
 - **ITEM.isBag requires View function**: When `ITEM.isBag = true`, Helix auto-calls `item.functions.View.OnClick(item)` on inventory open. You MUST define `ITEM.functions.View` with an `OnClick` handler, or you'll get "attempt to index field 'View' (a nil value)". See `sh_wallet.lua` or `sh_photo_album.lua` for the standard pattern that creates an `ixInventory` panel.
 
@@ -262,6 +265,56 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
   ```
 
 - **ix.log.AddType is SERVER-only**: The logging system only exists on the server. If you call `ix.log.AddType()` on the client (e.g., in a shared plugin hook like `InitializedPlugins`), you'll get "attempt to call field 'AddType' (a nil value)". Fix: Wrap in `if SERVER then` or add `if not SERVER then return end` at the start of the function.
+
+- **CharacterLoaded vs PlayerLoadedCharacter execution order**: These hooks run in a specific order during character loading:
+  1. `character:Setup()` → calls `CharacterLoaded` hook
+  2. `client:Spawn()`
+  3. `GM:PlayerLoadedCharacter()` → creates Helix salary timer here
+  4. `PlayerLoadedCharacter` hook (hook.Add listeners)
+
+  **Critical for timer overrides**: If you need to remove/replace Helix's salary timer (`ixSalary..steamID64`), you MUST use `PlayerLoadedCharacter` hook, NOT `CharacterLoaded`. The timer doesn't exist yet when `CharacterLoaded` runs, so `timer.Remove()` does nothing, and both timers run = double salary.
+  ```lua
+  -- WRONG: CharacterLoaded runs BEFORE Helix creates its timer
+  hook.Add("CharacterLoaded", "myHook", function(character)
+      timer.Remove("ixSalary" .. character:GetPlayer():SteamID64())  -- Does nothing!
+  end)
+
+  -- CORRECT: PlayerLoadedCharacter runs AFTER Helix's GM function
+  hook.Add("PlayerLoadedCharacter", "myHook", function(client, character, lastChar)
+      timer.Remove("ixSalary" .. client:SteamID64())  -- Timer exists, removal works
+  end)
+  ```
+
+- **Helix auto-assigns `ITEM.base` based on folder name**: When loading items from subdirectories of `schema/items/`, Helix automatically sets `ITEM.base = "base_" + folder_name`. For example:
+  - Items in `currency/` → `ITEM.base = "base_currency"`
+  - Items in `equipment/` → `ITEM.base = "base_equipment"`
+  - Items in `locks/` → `ITEM.base = "base_locks"`
+
+  **This means every item subfolder MUST have a matching base file in `items/base/`:**
+
+  | Folder | Required Base File | UniqueID (auto-generated) |
+  |--------|-------------------|---------------------------|
+  | `currency/` | `sh_currency.lua` | `base_currency` |
+  | `clothing/` | `sh_clothing.lua` | `base_clothing` |
+  | `documents/` | `sh_documents.lua` | `base_documents` |
+  | `doors/` | `sh_doors.lua` | `base_doors` |
+  | `equipment/` | `sh_equipment.lua` | `base_equipment` |
+  | `locks/` | `sh_locks.lua` | `base_locks` |
+  | `materials/` | `sh_materials.lua` | `base_materials` |
+  | `misc/` | `sh_misc.lua` | `base_misc` |
+  | `weapons/` | Helix built-in | `base_weapons` |
+
+  **IMPORTANT**: Base files should NOT have `base_` in their filename! Helix automatically adds `base_` prefix when loading from the `base/` folder. So `sh_currency.lua` becomes `base_currency`.
+
+  **To override auto-assignment**, explicitly set `ITEM.base` in your item file:
+  ```lua
+  -- This item is in equipment/ folder, but uses battery_device base instead
+  ITEM.base = "base_battery_device"  -- Overrides auto-assigned "base_equipment"
+  ```
+
+  **Common errors**:
+  - `[Helix] Item 'myitem' has a non-existent base! (base_foldername)` - You created a new item folder without a matching `sh_foldername.lua` in `items/base/`.
+  - `[Helix] Item 'base_base_something' has a non-existent base!` - You named your base file `sh_base_something.lua` but it should be `sh_something.lua`. Helix adds the `base_` prefix automatically.
 
 ### SWEP/Weapon Development
 
@@ -334,7 +387,7 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 
 - **SWEP properties don't network to client**: Setting `weapon.ixItem = item` on SERVER doesn't make it available on CLIENT. The client's SWEP copy has no knowledge of server-set properties. Fix: Client must find the data another way - look up equipped item from inventory, use networked vars, or send via net message.
 
-- **Worldmodel not visible in third person**: Workshop prop models used as SWEP world models lack proper bone attachments - the model won't render on the player's hand automatically. Fix: Override `DrawWorldModel()` on CLIENT to manually position using `owner:LookupBone("ValveBiped.Bip01_R_Hand")` and `GetBoneMatrix()`, then offset with `ang:Forward()/Right()/Up()` and rotate with `RotateAroundAxis()`. Offset values require trial and error to position correctly in the grip. See ix_personalid.lua and ix_gavel.lua for working examples.
+- **Worldmodel not visible in third person**: Workshop prop models used as SWEP world models lack proper bone attachments - the model won't render on the player's hand automatically. Fix: Override `DrawWorldModel()` on CLIENT to manually position using `owner:LookupBone("ValveBiped.Bip01_R_Hand")` and `GetBoneMatrix()`, then offset with `ang:Forward()/Right()/Up()` and rotate with `RotateAroundAxis()`. Offset values require trial and error to position correctly in the grip. See `entities/weapons/ix_personalid.lua` or `plugins/prisoner/entities/weapons/ix_gavel.lua` for working examples.
 
 - **Entity/weapon naming conflict**: Don't name a scripted entity the same as a weapon class. If weapon `ix_lantern` exists, an entity named `ix_lantern` will have broken NetworkVars (SetupDataTables doesn't register methods properly). Use distinct names like `ix_lantern` (weapon) and `ix_lantern_dropped` (entity).
 
@@ -412,6 +465,7 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 
 - **Item folder structure**: Items are organized into domain-based subdirectories under `schema/items/`:
   - `base/` - Base classes that other items inherit from
+  - `clothing/` - Clothing outfits (casual, work, uniforms)
   - `currency/` - Money items (cash, coins, wallet)
   - `documents/` - ID cards, photos, albums
   - `doors/` - Installable door items
@@ -423,6 +477,8 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 
   Helix auto-loads items recursively from all subdirectories, so no code changes are needed when moving files.
 
+  **IMPORTANT - Base file naming**: When you create a new item folder (e.g., `consumables/`), you MUST also create a matching base file named `sh_<foldername>.lua` (e.g., `sh_consumables.lua`) in `items/base/`. Helix automatically adds `base_` prefix when loading from the base folder, so `sh_consumables.lua` becomes `base_consumables`. See the "Helix auto-assigns ITEM.base" gotcha above.
+
 - **Network string centralization**: All schema and entity network strings are registered in `schema/sv_netstrings.lua`. Plugin network strings (permadeath, factions, prisoner) remain in their respective plugins for modularity.
   - **Never add `util.AddNetworkString()` to entity or item files** - add them to sv_netstrings.lua instead
   - **Naming convention**: Use `ixCamelCase` (e.g., `ixFlashlightSetLight`), NOT underscores (`ix_flashlight_SetLight`)
@@ -430,10 +486,13 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
   - GMod has a 4096 network string limit - centralizing prevents duplicates and makes auditing easy
 
 - **Base class pattern for items**: When multiple items share significant logic, extract a base class to `schema/items/base/`:
-  - `base_battery_device.lua` - For battery-powered equipment (flashlight, lantern, camera, defibrillator)
-  - `base_currency.lua` - For stackable currency (cash, coins)
+  - `sh_battery_device.lua` → `base_battery_device` - For battery-powered equipment (flashlight, lantern, camera, defibrillator). Items must explicitly set `ITEM.base = "base_battery_device"` to use this.
+  - `sh_currency.lua` → `base_currency` - For stackable currency (cash, coins). Auto-assigned to items in `currency/` folder.
+  - `sh_doors.lua` → `base_doors` - For installable door items. Auto-assigned to items in `doors/` folder.
+  - `sh_clothing.lua` → `base_clothing` - For clothing items. Auto-assigned to items in `clothing/` folder.
+  - Stub bases (`sh_equipment.lua`, `sh_locks.lua`, etc.) - Minimal bases for folders that don't need special shared logic.
 
-  Child items become pure configuration (~15-30 lines) instead of duplicating hundreds of lines of logic. See examples below.
+  Child items become pure configuration (~15-30 lines) instead of duplicating hundreds of lines of logic.
 
 ### Derma/UI Development
 
