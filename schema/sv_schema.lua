@@ -93,7 +93,7 @@ net.Receive("ixMoneyGive", function(len, client)
     if not inventory then return end
 
     -- Check item ownership (in main inventory or owned bag)
-    local itemInvID = item:GetInventory()
+    local itemInvID = item.invID
     if itemInvID ~= inventory:GetID() then
         local itemInv = ix.item.inventories[itemInvID]
         if not itemInv or itemInv:GetOwner() ~= character:GetID() then
@@ -196,7 +196,7 @@ net.Receive("ixWalletGive", function(len, client)
     if not inventory then return end
 
     -- Check wallet is in player's main inventory
-    if walletItem:GetInventory() ~= inventory:GetID() then return end
+    if walletItem.invID ~= inventory:GetID() then return end
 
     -- Get wallet inventory
     local walletInvID = walletItem:GetData("id")
