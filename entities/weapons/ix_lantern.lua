@@ -39,7 +39,8 @@ SWEP.Secondary.Ammo = ""
 SWEP.DrawAmmo = false
 SWEP.DrawCrosshair = false
 
--- Battery drain rate: 100up / 600 seconds = ~0.167up per second
+-- Battery drain rate: 100up / 600 seconds = ~0.167up per second (10 minutes per full battery)
+-- Canonical value defined in schema/sh_constants.lua as DRAIN_LANTERN
 SWEP.DrainRate = 100 / 600
 
 -- Light properties (bluish-white like the original addon)

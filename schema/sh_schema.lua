@@ -17,6 +17,9 @@ ix.util.Include("libs/sh_doors.lua")
 -- Include wallet system library (for currency routing to wallets)
 ix.util.Include("libs/sh_wallet.lua")
 
+-- Include centralized constants (must be early, before other files use them)
+ix.util.Include("sh_constants.lua")
+
 -- Schema Configuration
 Schema.colony = Schema.colony or {}
 Schema.colony.name = "Redrock City"

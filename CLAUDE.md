@@ -15,6 +15,7 @@ windswept/
 │   ├── cl_schema.lua        # Client entry point
 │   ├── sv_schema.lua        # Server entry point
 │   ├── sv_netstrings.lua    # Centralized network string registry
+│   ├── sh_constants.lua     # Centralized constants (ix.constants)
 │   ├── sh_hooks.lua         # Shared hooks
 │   ├── cl_hooks.lua         # Client hooks
 │   ├── sv_hooks.lua         # Server hooks
@@ -96,6 +97,14 @@ windswept/
 - Currency: CEG Dollar, written as "$50" or "50 dollars". The dollar is the standard currency used throughout CEG-controlled space.
 
 - For the battery system, "up" stands for "units of power", so a 100up battery has 100 units of power. Device drain rates vary: flashlight ~0.083up/sec (20 min per battery), lantern ~0.167up/sec (10 min per battery). Batteries are universal across all devices (defibrillator, flashlight, camera, lantern, etc.).
+
+- **Centralized Constants** (`schema/sh_constants.lua`): Magic numbers and repeated values are defined in `ix.constants`:
+  - `COLOR_UI_NEUTRAL` - Standard gray Color(200, 200, 200) for anti-metagaming UI
+  - `RANGE_INTERACTION` - Standard player interaction range (100*100 for DistToSqr)
+  - `RANGE_INTERACTION_CLOSE` - Close range for prisoner operations (96*96)
+  - `DRAIN_FLASHLIGHT`, `DRAIN_LANTERN` - Battery drain rates
+  - `BATTERY_FULL_CHARGE` - 100up
+  - Helper functions: `ix.constants.WithinRange()`, `ix.constants.CanInteract()`
 
 - **Network String Registry** (`schema/sv_netstrings.lua`): All schema and entity network strings are centralized here. This file is included by sv_schema.lua and registers 51 strings for:
   - Currency system (ixMoneyDestroy, ixMoneyGive, ixCurrencySplit, etc.)

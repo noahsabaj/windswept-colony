@@ -19,6 +19,7 @@ SWEP.Spawnable = false
 SWEP.Drop = false
 
 -- Battery drain rate: 100up / 1200 seconds = ~0.083up per second (20 minutes per full battery)
+-- Canonical value defined in schema/sh_constants.lua as DRAIN_FLASHLIGHT
 SWEP.DrainRate = 100 / 1200
 
 -- Network string registered in schema/sv_netstrings.lua as ixFlashlightSetLight

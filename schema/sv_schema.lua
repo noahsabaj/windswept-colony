@@ -106,7 +106,7 @@ net.Receive("ixMoneyGive", function(len, client)
     end
 
     -- Check range
-    if client:GetPos():DistToSqr(target:GetPos()) > (100 * 100) then
+    if client:GetPos():DistToSqr(target:GetPos()) > ix.constants.RANGE_INTERACTION then
         client:NotifyLocalized("targetTooFar")
         return
     end
@@ -209,7 +209,7 @@ net.Receive("ixWalletGive", function(len, client)
         return
     end
 
-    if client:GetPos():DistToSqr(target:GetPos()) > (100 * 100) then
+    if client:GetPos():DistToSqr(target:GetPos()) > ix.constants.RANGE_INTERACTION then
         client:NotifyLocalized("targetTooFar")
         return
     end
