@@ -542,14 +542,7 @@ end
 -- ============================================================================
 
 if SERVER then
-    util.AddNetworkString("ixCameraRequestPhoto")
-    util.AddNetworkString("ixCameraApprovePhoto")
-    util.AddNetworkString("ixCameraPhotoData")
-    util.AddNetworkString("ixCameraSetAiming")
-    util.AddNetworkString("ixCameraSetZoom")
-    util.AddNetworkString("ixCameraToggleFlash")
-    util.AddNetworkString("ixCameraFlashToggled")
-    util.AddNetworkString("ixCameraFlashEffect")
+    -- Network strings registered in schema/sv_netstrings.lua
 
     -- Forward declaration for ProcessCompletePhoto (defined below)
     local ProcessCompletePhoto

@@ -21,10 +21,7 @@ SWEP.Drop = false
 -- Battery drain rate: 100up / 1200 seconds = ~0.083up per second (20 minutes per full battery)
 SWEP.DrainRate = 100 / 1200
 
--- Register our net string for server-authoritative control
-if SERVER then
-    util.AddNetworkString("ix_flashlight_SetLight")
-end
+-- Network string registered in schema/sv_netstrings.lua as ixFlashlightSetLight
 
 -- ============================================================================
 -- SETUP DATA TABLES
@@ -87,7 +84,7 @@ function SWEP:SetLight(value)
         self:EmitSound("shaky_flashlight_toggle")
 
         -- Send request to server
-        net.Start("ix_flashlight_SetLight")
+        net.Start("ixFlashlightSetLight")
         net.WriteBool(value)
         net.SendToServer()
 
@@ -134,7 +131,7 @@ end
 -- ============================================================================
 
 if SERVER then
-    net.Receive("ix_flashlight_SetLight", function(len, ply)
+    net.Receive("ixFlashlightSetLight", function(len, ply)
         local weapon = ply:GetWeapon("ix_flashlight")
         if not IsValid(weapon) then return end
         if weapon.ratelimit and weapon.ratelimit > CurTime() then return end

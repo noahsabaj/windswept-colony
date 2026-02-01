@@ -52,11 +52,7 @@ SWEP.BaseRepairRate = 10  -- HP per second
 -- NETWORKING
 -- ============================================================================
 
-if SERVER then
-    util.AddNetworkString("ixToolkitStartRemove")
-    util.AddNetworkString("ixToolkitStartRepair")
-    util.AddNetworkString("ixToolkitCancel")
-end
+-- Network strings registered in schema/sv_netstrings.lua
 
 -- ============================================================================
 -- DATA TABLES

@@ -334,12 +334,6 @@ end
 -- ============================================================================
 
 if SERVER then
-    util.AddNetworkString("ixPhotoRename")
-    util.AddNetworkString("ixPhotoDestroy")
-    util.AddNetworkString("ixPhotoRequest")
-    util.AddNetworkString("ixPhotoData")
-    util.AddNetworkString("ixPhotoViewFromGround")
-
     -- Client requests photo data by ID
     net.Receive("ixPhotoRequest", function(len, client)
         local photoID = net.ReadString()

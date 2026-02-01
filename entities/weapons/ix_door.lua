@@ -46,10 +46,7 @@ SWEP.BaseInstallTime = 20  -- 20 seconds base for door
 -- NETWORKING
 -- ============================================================================
 
-if SERVER then
-    util.AddNetworkString("ixDoorInstall")
-    util.AddNetworkString("ixDoorCancel")
-end
+-- Network strings registered in schema/sv_netstrings.lua
 
 -- ============================================================================
 -- DATA TABLES

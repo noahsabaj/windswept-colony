@@ -45,10 +45,7 @@ SWEP.SoundInterval = 2  -- Play sound every 2 seconds
 -- NETWORKING
 -- ============================================================================
 
-if SERVER then
-    util.AddNetworkString("ixLockbreakerStart")
-    util.AddNetworkString("ixLockbreakerCancel")
-end
+-- Network strings registered in schema/sv_netstrings.lua
 
 -- ============================================================================
 -- DATA TABLES

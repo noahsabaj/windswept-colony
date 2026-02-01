@@ -17,12 +17,8 @@ resource.AddWorkshop("741923773")   -- Assorted Coins
 -- Database migrations
 ix.util.Include("sv_migration.lua")
 
--- Network strings for wallet/money system
-util.AddNetworkString("ixMoneyDestroy")
-util.AddNetworkString("ixMoneyGive")
-util.AddNetworkString("ixWalletGive")
-util.AddNetworkString("ixCurrencySplit")        -- Server→Client: open split dialog
-util.AddNetworkString("ixCurrencySplitConfirm") -- Client→Server: confirm split amount
+-- Centralized network string registry (schema + entities)
+ix.util.Include("sv_netstrings.lua")
 
 -- Money destroy handler
 net.Receive("ixMoneyDestroy", function(len, client)

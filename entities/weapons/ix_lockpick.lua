@@ -50,13 +50,7 @@ SWEP.LockDamageMax = 5
 -- NETWORKING
 -- ============================================================================
 
-if SERVER then
-    util.AddNetworkString("ixLockpickStart")
-    util.AddNetworkString("ixLockpickAttempt")
-    util.AddNetworkString("ixLockpickResult")
-    util.AddNetworkString("ixLockpickCancel")
-    util.AddNetworkString("ixLockpickState")
-end
+-- Network strings registered in schema/sv_netstrings.lua
 
 -- ============================================================================
 -- DATA TABLES

@@ -66,10 +66,7 @@ SWEP.Offset = {
 -- NETWORKING
 -- ============================================================================
 
-if SERVER then
-    util.AddNetworkString("ixLanternSetLight")
-    util.AddNetworkString("ixLanternPlace")
-end
+-- Network strings registered in schema/sv_netstrings.lua
 
 -- ============================================================================
 -- DATA TABLES

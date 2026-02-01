@@ -7,12 +7,6 @@
     Can be renamed multiple times.
 ]]--
 
-if SERVER then
-    util.AddNetworkString("ixPhotoAlbumView")
-    util.AddNetworkString("ixPhotoAlbumViewData")
-    util.AddNetworkString("ixPhotoAlbumRename")
-end
-
 ITEM.name = "Photo Album"
 ITEM.description = "A binder for storing and organizing photographs."
 ITEM.model = "models/props_lab/binderblue.mdl"
@@ -739,8 +733,6 @@ end)
 -- ============================================================================
 
 if SERVER then
-    util.AddNetworkString("ixPhotoAlbumViewFromGround")
-
     hook.Add("PlayerUse", "ixPhotoAlbumGroundView", function(client, entity)
         if not IsValid(entity) then return end
 

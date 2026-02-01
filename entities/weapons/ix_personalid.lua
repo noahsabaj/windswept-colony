@@ -41,10 +41,7 @@ SWEP.DrawCrosshair = false
 -- NETWORKING
 -- ============================================================================
 
-if SERVER then
-    util.AddNetworkString("ixPersonalIDShowForward")
-    util.AddNetworkString("ixPersonalIDViewSelf")
-end
+-- Network strings registered in schema/sv_netstrings.lua
 
 -- ============================================================================
 -- INITIALIZATION

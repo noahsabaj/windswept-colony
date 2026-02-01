@@ -9,14 +9,7 @@ AddCSLuaFile("shared.lua")
 AddCSLuaFile("cl_init.lua")
 include("shared.lua")
 
-util.AddNetworkString("ixLocksmithOpen")
-util.AddNetworkString("ixLocksmithClose")
-util.AddNetworkString("ixLocksmithProgramLock")
-util.AddNetworkString("ixLocksmithProgramKey")
-util.AddNetworkString("ixLocksmithAddKeying")
-util.AddNetworkString("ixLocksmithRename")
-util.AddNetworkString("ixLocksmithViewKeyings")
-util.AddNetworkString("ixLocksmithResult")
+-- Network strings registered in schema/sv_netstrings.lua
 
 function ENT:Initialize()
     self:SetModel("models/props_lab/reciever01b.mdl")

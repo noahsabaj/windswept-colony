@@ -19,7 +19,6 @@ ITEM.noBusiness = true -- Cannot be purchased, given on character creation
 
 -- ID Card models: https://steamcommunity.com/sharedfiles/filedetails/?id=2179653848
 if SERVER then
-    util.AddNetworkString("ixShowPersonalID")
     resource.AddWorkshop("2179653848")
 end
 

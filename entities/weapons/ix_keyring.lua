@@ -44,11 +44,7 @@ SWEP.MaxUseDistance = 96
 -- NETWORKING
 -- ============================================================================
 
-if SERVER then
-    util.AddNetworkString("ixKeyringLock")
-    util.AddNetworkString("ixKeyringUnlock")
-    util.AddNetworkString("ixKeyringCycle")
-end
+-- Network strings registered in schema/sv_netstrings.lua
 
 -- ============================================================================
 -- DATA TABLES

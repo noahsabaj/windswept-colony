@@ -47,11 +47,7 @@ SWEP.ActionTime = 1
 -- NETWORKING
 -- ============================================================================
 
-if SERVER then
-    util.AddNetworkString("ixKeyStartLock")
-    util.AddNetworkString("ixKeyStartUnlock")
-    util.AddNetworkString("ixKeyCancel")
-end
+-- Network strings registered in schema/sv_netstrings.lua
 
 -- ============================================================================
 -- DATA TABLES

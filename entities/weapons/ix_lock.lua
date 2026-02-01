@@ -46,11 +46,7 @@ SWEP.BaseInstallTime = 6  -- 6 seconds base, toolkit reduces this
 -- NETWORKING
 -- ============================================================================
 
-if SERVER then
-    util.AddNetworkString("ixLockInstall")
-    util.AddNetworkString("ixLockProgress")
-    util.AddNetworkString("ixLockCancel")
-end
+-- Network strings registered in schema/sv_netstrings.lua
 
 -- ============================================================================
 -- DATA TABLES

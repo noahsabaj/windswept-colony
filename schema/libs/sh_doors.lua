@@ -106,9 +106,6 @@ end
 -- ============================================================================
 
 if SERVER then
-    util.AddNetworkString("ixDoorsFrameUpdate")
-    util.AddNetworkString("ixDoorsSync")
-
     -- Capture all visual properties from an entity
     function ix.doors.CaptureVisualData(ent)
         local data = {

@@ -12,10 +12,6 @@ ITEM.invHeight = 5
 -- Wallet designation: "both", "cash", or "coins"
 -- Stored in item data as "designation"
 
-if SERVER then
-    util.AddNetworkString("ixBagDrop")
-end
-
 function ITEM:GetDescription()
     local desc = self.description
     local designation = self:GetData("designation", "both")
