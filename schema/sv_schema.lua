@@ -17,6 +17,62 @@ resource.AddWorkshop("741923773")   -- Assorted Coins
 -- Database migrations
 ix.util.Include("sv_migration.lua")
 
+-- Network strings for wallet/money system
+util.AddNetworkString("ixMoneyDestroy")
+
+-- Money destroy handler
+net.Receive("ixMoneyDestroy", function(len, client)
+    local itemID = net.ReadUInt(32)
+    local amount = net.ReadUInt(32)
+
+    local item = ix.item.instances[itemID]
+    if not item then return end
+
+    -- Validate ownership
+    local character = client:GetCharacter()
+    if not character then return end
+
+    local inventory = character:GetInventory()
+    if not inventory then return end
+
+    -- Check item is in player's inventory
+    if item:GetInventory() ~= inventory:GetID() then
+        -- Check if it's in a bag owned by player
+        local itemInv = ix.item.inventories[item:GetInventory()]
+        if not itemInv or itemInv:GetOwner() ~= character:GetID() then
+            return
+        end
+    end
+
+    -- Validate it's a currency item
+    if not item.isCurrency then return end
+
+    local currentQty = item:GetData("quantity", 1)
+    amount = math.min(amount, currentQty)
+
+    if amount <= 0 then return end
+
+    if amount >= currentQty then
+        -- Destroy entire stack
+        item:Remove()
+
+        if item.currencyValue == 100 then
+            client:NotifyLocalized("destroyedCash", "$" .. amount)
+        else
+            client:NotifyLocalized("destroyedCoins", amount .. "¢")
+        end
+    else
+        -- Reduce stack
+        item:SetData("quantity", currentQty - amount)
+
+        if item.currencyValue == 100 then
+            client:NotifyLocalized("destroyedCash", "$" .. amount)
+        else
+            client:NotifyLocalized("destroyedCoins", amount .. "¢")
+        end
+    end
+end)
+
 -- Disable faction whitelist requirements
 -- All factions are open for transfer without needing /PlyWhitelist first
 -- Players start factionless (no faction) and admins use /PlyTransfer to assign factions

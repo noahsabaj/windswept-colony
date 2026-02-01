@@ -250,4 +250,8 @@ LANGUAGE = {
     doorSpawned = "Door spawned.",
     doorSpawnFailed = "Failed to spawn door.",
     doorItemsGiven = "Door system test items added to inventory.",
+
+    -- Money System
+    destroyedCash = "You destroyed %s.",
+    destroyedCoins = "You destroyed %s.",
 }

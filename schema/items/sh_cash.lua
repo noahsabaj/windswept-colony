@@ -145,3 +145,39 @@ ITEM.functions.MergeWith = {
         return false
     end
 }
+
+ITEM.functions.Destroy = {
+    name = "Destroy",
+    tip = "Destroy this cash permanently.",
+    icon = "icon16/cross.png",
+    OnRun = function(item)
+        return false -- Handled via net message
+    end,
+    OnClick = function(item)
+        local quantity = item:GetData("quantity", 1)
+
+        Derma_StringRequest(
+            "Destroy Cash",
+            "How many dollars do you want to destroy?",
+            tostring(quantity),
+            function(text)
+                local amount = tonumber(text)
+                if not amount or amount <= 0 then return end
+
+                net.Start("ixMoneyDestroy")
+                    net.WriteUInt(item:GetID(), 32)
+                    net.WriteUInt(math.floor(amount), 32)
+                net.SendToServer()
+            end,
+            nil,
+            "Destroy",
+            "Cancel"
+        )
+
+        return false
+    end,
+    OnCanRun = function(item)
+        if IsValid(item.entity) then return false end
+        return true
+    end
+}
