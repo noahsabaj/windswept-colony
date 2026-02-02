@@ -15,13 +15,24 @@
 
 ITEM.name = "Lock"
 ITEM.description = "A programmed lock."
-ITEM.model = "models/props_c17/tools_pliers01a.mdl"  -- Placeholder model
+ITEM.model = "models/props_c17/tools_pliers01a.mdl"
 ITEM.width = 1
 ITEM.height = 1
 ITEM.category = "Keys & Locks"
 ITEM.noBusiness = true
 ITEM.class = "ix_lock"
 ITEM.weaponCategory = "lock"
+ITEM.base = "base_equippable"
+
+-- Equippable configuration
+ITEM.equipWeaponClass = "ix_lock"
+ITEM.equipPlayerKey = "ixLockItem"
+ITEM.equipNotifyKey = "lockEquipped"
+ITEM.equipSound = "physics/metal/metal_solid_impact_soft3.wav"
+ITEM.equipSoundVolume = 0.5
+ITEM.unequipSoundVolume = 0.4
+ITEM.equipTip = "Hold the lock to install it on a door."
+ITEM.unequipTip = "Put the lock away."
 
 -- Maximum keyings a lock can accept
 ITEM.maxKeyings = 3
@@ -57,6 +68,11 @@ function ITEM:CanAddKeying()
     return #keyings < self.maxKeyings
 end
 
+-- Additional equip check: must be programmed
+function ITEM:CanEquip()
+    return self:IsProgrammed()
+end
+
 -- Override GetName to show custom name or keying info
 function ITEM:GetName()
     if self:HasName() then
@@ -89,11 +105,10 @@ end
 
 if CLIENT then
     function ITEM:PaintOver(item, w, h)
-        local isEquipped = item:GetData("equipped")
         local durability = item:GetData("durability", 100)
 
         -- Draw equipped indicator (green dot)
-        if isEquipped then
+        if item:GetData("equipped") then
             surface.SetDrawColor(110, 255, 110, 200)
             surface.DrawRect(w - 14, h - 14, 8, 8)
         end
@@ -151,130 +166,6 @@ if CLIENT then
             nameRow:SetText("Label: " .. lockName)
             nameRow:SetBackgroundColor(Color(60, 100, 60))
             nameRow:SizeToContents()
-        end
-    end
-end
-
--- ============================================================================
--- ITEM FUNCTIONS
--- ============================================================================
-
--- Equip lock (to install on doors)
-ITEM.functions.Equip = {
-    name = "Equip",
-    tip = "Hold the lock to install it on a door.",
-    icon = "icon16/tick.png",
-    OnRun = function(item)
-        local client = item.player
-
-        -- Unequip any existing lock from this player
-        if client.ixLockItem and client.ixLockItem ~= item then
-            local oldItem = client.ixLockItem
-            oldItem:SetData("equipped", nil)
-        end
-
-        -- Strip existing lock SWEP if any
-        if client:HasWeapon("ix_lock") then
-            client:StripWeapon("ix_lock")
-        end
-
-        -- Set these BEFORE Give() so hooks see them
-        client.ixLockItem = item
-        item:SetData("equipped", true)
-
-        -- Give the SWEP
-        local weapon = client:Give("ix_lock")
-        if IsValid(weapon) then
-            weapon.ixItem = item
-            client:SelectWeapon("ix_lock")
-        end
-
-        client:EmitSound("physics/metal/metal_solid_impact_soft3.wav", 50)
-
-        return false
-    end,
-    OnCanRun = function(item)
-        if IsValid(item.entity) then return false end
-        if item:GetData("equipped") then return false end
-        if not item:IsProgrammed() then return false end
-        return true
-    end
-}
-
--- Unequip lock
-ITEM.functions.Unequip = {
-    name = "Unequip",
-    tip = "Put the lock away.",
-    icon = "icon16/cross.png",
-    OnRun = function(item)
-        local client = item.player
-
-        if client:HasWeapon("ix_lock") then
-            client:StripWeapon("ix_lock")
-        end
-
-        client.ixLockItem = nil
-        item:SetData("equipped", nil)
-
-        client:EmitSound("physics/metal/metal_solid_impact_soft3.wav", 50, 90)
-
-        return false
-    end,
-    OnCanRun = function(item)
-        return item:GetData("equipped") == true
-    end
-}
-
--- ============================================================================
--- HOOKS
--- ============================================================================
-
-function ITEM.postHooks.drop(item, result)
-    if item:GetData("equipped") then
-        local client = item:GetOwner()
-        if IsValid(client) then
-            if client:HasWeapon("ix_lock") then
-                client:StripWeapon("ix_lock")
-            end
-            client.ixLockItem = nil
-        end
-        item:SetData("equipped", nil)
-    end
-end
-
-function ITEM:OnTransferred(oldInventory, newInventory)
-    if self:GetData("equipped") then
-        local oldOwner = oldInventory and oldInventory.GetOwner and oldInventory:GetOwner()
-        if IsValid(oldOwner) then
-            if oldOwner:HasWeapon("ix_lock") then
-                oldOwner:StripWeapon("ix_lock")
-            end
-            oldOwner.ixLockItem = nil
-        end
-        self:SetData("equipped", nil)
-    end
-end
-
-function ITEM:CanTransfer(oldInventory, newInventory)
-    if newInventory and self:GetData("equipped") then
-        local owner = self:GetOwner()
-        if IsValid(owner) then
-            owner:NotifyLocalized("lockEquipped")
-        end
-        return false
-    end
-    return true
-end
-
-function ITEM:OnLoadout()
-    if self:GetData("equipped") then
-        local client = self.player
-        if not IsValid(client) then return end
-
-        local weapon = client:Give("ix_lock", true)
-        if IsValid(weapon) then
-            weapon.ixItem = self
-            client.ixLockItem = self
         end
     end
 end

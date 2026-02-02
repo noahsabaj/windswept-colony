@@ -24,13 +24,22 @@
 
 ITEM.name = "Toolkit"
 ITEM.description = "A toolkit for door and lock work."
-ITEM.model = "models/props_c17/tools_wrench01a.mdl"  -- Placeholder
+ITEM.model = "models/props_c17/tools_wrench01a.mdl"
 ITEM.width = 1
 ITEM.height = 1
 ITEM.category = "Tools"
 ITEM.noBusiness = true
 ITEM.class = "ix_toolkit"
 ITEM.weaponCategory = "toolkit"
+ITEM.base = "base_equippable"
+
+-- Equippable configuration
+ITEM.equipWeaponClass = "ix_toolkit"
+ITEM.equipPlayerKey = "ixToolkitItem"
+ITEM.equipNotifyKey = "toolkitEquipped"
+ITEM.equipSound = "physics/metal/metal_box_impact_soft1.wav"
+ITEM.equipTip = "Hold the toolkit to work on doors and locks."
+ITEM.unequipTip = "Put the toolkit away."
 
 -- Size configurations
 ITEM.sizes = {
@@ -171,13 +180,12 @@ end
 
 if CLIENT then
     function ITEM:PaintOver(item, w, h)
-        local isEquipped = item:GetData("equipped")
         local durability = item:GetData("durability", item:GetMaxDurability())
         local maxDurability = item:GetMaxDurability()
         local durPercent = (durability / maxDurability) * 100
 
-        -- Draw equipped indicator (green dot)
-        if isEquipped then
+        -- Draw equipped indicator (green dot) - same as base
+        if item:GetData("equipped") then
             surface.SetDrawColor(110, 255, 110, 200)
             surface.DrawRect(w - 14, h - 14, 8, 8)
         end
@@ -204,7 +212,6 @@ if CLIENT then
 
     function ITEM:PopulateTooltip(tooltip)
         local sizeConfig = self:GetSizeConfig()
-        local qualityConfig = self:GetQualityConfig()
         local durability = self:GetDurability()
         local maxDurability = self:GetMaxDurability()
 
@@ -241,127 +248,8 @@ if CLIENT then
 end
 
 -- ============================================================================
--- ITEM FUNCTIONS
--- ============================================================================
-
--- Equip toolkit
-ITEM.functions.Equip = {
-    name = "Equip",
-    tip = "Hold the toolkit to work on doors and locks.",
-    icon = "icon16/tick.png",
-    OnRun = function(item)
-        local client = item.player
-
-        -- Unequip any existing toolkit from this player
-        if client.ixToolkitItem and client.ixToolkitItem ~= item then
-            local oldItem = client.ixToolkitItem
-            oldItem:SetData("equipped", nil)
-        end
-
-        -- Strip existing toolkit SWEP if any
-        if client:HasWeapon("ix_toolkit") then
-            client:StripWeapon("ix_toolkit")
-        end
-
-        -- Set these BEFORE Give() so hooks see them
-        client.ixToolkitItem = item
-        item:SetData("equipped", true)
-
-        -- Give the SWEP
-        local weapon = client:Give("ix_toolkit")
-        if IsValid(weapon) then
-            weapon.ixItem = item
-            client:SelectWeapon("ix_toolkit")
-        end
-
-        client:EmitSound("physics/metal/metal_box_impact_soft1.wav", 50)
-
-        return false
-    end,
-    OnCanRun = function(item)
-        if IsValid(item.entity) then return false end
-        if item:GetData("equipped") then return false end
-        return true
-    end
-}
-
--- Unequip toolkit
-ITEM.functions.Unequip = {
-    name = "Unequip",
-    tip = "Put the toolkit away.",
-    icon = "icon16/cross.png",
-    OnRun = function(item)
-        local client = item.player
-
-        if client:HasWeapon("ix_toolkit") then
-            client:StripWeapon("ix_toolkit")
-        end
-
-        client.ixToolkitItem = nil
-        item:SetData("equipped", nil)
-
-        client:EmitSound("physics/metal/metal_box_impact_soft1.wav", 50, 90)
-
-        return false
-    end,
-    OnCanRun = function(item)
-        return item:GetData("equipped") == true
-    end
-}
-
--- ============================================================================
 -- HOOKS
 -- ============================================================================
-
-function ITEM.postHooks.drop(item, result)
-    if item:GetData("equipped") then
-        local client = item:GetOwner()
-        if IsValid(client) then
-            if client:HasWeapon("ix_toolkit") then
-                client:StripWeapon("ix_toolkit")
-            end
-            client.ixToolkitItem = nil
-        end
-        item:SetData("equipped", nil)
-    end
-end
-
-function ITEM:OnTransferred(oldInventory, newInventory)
-    if self:GetData("equipped") then
-        local oldOwner = oldInventory and oldInventory.GetOwner and oldInventory:GetOwner()
-        if IsValid(oldOwner) then
-            if oldOwner:HasWeapon("ix_toolkit") then
-                oldOwner:StripWeapon("ix_toolkit")
-            end
-            oldOwner.ixToolkitItem = nil
-        end
-        self:SetData("equipped", nil)
-    end
-end
-
-function ITEM:CanTransfer(oldInventory, newInventory)
-    if newInventory and self:GetData("equipped") then
-        local owner = self:GetOwner()
-        if IsValid(owner) then
-            owner:NotifyLocalized("toolkitEquipped")
-        end
-        return false
-    end
-    return true
-end
-
-function ITEM:OnLoadout()
-    if self:GetData("equipped") then
-        local client = self.player
-        if not IsValid(client) then return end
-
-        local weapon = client:Give("ix_toolkit", true)
-        if IsValid(weapon) then
-            weapon.ixItem = self
-            client.ixToolkitItem = self
-        end
-    end
-end
 
 -- Initialize new toolkits with default durability
 function ITEM:OnInstanced(invID, x, y)

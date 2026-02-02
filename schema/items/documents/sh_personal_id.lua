@@ -16,11 +16,24 @@ ITEM.width = 1
 ITEM.height = 1
 ITEM.category = "Documents"
 ITEM.noBusiness = true -- Cannot be purchased, given on character creation
+ITEM.base = "base_equippable"
 
 -- ID Card models: https://steamcommunity.com/sharedfiles/filedetails/?id=2179653848
 if SERVER then
     resource.AddWorkshop("2179653848")
 end
+
+-- Equippable configuration
+ITEM.equipWeaponClass = "ix_personalid"
+ITEM.equipPlayerKey = "ixPersonalIDItem"
+ITEM.equipNotifyKey = "idCardEquipped"
+ITEM.equipSound = "physics/cardboard/cardboard_box_impact_soft1.wav"
+ITEM.equipTip = "Hold the ID card in your hand."
+ITEM.unequipTip = "Put the ID card away."
+
+-- ============================================================================
+-- ID CARD DATA
+-- ============================================================================
 
 -- Build the data table for the ID card UI
 function ITEM:GetIDCardData()
@@ -142,140 +155,4 @@ function ITEM:GetDescription()
     end
 
     return table.concat(lines, "\n")
-end
-
--- ============================================================================
--- CLIENT VISUALS
--- ============================================================================
-
-if CLIENT then
-    function ITEM:PaintOver(item, w, h)
-        local isEquipped = item:GetData("equipped")
-
-        -- Draw equipped indicator (green dot)
-        if isEquipped then
-            surface.SetDrawColor(110, 255, 110, 200)
-            surface.DrawRect(w - 14, h - 14, 8, 8)
-        end
-    end
-end
-
--- ============================================================================
--- ITEM FUNCTIONS - EQUIP/UNEQUIP
--- ============================================================================
-
-ITEM.functions.Equip = {
-    name = "Equip",
-    tip = "Hold the ID card in your hand.",
-    icon = "icon16/vcard.png",
-    OnRun = function(item)
-        local client = item.player
-
-        -- Unequip any existing ID card from this player
-        if client.ixPersonalIDItem and client.ixPersonalIDItem ~= item then
-            local oldItem = client.ixPersonalIDItem
-            oldItem:SetData("equipped", nil)
-        end
-
-        -- Strip existing ID SWEP if any
-        if client:HasWeapon("ix_personalid") then
-            client:StripWeapon("ix_personalid")
-        end
-
-        -- Give the SWEP
-        local weapon = client:Give("ix_personalid")
-        if IsValid(weapon) then
-            weapon.ixItem = item
-            client:SelectWeapon("ix_personalid")
-        end
-
-        client.ixPersonalIDItem = item
-        item:SetData("equipped", true)
-
-        client:EmitSound("physics/cardboard/cardboard_box_impact_soft1.wav", 50)
-
-        return false
-    end,
-    OnCanRun = function(item)
-        if IsValid(item.entity) then return false end
-        if item:GetData("equipped") then return false end
-        return true
-    end
-}
-
-ITEM.functions.Unequip = {
-    name = "Unequip",
-    tip = "Put the ID card away.",
-    icon = "icon16/cross.png",
-    OnRun = function(item)
-        local client = item.player
-
-        if client:HasWeapon("ix_personalid") then
-            client:StripWeapon("ix_personalid")
-        end
-
-        client.ixPersonalIDItem = nil
-        item:SetData("equipped", nil)
-
-        client:EmitSound("physics/cardboard/cardboard_box_impact_soft1.wav", 50, 90)
-
-        return false
-    end,
-    OnCanRun = function(item)
-        return item:GetData("equipped") == true
-    end
-}
-
--- ============================================================================
--- HOOKS
--- ============================================================================
-
-function ITEM.postHooks.drop(item, result)
-    if item:GetData("equipped") then
-        local client = item:GetOwner()
-        if IsValid(client) then
-            if client:HasWeapon("ix_personalid") then
-                client:StripWeapon("ix_personalid")
-            end
-            client.ixPersonalIDItem = nil
-        end
-        item:SetData("equipped", nil)
-    end
-end
-
-function ITEM:OnTransferred(oldInventory, newInventory)
-    if self:GetData("equipped") then
-        local oldOwner = oldInventory and oldInventory.GetOwner and oldInventory:GetOwner()
-        if IsValid(oldOwner) then
-            if oldOwner:HasWeapon("ix_personalid") then
-                oldOwner:StripWeapon("ix_personalid")
-            end
-            oldOwner.ixPersonalIDItem = nil
-        end
-        self:SetData("equipped", nil)
-    end
-end
-
-function ITEM:CanTransfer(oldInventory, newInventory)
-    if newInventory and self:GetData("equipped") then
-        local owner = self:GetOwner()
-        if IsValid(owner) then
-            owner:NotifyLocalized("idCardEquipped")
-        end
-        return false
-    end
-    return true
-end
-
-function ITEM:OnLoadout()
-    if self:GetData("equipped") then
-        local client = self.player
-        if not IsValid(client) then return end
-
-        local weapon = client:Give("ix_personalid", true)
-        if IsValid(weapon) then
-            weapon.ixItem = self
-            client.ixPersonalIDItem = self
-        end
-    end
 end

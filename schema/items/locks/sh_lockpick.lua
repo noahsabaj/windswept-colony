@@ -18,13 +18,22 @@
 
 ITEM.name = "Lockpick"
 ITEM.description = "A tool for picking locks."
-ITEM.model = "models/props_c17/tools_pliers01a.mdl"  -- Placeholder
+ITEM.model = "models/props_c17/tools_pliers01a.mdl"
 ITEM.width = 1
 ITEM.height = 1
 ITEM.category = "Tools"
 ITEM.noBusiness = true
 ITEM.class = "ix_lockpick"
 ITEM.weaponCategory = "lockpick"
+ITEM.base = "base_equippable"
+
+-- Equippable configuration
+ITEM.equipWeaponClass = "ix_lockpick"
+ITEM.equipPlayerKey = "ixLockpickItem"
+ITEM.equipNotifyKey = "lockpickEquipped"
+ITEM.equipSound = "physics/metal/metal_solid_impact_soft1.wav"
+ITEM.equipTip = "Hold the lockpick to pick locks."
+ITEM.unequipTip = "Put the lockpick away."
 
 -- Quality configurations
 ITEM.qualities = {
@@ -110,10 +119,8 @@ end
 
 if CLIENT then
     function ITEM:PaintOver(item, w, h)
-        local isEquipped = item:GetData("equipped")
-
-        -- Draw equipped indicator (green dot)
-        if isEquipped then
+        -- Draw equipped indicator (green dot) - same as base
+        if item:GetData("equipped") then
             surface.SetDrawColor(110, 255, 110, 200)
             surface.DrawRect(w - 14, h - 14, 8, 8)
         end
@@ -152,128 +159,5 @@ if CLIENT then
         attemptsRow:SetText("Attempts: " .. config.maxAttempts)
         attemptsRow:SetBackgroundColor(Color(60, 60, 80))
         attemptsRow:SizeToContents()
-    end
-end
-
--- ============================================================================
--- ITEM FUNCTIONS
--- ============================================================================
-
--- Equip lockpick
-ITEM.functions.Equip = {
-    name = "Equip",
-    tip = "Hold the lockpick to pick locks.",
-    icon = "icon16/tick.png",
-    OnRun = function(item)
-        local client = item.player
-
-        -- Unequip any existing lockpick from this player
-        if client.ixLockpickItem and client.ixLockpickItem ~= item then
-            local oldItem = client.ixLockpickItem
-            oldItem:SetData("equipped", nil)
-        end
-
-        -- Strip existing lockpick SWEP if any
-        if client:HasWeapon("ix_lockpick") then
-            client:StripWeapon("ix_lockpick")
-        end
-
-        -- Set these BEFORE Give() so hooks see them
-        client.ixLockpickItem = item
-        item:SetData("equipped", true)
-
-        -- Give the SWEP
-        local weapon = client:Give("ix_lockpick")
-        if IsValid(weapon) then
-            weapon.ixItem = item
-            client:SelectWeapon("ix_lockpick")
-        end
-
-        client:EmitSound("physics/metal/metal_solid_impact_soft1.wav", 50)
-
-        return false
-    end,
-    OnCanRun = function(item)
-        if IsValid(item.entity) then return false end
-        if item:GetData("equipped") then return false end
-        return true
-    end
-}
-
--- Unequip lockpick
-ITEM.functions.Unequip = {
-    name = "Unequip",
-    tip = "Put the lockpick away.",
-    icon = "icon16/cross.png",
-    OnRun = function(item)
-        local client = item.player
-
-        if client:HasWeapon("ix_lockpick") then
-            client:StripWeapon("ix_lockpick")
-        end
-
-        client.ixLockpickItem = nil
-        item:SetData("equipped", nil)
-
-        client:EmitSound("physics/metal/metal_solid_impact_soft1.wav", 50, 90)
-
-        return false
-    end,
-    OnCanRun = function(item)
-        return item:GetData("equipped") == true
-    end
-}
-
--- ============================================================================
--- HOOKS
--- ============================================================================
-
-function ITEM.postHooks.drop(item, result)
-    if item:GetData("equipped") then
-        local client = item:GetOwner()
-        if IsValid(client) then
-            if client:HasWeapon("ix_lockpick") then
-                client:StripWeapon("ix_lockpick")
-            end
-            client.ixLockpickItem = nil
-        end
-        item:SetData("equipped", nil)
-    end
-end
-
-function ITEM:OnTransferred(oldInventory, newInventory)
-    if self:GetData("equipped") then
-        local oldOwner = oldInventory and oldInventory.GetOwner and oldInventory:GetOwner()
-        if IsValid(oldOwner) then
-            if oldOwner:HasWeapon("ix_lockpick") then
-                oldOwner:StripWeapon("ix_lockpick")
-            end
-            oldOwner.ixLockpickItem = nil
-        end
-        self:SetData("equipped", nil)
-    end
-end
-
-function ITEM:CanTransfer(oldInventory, newInventory)
-    if newInventory and self:GetData("equipped") then
-        local owner = self:GetOwner()
-        if IsValid(owner) then
-            owner:NotifyLocalized("lockpickEquipped")
-        end
-        return false
-    end
-    return true
-end
-
-function ITEM:OnLoadout()
-    if self:GetData("equipped") then
-        local client = self.player
-        if not IsValid(client) then return end
-
-        local weapon = client:Give("ix_lockpick", true)
-        if IsValid(weapon) then
-            weapon.ixItem = self
-            client.ixLockpickItem = self
-        end
     end
 end
