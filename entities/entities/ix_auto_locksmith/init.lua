@@ -16,32 +16,97 @@ function ENT:Initialize()
     self:PhysicsInit(SOLID_VPHYSICS)
     self:SetMoveType(MOVETYPE_VPHYSICS)
     self:SetSolid(SOLID_VPHYSICS)
-    self:SetUseType(SIMPLE_USE)
+    self:SetUseType(CONTINUOUS_USE) -- For hold E detection
 
     local phys = self:GetPhysicsObject()
     if IsValid(phys) then
         phys:Wake()
-        phys:EnableMotion(false)
     end
 
     self:SetInUse(false)
+
+    -- Track hold E for pickup
+    self.holdEStart = {}
 end
 
 function ENT:Use(activator, caller)
     if not IsValid(activator) or not activator:IsPlayer() then return end
 
-    if self:GetInUse() and self:GetUser() ~= activator then
-        activator:NotifyLocalized("locksmithInUse")
+    -- Track hold E for pickup
+    if not self.holdEStart[activator] then
+        self.holdEStart[activator] = CurTime()
+    end
+
+    local holdTime = CurTime() - self.holdEStart[activator]
+    local pickupTime = ix.config.Get("itemPickupTime", 0.5)
+
+    -- Check if held long enough for pickup
+    if holdTime >= pickupTime then
+        self:PickupByPlayer(activator)
+        self.holdEStart[activator] = nil
+        return
+    end
+end
+
+-- Check for press release and handle actions
+function ENT:Think()
+    for ply, startTime in pairs(self.holdEStart or {}) do
+        if not IsValid(ply) then
+            self.holdEStart[ply] = nil
+            continue
+        end
+
+        -- Check if player released E
+        if not ply:KeyDown(IN_USE) then
+            local holdTime = CurTime() - startTime
+            local pickupTime = ix.config.Get("itemPickupTime", 0.5)
+
+            -- Short press (released before pickup time) = open UI
+            if holdTime < pickupTime then
+                if self:GetInUse() and self:GetUser() ~= ply then
+                    ply:NotifyLocalized("locksmithInUse")
+                else
+                    -- Open locksmith UI
+                    self:SetInUse(true)
+                    self:SetUser(ply)
+
+                    net.Start("ixLocksmithOpen")
+                        net.WriteEntity(self)
+                    net.Send(ply)
+                end
+            end
+
+            -- Clean up tracking
+            self.holdEStart[ply] = nil
+        end
+    end
+end
+
+function ENT:PickupByPlayer(client)
+    if not IsValid(client) then return end
+
+    local character = client:GetCharacter()
+    if not character then return end
+
+    local inventory = character:GetInventory()
+    if not inventory then return end
+
+    -- Check if there's room in inventory (locksmith_station is 2x1)
+    if not inventory:FindEmptySlot(2, 1) then
+        client:NotifyLocalized("inventoryFull")
         return
     end
 
-    -- Open locksmith UI
-    self:SetInUse(true)
-    self:SetUser(activator)
+    -- Close UI if someone is using it
+    if self:GetInUse() then
+        self:CloseForUser(self:GetUser())
+    end
 
-    net.Start("ixLocksmithOpen")
-        net.WriteEntity(self)
-    net.Send(activator)
+    -- Add item to inventory
+    inventory:Add("locksmith_station", 1)
+
+    -- Remove entity
+    self:Remove()
 end
 
 function ENT:CloseForUser(user)

@@ -118,18 +118,76 @@ end)
 -- RADIO VOLUME SLIDER
 -- ============================================================================
 
+-- Custom slider dialog (GMod doesn't have Derma_SliderRequest)
+local function OpenVolumeSlider(title, text, currentValue, minValue, maxValue, callback)
+    local frame = vgui.Create("DFrame")
+    frame:SetTitle(title)
+    frame:SetSize(300, 140)
+    frame:Center()
+    frame:MakePopup()
+    frame:SetBackgroundBlur(true)
+
+    local label = vgui.Create("DLabel", frame)
+    label:SetText(text)
+    label:SetFont("DermaDefaultBold")
+    label:SetPos(10, 30)
+    label:SizeToContents()
+
+    -- Use DSlider + DTextEntry for cleaner layout
+    local slider = vgui.Create("DSlider", frame)
+    slider:SetPos(10, 55)
+    slider:SetSize(200, 20)
+    slider:SetLockY(0.5)
+    slider:SetSlideX(currentValue / maxValue)
+
+    local valueEntry = vgui.Create("DTextEntry", frame)
+    valueEntry:SetPos(220, 55)
+    valueEntry:SetSize(50, 20)
+    valueEntry:SetNumeric(true)
+    valueEntry:SetValue(tostring(currentValue))
+
+    -- Sync slider to text entry
+    slider.OnValueChanged = function(self, x, y)
+        local val = math.Round(x * maxValue)
+        valueEntry:SetValue(tostring(val))
+    end
+
+    -- Sync text entry to slider
+    valueEntry.OnEnter = function(self)
+        local val = math.Clamp(tonumber(self:GetValue()) or 0, minValue, maxValue)
+        self:SetValue(tostring(val))
+        slider:SetSlideX(val / maxValue)
+    end
+
+    local okButton = vgui.Create("DButton", frame)
+    okButton:SetText("OK")
+    okButton:SetPos(200, 95)
+    okButton:SetSize(80, 25)
+    okButton.DoClick = function()
+        local val = math.Clamp(tonumber(valueEntry:GetValue()) or 0, minValue, maxValue)
+        callback(val)
+        frame:Close()
+    end
+
+    local cancelButton = vgui.Create("DButton", frame)
+    cancelButton:SetText("Cancel")
+    cancelButton:SetPos(110, 95)
+    cancelButton:SetSize(80, 25)
+    cancelButton.DoClick = function()
+        frame:Close()
+    end
+end
+
 net.Receive("ixRadioVolume", function()
     local itemID = net.ReadUInt(32)
     local currentVolume = net.ReadUInt(7)
 
-    -- Create volume slider dialog
-    Derma_SliderRequest(
+    OpenVolumeSlider(
         "Radio Volume",
         "Set receive volume (0-100%):",
         currentVolume,
         0,
         100,
-        0,  -- decimals
         function(value)
             net.Start("ixRadioVolumeSet")
             net.WriteUInt(itemID, 32)

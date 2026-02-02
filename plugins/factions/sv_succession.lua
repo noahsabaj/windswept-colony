@@ -440,9 +440,18 @@ function ix.factions.AnnounceResults(factionID, tallies, winnerCharID, winnerNam
     end
 end
 
--- Notify winners who were offline during vote completion
-hook.Add("PlayerLoadedCharacter", "ixCheckPendingPromotion", function(client, character, lastChar)
-    if not character then return end
+-- Check for pending election promotions for a character
+local function CheckPendingPromotion(client, character)
+    if not IsValid(client) or not character then return end
+    if client:GetCharacter() ~= character then return end  -- Character changed
+
+    -- Ensure migration is complete before querying
+    if not ix.factions.bootstrapComplete then
+        timer.Simple(2, function()
+            CheckPendingPromotion(client, character)
+        end)
+        return
+    end
 
     local charID = character:GetID()
 
@@ -453,6 +462,7 @@ hook.Add("PlayerLoadedCharacter", "ixCheckPendingPromotion", function(client, ch
     query:Where("promotion_applied", 0)  -- Only if they haven't been notified
     query:Callback(function(result)
         if not result or #result == 0 then return end
+        if not IsValid(client) then return end
 
         -- Found a vote they won while offline
         local row = result[1]
@@ -476,6 +486,22 @@ hook.Add("PlayerLoadedCharacter", "ixCheckPendingPromotion", function(client, ch
         updateQuery:Execute()
     end)
     query:Execute()
+end
+
+-- Notify winners who were offline during vote completion
+hook.Add("PlayerLoadedCharacter", "ixCheckPendingPromotion", function(client, character, lastChar)
+    if not character then return end
+
+    -- Wait for vote table migration to complete before querying promotion_applied column
+    if not ix.factions.bootstrapComplete then
+        -- Retry after migration should be complete
+        timer.Simple(3, function()
+            CheckPendingPromotion(client, character)
+        end)
+        return
+    end
+
+    CheckPendingPromotion(client, character)
 end)
 
 -- Load active votes from database on server start

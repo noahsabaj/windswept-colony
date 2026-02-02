@@ -1,10 +1,12 @@
 --[[
-    Factions Plugin - Database Migration
-    Bootstrap anchor and default classes on first run
+    Factions Plugin - Bootstrap & Schema Setup
+    - Seeds default faction classes on first run (anchor, static, default classes)
+    - Ensures vote table has required columns for offline promotion tracking
+    - Sets ix.factions.bootstrapComplete flag for other code to wait on
 ]]--
 
 ix.factions = ix.factions or {}
-ix.factions.migrations = ix.factions.migrations or {}
+ix.factions.bootstrapComplete = false  -- Set to true when schema setup is done
 
 function ix.factions.RunMigrations()
     -- Check migration version
@@ -153,23 +155,45 @@ end
 
 -- Migration: Add offline promotion columns to votes table
 function ix.factions.MigrateVotesTable()
-    -- Add anchor_class_id column if it doesn't exist
-    local query1 = mysql:RawQuery([[
-        ALTER TABLE ix_faction_votes
-        ADD COLUMN IF NOT EXISTS anchor_class_id INT NULL,
-        ADD COLUMN IF NOT EXISTS promotion_applied TINYINT(1) DEFAULT 0
-    ]])
-    query1:Callback(function(result, status, err)
-        if err then
-            -- Column might already exist, or syntax not supported - try individual statements
-            local q1 = mysql:RawQuery("ALTER TABLE ix_faction_votes ADD COLUMN anchor_class_id INT NULL")
-            q1:Execute()
+    -- SQLite doesn't support IF NOT EXISTS for ADD COLUMN
+    -- Use sql.Query directly for SQLite-specific PRAGMA query
+    local result = sql.Query("PRAGMA table_info(ix_faction_votes)")
 
-            local q2 = mysql:RawQuery("ALTER TABLE ix_faction_votes ADD COLUMN promotion_applied TINYINT(1) DEFAULT 0")
-            q2:Execute()
+    if not result then
+        -- Table might not exist yet, mark migration as complete anyway
+        ix.factions.bootstrapComplete = true
+        print("[Factions] Vote table migration complete (table not found)")
+        return
+    end
+
+    -- Build set of existing column names
+    local existingColumns = {}
+    for _, row in ipairs(result) do
+        existingColumns[row.name] = true
+    end
+
+    -- Add anchor_class_id if missing
+    if not existingColumns["anchor_class_id"] then
+        local success = sql.Query("ALTER TABLE ix_faction_votes ADD COLUMN anchor_class_id INT NULL")
+        if success ~= false then
+            print("[Factions] Added anchor_class_id column to ix_faction_votes")
+        else
+            print("[Factions] Failed to add anchor_class_id: " .. sql.LastError())
         end
-    end)
-    query1:Execute()
+    end
+
+    -- Add promotion_applied if missing
+    if not existingColumns["promotion_applied"] then
+        local success = sql.Query("ALTER TABLE ix_faction_votes ADD COLUMN promotion_applied INTEGER DEFAULT 0")
+        if success ~= false then
+            print("[Factions] Added promotion_applied column to ix_faction_votes")
+        else
+            print("[Factions] Failed to add promotion_applied: " .. sql.LastError())
+        end
+    end
+
+    ix.factions.bootstrapComplete = true
+    print("[Factions] Vote table migration complete")
 end
 
 -- Run on server start

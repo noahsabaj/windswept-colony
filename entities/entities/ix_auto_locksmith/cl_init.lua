@@ -26,7 +26,8 @@ end
 -- Throttled eye trace to reduce per-frame overhead
 local locksmithHintCache = {
     ent = nil,
-    text = nil,
+    text1 = nil,
+    text2 = nil,
     lastCheck = 0
 }
 local LOCKSMITH_HINT_INTERVAL = 0.1  -- Check every 0.1 seconds
@@ -44,22 +45,28 @@ hook.Add("HUDPaint", "ixLocksmithHint", function()
 
         if not IsValid(ent) or ent:GetClass() ~= "ix_auto_locksmith" or ply:GetPos():DistToSqr(ent:GetPos()) > (150 * 150) then
             locksmithHintCache.ent = nil
-            locksmithHintCache.text = nil
+            locksmithHintCache.text1 = nil
+            locksmithHintCache.text2 = nil
             return
         end
 
         locksmithHintCache.ent = ent
         if ent:GetInUse() and ent:GetUser() ~= ply then
-            locksmithHintCache.text = "Machine is in use"
+            locksmithHintCache.text1 = "Machine is in use"
+            locksmithHintCache.text2 = nil
         else
-            locksmithHintCache.text = "Press E to use Locksmith"
+            locksmithHintCache.text1 = "Press E to use Locksmith"
+            locksmithHintCache.text2 = "Hold E to pick up"
         end
     end
 
     -- Draw cached result
-    if locksmithHintCache.ent and locksmithHintCache.text then
+    if locksmithHintCache.ent and locksmithHintCache.text1 then
         local scrW, scrH = ScrW(), ScrH()
-        draw.SimpleText(locksmithHintCache.text, "ixSmallFont", scrW / 2, scrH * 0.6, Color(255, 255, 255, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+        draw.SimpleText(locksmithHintCache.text1, "ixSmallFont", scrW / 2, scrH * 0.6, Color(255, 255, 255, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+        if locksmithHintCache.text2 then
+            draw.SimpleText(locksmithHintCache.text2, "ixSmallFont", scrW / 2, scrH * 0.6 + 20, Color(200, 200, 200, 150), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+        end
     end
 end)
 
