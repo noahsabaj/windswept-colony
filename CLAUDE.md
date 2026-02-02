@@ -170,6 +170,12 @@ garrysmod/addons/
   - **Amplitude-based distance**: Voice range scales with how loud you speak. Whisper ~100u, normal ~300u, yelling ~800u.
   - **Uses `Player:VoiceVolume()`**: Returns 0-1 amplitude, updated every 0.1 seconds while speaking.
 
+- **Faction Permissions** (`plugins/factions/sh_factionperms.lua`): Class-based permission system for faction management.
+  - **Rank rules**: Rank 255 (anchor) = all permissions, Rank 0 (default) = none, Ranks 1-254 = based on `classData.permissions` table.
+  - **Rank scope**: Can only affect ranks below yours (`CanAffectRank(char, targetRank)` returns `myRank > targetRank`).
+  - **9 permissions**: `CLASS_CREATE`, `CLASS_DELETE`, `CLASS_UPDATE`, `CLASS_ASSIGN`, `PERM_GRANT`, `PERM_REVOKE`, `FACTION_INVITE`, `FACTION_REMOVE`, `FACTION_INFO`.
+  - **API**: `ix.factionperms.HasPermission(char, perm)`, `ix.factionperms.GetMaxAssignableRank(char)`, `ix.factionperms.CanAffectRank(char, rank)`.
+
 ## Item Base Classes
 
 ### base_battery_device (`schema/items/base/sh_battery_device.lua`)
