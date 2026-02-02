@@ -13,6 +13,12 @@ resource.AddWorkshop("3478998917")  -- TFA INS2 Weapons Pack (Model 10 revolver,
 resource.AddWorkshop("1376312181")  -- TFA INS2 KA-BAR Combat Knife
 resource.AddWorkshop("3624686503")  -- Citizen Clothing Overhaul
 resource.AddWorkshop("741923773")   -- Assorted Coins
+resource.AddWorkshop("635535045")   -- Handheld Radio Model (c_model + w_model)
+
+-- Disable TFA weapon inspection menu (opens on C key)
+-- This menu shows weapon stats, damage graphs, and allows swapping ammo types
+-- which violates our scarcity principle (nothing appears from nowhere)
+RunConsoleCommand("sv_tfa_cmenu", "0")
 
 -- Database migrations
 ix.util.Include("sv_migration.lua")
