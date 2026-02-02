@@ -22,6 +22,21 @@ LANGUAGE = {
     radioRequired = "You need a radio to do that.",
     invalidFrequency = "Invalid frequency format. Use ###.# (e.g., 100.0)",
     radioHandsUp = "You can't transmit with your hands up.",
+    radioNoBattery = "No battery inserted.",
+    radioBatteryDepleted = "Radio battery depleted.",
+    radioBatteryLoaded = "Battery loaded (%dup).",
+    radioBatteryEjected = "Battery ejected.",
+    radioAutoLoaded = "Auto-loaded battery (%dup).",
+    radioSlotFull = "The radio already has a battery loaded.",
+    radioRequiresFull = "This radio requires a fully charged battery.",
+    radioVolumeSet = "Volume set to %d%%.",
+    radioTransmitting = "Transmitting...",
+    radioCannotTransmit = "Cannot transmit right now.",
+
+    -- Stationary Radio
+    stationaryRadioInUse = "Console is in use.",
+    stationaryRadioTooFar = "You moved too far from the console.",
+    stationaryRadioNoTx = "No transmit channels enabled.",
 
     -- Battery
     batteryFull = "Battery is fully charged.",
@@ -138,12 +153,16 @@ LANGUAGE = {
     lanternSlotFull = "The lantern already has a battery loaded.",
     lanternCantPlace = "Can't place lantern here.",
 
+    -- Binoculars
+    binocularsEquipped = "Unequip the binoculars first.",
+
     -- Description Editing
     descEditDisabled = "Physical descriptions cannot be manually edited.",
 
     -- Weapons/Ammo
     noAmmoToLoad = "You don't have any ammunition to load.",
     mustHoldWeapon = "You must be holding the weapon to load it.",
+    batteringRamEquipped = "Unequip the battering ram first.",
 
     -- Key System
     keyNoDoor = "No door in front of you.",

@@ -227,3 +227,381 @@ ix.currency.HandlePickup = function(client, entity)
         client:NotifyLocalized("inventoryFull")
     end
 end
+
+-- ============================================================================
+-- RADIO VOICE SYSTEM
+-- ============================================================================
+
+-- Track who is currently transmitting on radio
+Schema.radioTransmitters = Schema.radioTransmitters or {}
+
+-- Constants for voice distance scaling
+local BASE_VOICE_RANGE = 600  -- Helix default voiceDistance
+local BASE_EAVESDROP_RANGE = 400
+
+-- Get player's active radio item
+local function GetActiveRadio(client)
+    if not IsValid(client) then return nil end
+
+    local character = client:GetCharacter()
+    if not character then return nil end
+
+    -- Quick check using cached flag
+    if not character:GetData("ixHasActiveRadio") then return nil end
+
+    local inventory = character:GetInventory()
+    if not inventory then return nil end
+
+    local radios = inventory:GetItemsByUniqueID("handheld_radio", true)
+    for _, radio in ipairs(radios) do
+        if radio:GetData("enabled") and radio:CanOperate() then
+            return radio
+        end
+    end
+
+    return nil
+end
+
+-- Get radio on a ragdoll entity (dead player)
+local function GetRagdollRadio(ragdoll)
+    if not IsValid(ragdoll) then return nil end
+
+    -- Check if this is a Helix ragdoll with inventory
+    local charID = ragdoll.ixCharID
+    if not charID then return nil end
+
+    -- Find inventory by character ID
+    for _, inv in pairs(ix.item.inventories) do
+        if inv:GetOwner() == charID then
+            local radios = inv:GetItemsByUniqueID("handheld_radio", true)
+            for _, radio in ipairs(radios) do
+                if radio:GetData("enabled") and radio:CanOperate() then
+                    return radio
+                end
+            end
+            break
+        end
+    end
+
+    return nil
+end
+
+-- Net receiver: Player started transmitting
+net.Receive("ixRadioVoiceStart", function(len, client)
+    if not IsValid(client) then return end
+
+    -- Check player can transmit
+    if not client:Alive() then return end
+    if client:GetNetVar("ixKnocked") then return end
+    if client:GetNetVar("gagged") then return end
+    if client:GetNetVar("ixRestricted") then return end
+
+    local radio = GetActiveRadio(client)
+    if not radio then return end
+
+    -- Store transmission state
+    Schema.radioTransmitters[client] = {
+        frequency = radio:GetData("frequency", "100.0"),
+        startTime = CurTime(),
+        radio = radio
+    }
+end)
+
+-- Net receiver: Player stopped transmitting
+net.Receive("ixRadioVoiceStop", function(len, client)
+    if not IsValid(client) then return end
+
+    local txData = Schema.radioTransmitters[client]
+    if txData then
+        -- Calculate transmission duration and drain battery
+        local duration = CurTime() - txData.startTime
+        if txData.radio and duration > 0 then
+            txData.radio:DrainActive(duration)
+        end
+
+        Schema.radioTransmitters[client] = nil
+    end
+end)
+
+-- Net receiver: Set radio volume
+net.Receive("ixRadioVolumeSet", function(len, client)
+    if not IsValid(client) then return end
+
+    local itemID = net.ReadUInt(32)
+    local volume = net.ReadUInt(7)
+
+    local item = ix.item.instances[itemID]
+    if not item or item.uniqueID ~= "handheld_radio" then return end
+
+    -- Verify ownership
+    local character = client:GetCharacter()
+    if not character then return end
+
+    local inventory = character:GetInventory()
+    if not inventory then return end
+
+    if item.invID ~= inventory:GetID() then return end
+
+    -- Set volume
+    item:SetData("volume", math.Clamp(volume, 0, 100))
+    client:NotifyLocalized("radioVolumeSet", volume)
+end)
+
+-- Clean up transmitter on disconnect
+hook.Add("PlayerDisconnected", "ixRadioTransmitCleanup", function(client)
+    Schema.radioTransmitters[client] = nil
+end)
+
+-- Drain battery for voice receivers (runs every second while transmissions are active)
+timer.Create("ixRadioVoiceReceiverDrain", 1, 0, function()
+    -- Skip if no active transmitters
+    if table.IsEmpty(Schema.radioTransmitters) then return end
+
+    -- For each frequency being transmitted on, find all receivers and drain their batteries
+    local frequencyDrained = {}  -- Track which player+frequency combos we've drained
+
+    for transmitter, txData in pairs(Schema.radioTransmitters) do
+        if not IsValid(transmitter) then
+            Schema.radioTransmitters[transmitter] = nil
+            continue
+        end
+
+        local frequency = txData.frequency
+
+        -- Find all receivers on this frequency
+        for _, ply in ipairs(player.GetAll()) do
+            if ply == transmitter then continue end
+
+            local drainKey = ply:SteamID64() .. "_" .. frequency
+            if frequencyDrained[drainKey] then continue end  -- Already drained this player for this frequency
+
+            local radio = GetActiveRadio(ply)
+            if radio and radio:GetData("frequency", "100.0") == frequency then
+                -- Drain 1 second of active usage
+                radio:DrainActive(1)
+                frequencyDrained[drainKey] = true
+            end
+        end
+    end
+end)
+
+-- ============================================================================
+-- VOICE SYSTEM OVERRIDE
+-- Handles: radio transmission, amplitude-based distance, eavesdropping
+-- ============================================================================
+
+-- Store voice amplitude per player for distance calculations
+Schema.voiceAmplitudes = Schema.voiceAmplitudes or {}
+
+-- Track voice amplitude when player speaks
+hook.Add("PlayerStartVoice", "ixTrackVoiceAmplitude", function(client)
+    -- Reset amplitude tracking
+    Schema.voiceAmplitudes[client] = 0.5  -- Default to medium
+end)
+
+-- Update amplitude during voice (called by Think)
+timer.Create("ixVoiceAmplitudeUpdate", 0.1, 0, function()
+    for _, client in ipairs(player.GetAll()) do
+        if client:IsSpeaking() then
+            local amp = client:VoiceVolume() or 0.5
+            Schema.voiceAmplitudes[client] = amp
+        end
+    end
+end)
+
+-- Helper: Check if speaker is within voice range of a position (for stationary radio pickup)
+local function IsSpeakerInRangeOfPosition(speaker, pos, speakerAmplitude)
+    local voiceRange = 100 + (speakerAmplitude * 700)
+    local distSqr = speaker:GetPos():DistToSqr(pos)
+    return distSqr <= (voiceRange * voiceRange)
+end
+
+-- Helper: Get all frequencies a speaker is being broadcast on (via stationary radios)
+local function GetStationaryRadioBroadcastFrequencies(speaker, speakerAmplitude)
+    local frequencies = {}
+
+    for source, txData in pairs(Schema.radioTransmitters) do
+        if txData.isStationary and IsValid(txData.entity) then
+            -- Check if speaker is within voice range of the stationary radio
+            if IsSpeakerInRangeOfPosition(speaker, txData.entity:GetPos(), speakerAmplitude) then
+                -- Add all TX frequencies from this stationary radio
+                for freq, _ in pairs(txData.frequencies) do
+                    frequencies[freq] = txData.entity
+                end
+            end
+        end
+    end
+
+    return frequencies
+end
+
+-- Helper: Check if listener is at a stationary radio receiving on any of these frequencies
+local function IsListenerAtStationaryRadioReceiving(listener, frequencies)
+    for source, txData in pairs(Schema.radioTransmitters) do
+        if txData.isStationary and IsValid(txData.entity) and txData.user == listener then
+            -- Listener is at this stationary radio - check RX frequencies
+            local rxFreqs = txData.entity:GetRXFrequencies()
+            for freq, volume in pairs(rxFreqs) do
+                if frequencies[freq] then
+                    return true, volume
+                end
+            end
+        end
+    end
+    return false, 0
+end
+
+-- Main voice hearing logic
+function Schema:PlayerCanHearPlayersVoice(listener, speaker)
+    if not IsValid(listener) or not IsValid(speaker) then return false, false end
+    if listener == speaker then return true, false end  -- Always hear yourself
+
+    -- Dead players can't speak
+    if not speaker:Alive() then return false, false end
+
+    -- Get speaker's current voice amplitude
+    local speakerAmplitude = Schema.voiceAmplitudes[speaker] or 0.5
+
+    -- Check if speaker is transmitting on handheld radio
+    local txData = Schema.radioTransmitters[speaker]
+    local handheldFrequency = nil
+
+    if txData and not txData.isStationary then
+        -- Speaker is transmitting on handheld radio
+        handheldFrequency = txData.frequency
+    end
+
+    -- Check if speaker is being picked up by any stationary radios with MIC on
+    local stationaryFrequencies = GetStationaryRadioBroadcastFrequencies(speaker, speakerAmplitude)
+
+    -- Combine all frequencies speaker is being broadcast on
+    local allBroadcastFrequencies = {}
+    if handheldFrequency then
+        allBroadcastFrequencies[handheldFrequency] = true
+    end
+    for freq, _ in pairs(stationaryFrequencies) do
+        allBroadcastFrequencies[freq] = true
+    end
+
+    -- If speaker is being broadcast on any frequency, check if listener can receive
+    if not table.IsEmpty(allBroadcastFrequencies) then
+        -- Check if listener has handheld radio on any broadcast frequency
+        local listenerRadio = GetActiveRadio(listener)
+        if listenerRadio then
+            local listenerFreq = listenerRadio:GetData("frequency", "100.0")
+            if allBroadcastFrequencies[listenerFreq] then
+                return true, false  -- Direct radio reception
+            end
+        end
+
+        -- Check if listener is at a stationary radio receiving on any broadcast frequency
+        local atStationary, volume = IsListenerAtStationaryRadioReceiving(listener, allBroadcastFrequencies)
+        if atStationary then
+            return true, false  -- Receiving via stationary radio
+        end
+
+        -- Check eavesdropping: listener is near someone/something with a receiving radio
+        local listenerPos = listener:GetPos()
+        local closestReceiverDist = math.huge
+        local closestReceiverVolume = 0
+
+        -- Check living players with handheld radios
+        for _, ply in ipairs(player.GetAll()) do
+            if ply ~= speaker and ply ~= listener then
+                local radio = GetActiveRadio(ply)
+                if radio then
+                    local radioFreq = radio:GetData("frequency", "100.0")
+                    if allBroadcastFrequencies[radioFreq] then
+                        local dist = listenerPos:Distance(ply:GetPos())
+                        if dist < closestReceiverDist then
+                            closestReceiverDist = dist
+                            closestReceiverVolume = radio:GetData("volume", 50) / 100
+                        end
+                    end
+                end
+            end
+        end
+
+        -- Check ragdolls (knocked/dead)
+        for _, ent in ipairs(ents.FindByClass("prop_ragdoll")) do
+            local radio = GetRagdollRadio(ent)
+            if radio then
+                local radioFreq = radio:GetData("frequency", "100.0")
+                if allBroadcastFrequencies[radioFreq] then
+                    local dist = listenerPos:Distance(ent:GetPos())
+                    if dist < closestReceiverDist then
+                        closestReceiverDist = dist
+                        closestReceiverVolume = radio:GetData("volume", 50) / 100
+                    end
+                end
+            end
+        end
+
+        -- Check ix_knocked entities
+        for _, ent in ipairs(ents.FindByClass("ix_knocked")) do
+            if ent.GetInventory then
+                local inv = ent:GetInventory()
+                if inv then
+                    local radios = inv:GetItemsByUniqueID("handheld_radio", true)
+                    for _, radio in ipairs(radios) do
+                        if radio:GetData("enabled") and radio:CanOperate() then
+                            local radioFreq = radio:GetData("frequency", "100.0")
+                            if allBroadcastFrequencies[radioFreq] then
+                                local dist = listenerPos:Distance(ent:GetPos())
+                                if dist < closestReceiverDist then
+                                    closestReceiverDist = dist
+                                    closestReceiverVolume = radio:GetData("volume", 50) / 100
+                                end
+                                break
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        -- Check stationary radios (eavesdrop from their speaker)
+        for _, ent in ipairs(ents.FindByClass("ix_stationary_radio")) do
+            local rxFreqs = ent:GetRXFrequencies()
+            for freq, volume in pairs(rxFreqs) do
+                if allBroadcastFrequencies[freq] then
+                    local dist = listenerPos:Distance(ent:GetPos())
+                    if dist < closestReceiverDist then
+                        closestReceiverDist = dist
+                        closestReceiverVolume = volume / 100
+                    end
+                end
+            end
+        end
+
+        -- Calculate eavesdrop range: base * receiver_volume * transmitter_amplitude
+        local eavesdropRange = BASE_EAVESDROP_RANGE * closestReceiverVolume * speakerAmplitude
+
+        if closestReceiverDist < eavesdropRange then
+            return true, false  -- Can hear via eavesdrop
+        end
+
+        -- If speaker was ONLY broadcasting via radio (not also speaking locally), stop here
+        if handheldFrequency then
+            return false, false
+        end
+    end
+
+    -- Normal proximity voice with amplitude scaling
+    local listenerPos = listener:EyePos()
+    local speakerPos = speaker:EyePos()
+    local distance = listenerPos:Distance(speakerPos)
+
+    -- Scale voice range by amplitude
+    -- Whisper (0.0-0.2): 100-200 units
+    -- Normal (0.2-0.5): 200-400 units
+    -- Loud (0.5-0.8): 400-600 units
+    -- Yelling (0.8-1.0): 600-800 units
+    local voiceRange = 100 + (speakerAmplitude * 700)
+
+    if distance <= voiceRange then
+        return true, false
+    end
+
+    return false, false
+end

@@ -134,3 +134,20 @@ util.AddNetworkString("ixCameraSetZoom")
 util.AddNetworkString("ixCameraToggleFlash")
 util.AddNetworkString("ixCameraFlashToggled")
 util.AddNetworkString("ixCameraFlashEffect")
+
+-- =============================================================================
+-- RADIO SYSTEM (schema/items/equipment/sh_handheld_radio.lua)
+-- =============================================================================
+util.AddNetworkString("ixRadioVolume")        -- Server->Client: open volume slider
+util.AddNetworkString("ixRadioVolumeSet")     -- Client->Server: set volume value
+util.AddNetworkString("ixRadioVoiceStart")    -- Client->Server: started transmitting
+util.AddNetworkString("ixRadioVoiceStop")     -- Client->Server: stopped transmitting
+
+-- =============================================================================
+-- STATIONARY RADIO (entities/entities/ix_stationary_radio/)
+-- =============================================================================
+util.AddNetworkString("ixStationaryRadioOpen")      -- Server->Client: open UI for entity
+util.AddNetworkString("ixStationaryRadioClose")     -- Client->Server: client closed UI
+util.AddNetworkString("ixStationaryRadioConfig")    -- Client->Server: channel config change
+util.AddNetworkString("ixStationaryRadioTransmit")  -- Client->Server: text message
+util.AddNetworkString("ixStationaryRadioMic")       -- Client->Server: mic toggle

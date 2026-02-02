@@ -11,6 +11,11 @@ do
     local COMMAND = {}
     COMMAND.arguments = ix.type.text
 
+    -- Calculate speaking time from message length (15 chars/sec average)
+    local function GetSpeakingTime(message)
+        return math.max(0.5, string.len(message) / 15)
+    end
+
     function COMMAND:OnRun(client, message)
         local character = client:GetCharacter()
         local radios = character:GetInventory():GetItemsByUniqueID("handheld_radio", true)
@@ -25,6 +30,11 @@ do
         end
 
         if activeRadio then
+            -- Check radio has battery power
+            if not activeRadio:CanOperate() then
+                return "@radioNoBattery"
+            end
+
             -- Block transmission if hands up (can still receive)
             local wep = client:GetActiveWeapon()
             if IsValid(wep) and wep:GetClass() == "ix_handsup" then
@@ -32,8 +42,18 @@ do
             end
 
             if not client:IsRestricted() then
+                -- Calculate and drain battery for transmission
+                local speakingTime = GetSpeakingTime(message)
+                activeRadio:DrainActive(speakingTime)
+
+                -- Store message info for receiver battery drain
+                -- (receivers will drain in the chat class CanHear)
+                ix.radioMessageLength = string.len(message)
+
                 ix.chat.Send(client, "radio", message)
                 ix.chat.Send(client, "radio_eavesdrop", message)
+
+                ix.radioMessageLength = nil
             else
                 return "@notNow"
             end

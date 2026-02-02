@@ -17,6 +17,9 @@ ix.util.Include("libs/sh_doors.lua")
 -- Include wallet system library (for currency routing to wallets)
 ix.util.Include("libs/sh_wallet.lua")
 
+-- Include radio utilities library (for handheld and stationary radios)
+ix.util.Include("libs/sh_radio.lua")
+
 -- Include centralized constants (must be early, before other files use them)
 ix.util.Include("sh_constants.lua")
 
@@ -79,12 +82,29 @@ do
     CLASS.color = Color(75, 150, 50)  -- Green
     CLASS.format = "%s radios in: \"%s\""
 
+    -- Helper to get listener's active radio
+    local function GetListenerRadio(listener)
+        local listenerChar = listener:GetCharacter()
+        if not listenerChar then return nil end
+
+        local inventory = listenerChar:GetInventory()
+        if not inventory then return nil end
+
+        local radios = inventory:GetItemsByUniqueID("handheld_radio", true)
+        for _, radio in ipairs(radios) do
+            if radio:GetData("enabled") and radio:CanOperate() then
+                return radio
+            end
+        end
+
+        return nil
+    end
+
     function CLASS:CanHear(speaker, listener)
         local listenerChar = listener:GetCharacter()
         if not listenerChar then return false end
 
         -- Quick check: if listener has no active radio, skip everything
-        -- This cache is set when radios are toggled on/off (only one radio can be active)
         if not listenerChar:GetData("ixHasActiveRadio") then return false end
 
         local speakerChar = speaker:GetCharacter()
@@ -94,7 +114,19 @@ do
         local speakerFreq = speakerChar:GetData("frequency", "100.0")
         local listenerFreq = listenerChar:GetData("frequency", "100.0")
 
-        return speakerFreq == listenerFreq
+        if speakerFreq ~= listenerFreq then return false end
+
+        -- Get listener's radio and verify it can operate
+        local listenerRadio = GetListenerRadio(listener)
+        if not listenerRadio then return false end
+
+        -- Drain listener's battery for receiving (server-side only)
+        if SERVER and ix.radioMessageLength then
+            local speakingTime = math.max(0.5, ix.radioMessageLength / 15)
+            listenerRadio:DrainActive(speakingTime)
+        end
+
+        return true
     end
 
     -- Custom OnChatAdd: pass nil chatType so unrecognized speakers show as "Unknown"
