@@ -32,10 +32,4 @@ FACTION.models = {
 -- Pay for security (if using salary system)
 FACTION.pay = 50
 
-function FACTION:OnCharacterCreated(client, character)
-    -- Starting equipment for security
-    -- character:GetInventory():Add("security_uniform", 1)
-    -- character:GetInventory():Add("radio", 1)
-end
-
 FACTION_SECURITY = FACTION.index

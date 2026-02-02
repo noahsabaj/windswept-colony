@@ -30,10 +30,4 @@ FACTION.models = {
 -- Pay for medical (if using salary system)
 FACTION.pay = 70
 
-function FACTION:OnCharacterCreated(client, character)
-    -- Starting equipment for medical
-    -- character:GetInventory():Add("medical_uniform", 1)
-    -- character:GetInventory():Add("radio", 1)
-end
-
 FACTION_MEDICAL = FACTION.index

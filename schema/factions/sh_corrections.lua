@@ -29,10 +29,4 @@ FACTION.models = {
 -- Pay for corrections (if using salary system)
 FACTION.pay = 60
 
-function FACTION:OnCharacterCreated(client, character)
-    -- Starting equipment for corrections
-    -- character:GetInventory():Add("corrections_uniform", 1)
-    -- character:GetInventory():Add("radio", 1)
-end
-
 FACTION_CORRECTIONS = FACTION.index

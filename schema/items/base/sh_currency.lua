@@ -81,7 +81,7 @@ ITEM.functions.Split = {
         local currencyType = item.currencyValue == 100 and "cash" or "coins"
         net.Start("ixCurrencySplit")
             net.WriteUInt(item:GetID(), 32)
-            net.WriteUInt(quantity, 16)
+            net.WriteUInt(quantity, 16)  -- 16-bit limit = max 65535 units (well above MAX_STACK of 100)
             net.WriteString(currencyType)
         net.Send(item.player)
         return false

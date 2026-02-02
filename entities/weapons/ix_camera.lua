@@ -712,6 +712,9 @@ if SERVER then
         end
 
         -- Save image data to file
+        -- Note: Uses .txt extension for base64-encoded JPEG data. GMod's file.Write
+        -- works with any extension, and .txt ensures no issues with file system filters.
+        -- The actual content is base64 text, so .txt is technically accurate.
         file.Write(photoDir .. "/" .. photoID .. ".txt", imageData)
 
         -- Item only stores the ID reference, not the actual image data

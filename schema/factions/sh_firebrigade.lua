@@ -29,10 +29,4 @@ FACTION.models = {
 -- Pay for fire brigade (if using salary system)
 FACTION.pay = 40
 
-function FACTION:OnCharacterCreated(client, character)
-    -- Starting equipment for fire brigade
-    -- character:GetInventory():Add("firebrigade_uniform", 1)
-    -- character:GetInventory():Add("radio", 1)
-end
-
 FACTION_FIREBRIGADE = FACTION.index
