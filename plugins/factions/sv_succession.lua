@@ -268,11 +268,12 @@ function ix.factions.ApplyVoteResult(voteID, winnerCharID, tallies)
     local vote = ix.factions.activeVotes[voteID]
     if not vote then return end
 
-    -- Update database
+    -- Update database with vote results
     local query = mysql:Update("ix_faction_votes")
     query:Update("status", "completed")
     query:Update("results", util.TableToJSON(tallies))
     query:Update("winner_char_id", winnerCharID)
+    query:Update("anchor_class_id", vote.anchorClassID)  -- Store for offline promotion
     query:Where("id", voteID)
     query:Execute()
 
@@ -297,6 +298,23 @@ function ix.factions.ApplyVoteResult(voteID, winnerCharID, tallies)
         if classData then
             winnerPlayer:NotifyLocalized("electedLeader", classData.name)
         end
+
+        -- Mark promotion as applied
+        local updateQuery = mysql:Update("ix_faction_votes")
+        updateQuery:Update("promotion_applied", 1)
+        updateQuery:Where("id", voteID)
+        updateQuery:Execute()
+    else
+        -- Winner is offline - update character directly in database
+        -- The class will be applied when they log in, and they'll be notified via PlayerLoadedCharacter hook
+        -- DO NOT set promotion_applied = 1 here - that happens when they log in and are notified
+        local charQuery = mysql:Update("ix_characters")
+        charQuery:Update("class", vote.anchorClassID)
+        charQuery:Where("id", winnerCharID)
+        charQuery:Callback(function()
+            print("[Factions] Updated offline character #" .. winnerCharID .. " to class " .. vote.anchorClassID .. " (will be notified on login)")
+        end)
+        charQuery:Execute()
     end
 
     -- Announce results
@@ -421,6 +439,44 @@ function ix.factions.AnnounceResults(factionID, tallies, winnerCharID, winnerNam
         end
     end
 end
+
+-- Notify winners who were offline during vote completion
+hook.Add("PlayerLoadedCharacter", "ixCheckPendingPromotion", function(client, character, lastChar)
+    if not character then return end
+
+    local charID = character:GetID()
+
+    -- Check if this character won a vote while offline (promotion_applied = 0 means they weren't notified)
+    local query = mysql:Select("ix_faction_votes")
+    query:Where("winner_char_id", charID)
+    query:Where("status", "completed")
+    query:Where("promotion_applied", 0)  -- Only if they haven't been notified
+    query:Callback(function(result)
+        if not result or #result == 0 then return end
+
+        -- Found a vote they won while offline
+        local row = result[1]
+        local anchorClassID = row.anchor_class_id
+
+        if anchorClassID then
+            local classData = ix.class.Get(anchorClassID)
+            if classData then
+                -- Notify them of their promotion
+                client:NotifyLocalized("electedLeader", classData.name)
+
+                -- Fire the hook (class is already set from DB load)
+                hook.Run("PlayerJoinedClass", client, anchorClassID, nil)
+            end
+        end
+
+        -- Mark as applied so they don't get notified again
+        local updateQuery = mysql:Update("ix_faction_votes")
+        updateQuery:Update("promotion_applied", 1)
+        updateQuery:Where("id", row.id)
+        updateQuery:Execute()
+    end)
+    query:Execute()
+end)
 
 -- Load active votes from database on server start
 hook.Add("InitPostEntity", "ixLoadActiveVotes", function()

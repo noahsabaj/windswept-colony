@@ -239,6 +239,89 @@ Schema.radioTransmitters = Schema.radioTransmitters or {}
 local BASE_VOICE_RANGE = 600  -- Helix default voiceDistance
 local BASE_EAVESDROP_RANGE = 400
 
+-- ============================================================================
+-- ENTITY CACHING FOR VOICE SYSTEM PERFORMANCE
+-- Cache radio-related entities to avoid ents.FindByClass() in voice hooks
+-- ============================================================================
+
+Schema.entityCache = Schema.entityCache or {
+    ragdolls = {},           -- prop_ragdoll entities
+    knockedBodies = {},      -- ix_knocked entities
+    stationaryRadios = {},   -- ix_stationary_radio entities
+}
+
+-- Helper to add entity to cache
+local function CacheEntity(ent, cacheTable)
+    cacheTable[ent] = true
+end
+
+-- Helper to remove entity from cache
+local function UncacheEntity(ent, cacheTable)
+    cacheTable[ent] = nil
+end
+
+-- Cache entities on creation
+hook.Add("OnEntityCreated", "ixRadioEntityCache", function(ent)
+    if not IsValid(ent) then return end
+
+    -- Delay slightly to ensure entity is fully initialized
+    timer.Simple(0, function()
+        if not IsValid(ent) then return end
+
+        local class = ent:GetClass()
+        if class == "prop_ragdoll" then
+            CacheEntity(ent, Schema.entityCache.ragdolls)
+        elseif class == "ix_knocked" then
+            CacheEntity(ent, Schema.entityCache.knockedBodies)
+        elseif class == "ix_stationary_radio" then
+            CacheEntity(ent, Schema.entityCache.stationaryRadios)
+        end
+    end)
+end)
+
+-- Remove entities from cache on removal
+hook.Add("EntityRemoved", "ixRadioEntityUncache", function(ent)
+    if not ent then return end
+
+    -- Remove from all caches (cheaper than checking class)
+    Schema.entityCache.ragdolls[ent] = nil
+    Schema.entityCache.knockedBodies[ent] = nil
+    Schema.entityCache.stationaryRadios[ent] = nil
+end)
+
+-- Rebuild cache on map cleanup (fallback safety)
+hook.Add("PostCleanupMap", "ixRadioEntityCacheRebuild", function()
+    Schema.entityCache.ragdolls = {}
+    Schema.entityCache.knockedBodies = {}
+    Schema.entityCache.stationaryRadios = {}
+
+    -- Repopulate caches
+    for _, ent in ipairs(ents.FindByClass("prop_ragdoll")) do
+        CacheEntity(ent, Schema.entityCache.ragdolls)
+    end
+    for _, ent in ipairs(ents.FindByClass("ix_knocked")) do
+        CacheEntity(ent, Schema.entityCache.knockedBodies)
+    end
+    for _, ent in ipairs(ents.FindByClass("ix_stationary_radio")) do
+        CacheEntity(ent, Schema.entityCache.stationaryRadios)
+    end
+end)
+
+-- Initialize caches on server start
+hook.Add("InitPostEntity", "ixRadioEntityCacheInit", function()
+    timer.Simple(1, function()
+        for _, ent in ipairs(ents.FindByClass("prop_ragdoll")) do
+            CacheEntity(ent, Schema.entityCache.ragdolls)
+        end
+        for _, ent in ipairs(ents.FindByClass("ix_knocked")) do
+            CacheEntity(ent, Schema.entityCache.knockedBodies)
+        end
+        for _, ent in ipairs(ents.FindByClass("ix_stationary_radio")) do
+            CacheEntity(ent, Schema.entityCache.stationaryRadios)
+        end
+    end)
+end)
+
 -- Get player's active radio item
 local function GetActiveRadio(client)
     if not IsValid(client) then return nil end
@@ -522,24 +605,26 @@ function Schema:PlayerCanHearPlayersVoice(listener, speaker)
             end
         end
 
-        -- Check ragdolls (knocked/dead)
-        for _, ent in ipairs(ents.FindByClass("prop_ragdoll")) do
-            local radio = GetRagdollRadio(ent)
-            if radio then
-                local radioFreq = radio:GetData("frequency", "100.0")
-                if allBroadcastFrequencies[radioFreq] then
-                    local dist = listenerPos:Distance(ent:GetPos())
-                    if dist < closestReceiverDist then
-                        closestReceiverDist = dist
-                        closestReceiverVolume = radio:GetData("volume", 50) / 100
+        -- Check ragdolls (knocked/dead) - uses cached entities
+        for ent, _ in pairs(Schema.entityCache.ragdolls) do
+            if IsValid(ent) then
+                local radio = GetRagdollRadio(ent)
+                if radio then
+                    local radioFreq = radio:GetData("frequency", "100.0")
+                    if allBroadcastFrequencies[radioFreq] then
+                        local dist = listenerPos:Distance(ent:GetPos())
+                        if dist < closestReceiverDist then
+                            closestReceiverDist = dist
+                            closestReceiverVolume = radio:GetData("volume", 50) / 100
+                        end
                     end
                 end
             end
         end
 
-        -- Check ix_knocked entities
-        for _, ent in ipairs(ents.FindByClass("ix_knocked")) do
-            if ent.GetInventory then
+        -- Check ix_knocked entities - uses cached entities
+        for ent, _ in pairs(Schema.entityCache.knockedBodies) do
+            if IsValid(ent) and ent.GetInventory then
                 local inv = ent:GetInventory()
                 if inv then
                     local radios = inv:GetItemsByUniqueID("handheld_radio", true)
@@ -560,15 +645,17 @@ function Schema:PlayerCanHearPlayersVoice(listener, speaker)
             end
         end
 
-        -- Check stationary radios (eavesdrop from their speaker)
-        for _, ent in ipairs(ents.FindByClass("ix_stationary_radio")) do
-            local rxFreqs = ent:GetRXFrequencies()
-            for freq, volume in pairs(rxFreqs) do
-                if allBroadcastFrequencies[freq] then
-                    local dist = listenerPos:Distance(ent:GetPos())
-                    if dist < closestReceiverDist then
-                        closestReceiverDist = dist
-                        closestReceiverVolume = volume / 100
+        -- Check stationary radios (eavesdrop from their speaker) - uses cached entities
+        for ent, _ in pairs(Schema.entityCache.stationaryRadios) do
+            if IsValid(ent) then
+                local rxFreqs = ent:GetRXFrequencies()
+                for freq, volume in pairs(rxFreqs) do
+                    if allBroadcastFrequencies[freq] then
+                        local dist = listenerPos:Distance(ent:GetPos())
+                        if dist < closestReceiverDist then
+                            closestReceiverDist = dist
+                            closestReceiverVolume = volume / 100
+                        end
                     end
                 end
             end

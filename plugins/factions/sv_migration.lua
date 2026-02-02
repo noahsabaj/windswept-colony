@@ -151,9 +151,31 @@ function ix.factions.BootstrapClasses()
     print("[Factions] Bootstrap complete - created anchor, static, and default classes")
 end
 
+-- Migration: Add offline promotion columns to votes table
+function ix.factions.MigrateVotesTable()
+    -- Add anchor_class_id column if it doesn't exist
+    local query1 = mysql:RawQuery([[
+        ALTER TABLE ix_faction_votes
+        ADD COLUMN IF NOT EXISTS anchor_class_id INT NULL,
+        ADD COLUMN IF NOT EXISTS promotion_applied TINYINT(1) DEFAULT 0
+    ]])
+    query1:Callback(function(result, status, err)
+        if err then
+            -- Column might already exist, or syntax not supported - try individual statements
+            local q1 = mysql:RawQuery("ALTER TABLE ix_faction_votes ADD COLUMN anchor_class_id INT NULL")
+            q1:Execute()
+
+            local q2 = mysql:RawQuery("ALTER TABLE ix_faction_votes ADD COLUMN promotion_applied TINYINT(1) DEFAULT 0")
+            q2:Execute()
+        end
+    end)
+    query1:Execute()
+end
+
 -- Run on server start
 hook.Add("InitPostEntity", "ixFactionMigration", function()
     timer.Simple(5, function()
         ix.factions.RunMigrations()
+        ix.factions.MigrateVotesTable()
     end)
 end)
