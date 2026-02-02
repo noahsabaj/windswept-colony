@@ -304,8 +304,7 @@ function PLUGIN:CreateKnockout(client, character, dmgInfo)
 
         if not protected[class] and activeWeapon.ixItem then
             local item = activeWeapon.ixItem
-            -- Clear both keys - base_weapons uses "equip", custom items use "equipped"
-            item:SetData("equip", nil)
+            -- Clear equipped state before dropping
             item:SetData("equipped", nil)
             item:Transfer(nil, nil, nil, client, client:GetPos() + Vector(0, 0, 10))
         end

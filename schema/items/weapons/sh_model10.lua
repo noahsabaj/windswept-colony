@@ -63,7 +63,7 @@ ITEM.functions.LoadAmmo = {
             return false
         end
 
-        if not item:GetData("equip") then
+        if not item:GetData("equipped") then
             return false
         end
 

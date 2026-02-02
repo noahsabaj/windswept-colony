@@ -276,8 +276,8 @@ function PLUGIN:EquipPrisonJumpsuit(client)
     local inventory = character:GetInventory()
     if inventory then
         for _, item in pairs(inventory:GetItems()) do
-            if item.isOutfit and item:GetData("equip") then
-                item:SetData("equip", false)
+            if item.isOutfit and item:GetData("equipped") then
+                item:SetData("equipped", false)
                 if item.OnUnequipped then
                     item:OnUnequipped(client)
                 end
