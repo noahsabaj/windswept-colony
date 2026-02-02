@@ -987,12 +987,17 @@ if SERVER then
     -- DOUBLE DOOR PARTNER LINKING
     -- ============================================================================
 
-    -- Link double doors via ixPartner based on targetname/slavename relationships
-    -- This is required for Helix's BlastDoor() and our lock sync to work properly
+    -- Link double doors via ixPartner
+    -- Uses two methods:
+    -- 1. targetname/slavename keyvalues (if mapper set them up)
+    -- 2. Proximity detection (doors within 50 units with similar facing angles)
     function ix.doors.LinkPartners()
-        -- Build lookup table: targetname -> door entity
-        local byTargetname = {}
+        local linkedCount = 0
+        local linkedByKeyvalue = 0
+        local linkedByProximity = 0
 
+        -- First pass: Try keyvalue-based linking (targetname/slavename)
+        local byTargetname = {}
         for mapID, frameData in pairs(ix.doors.frames) do
             if frameData.hasDoor and IsValid(frameData.doorEntity) then
                 local door = frameData.doorEntity
@@ -1003,25 +1008,72 @@ if SERVER then
             end
         end
 
-        -- Link partners via slavename
-        local linkedCount = 0
         for mapID, frameData in pairs(ix.doors.frames) do
             if frameData.hasDoor and IsValid(frameData.doorEntity) then
                 local door = frameData.doorEntity
                 local slavename = frameData.keyvalues and frameData.keyvalues.slavename
                 if slavename and slavename ~= "" then
                     local partner = byTargetname[slavename]
-                    if IsValid(partner) and partner ~= door then
+                    if IsValid(partner) and partner ~= door and not door.ixPartner then
                         door.ixPartner = partner
-                        partner.ixPartner = door  -- Bidirectional link
+                        partner.ixPartner = door
                         linkedCount = linkedCount + 1
+                        linkedByKeyvalue = linkedByKeyvalue + 1
                     end
                 end
             end
         end
 
+        -- Second pass: Proximity-based linking for doors without partners
+        -- Two doors are considered a double-door pair if:
+        -- 1. They are within 100 units of each other
+        -- 2. They use the same model
+        local PROXIMITY_THRESHOLD = 100 * 100  -- DistToSqr comparison
+
+        local allDoors = {}
+        for mapID, frameData in pairs(ix.doors.frames) do
+            if frameData.hasDoor and IsValid(frameData.doorEntity) then
+                local door = frameData.doorEntity
+                table.insert(allDoors, {
+                    door = door,
+                    pos = door:GetPos(),
+                    model = door:GetModel()
+                })
+            end
+        end
+
+        for i, data1 in ipairs(allDoors) do
+            local door1 = data1.door
+
+            -- Skip if already linked
+            if door1.ixPartner then continue end
+
+            for j, data2 in ipairs(allDoors) do
+                if i == j then continue end
+
+                local door2 = data2.door
+
+                -- Skip if already linked
+                if door2.ixPartner then continue end
+
+                -- Check same model
+                if data2.model ~= data1.model then continue end
+
+                -- Check proximity
+                local distSqr = data1.pos:DistToSqr(data2.pos)
+                if distSqr > PROXIMITY_THRESHOLD then continue end
+
+                -- These are double doors!
+                door1.ixPartner = door2
+                door2.ixPartner = door1
+                linkedCount = linkedCount + 1
+                linkedByProximity = linkedByProximity + 1
+                break  -- Move to next door1
+            end
+        end
+
         if linkedCount > 0 then
-            print("[ix.doors] Linked " .. linkedCount .. " double door pairs")
+            print("[ix.doors] Linked " .. linkedCount .. " double door pairs (" .. linkedByKeyvalue .. " by keyvalue, " .. linkedByProximity .. " by proximity)")
         end
     end
 

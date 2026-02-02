@@ -115,6 +115,32 @@ hook.Add("EntityNetworkedVarChanged", "ixRadioStopOnIncapacitate", function(ent,
 end)
 
 -- ============================================================================
+-- VOICE AMPLITUDE SYNC
+-- Send voice amplitude to server for distance calculations
+-- VoiceVolume() only works client-side, so we must sync it
+-- ============================================================================
+
+local lastAmplitudeSent = 0
+local AMPLITUDE_SEND_INTERVAL = 0.1
+
+timer.Create("ixVoiceAmplitudeSync", AMPLITUDE_SEND_INTERVAL, 0, function()
+    local client = LocalPlayer()
+    if not IsValid(client) then return end
+
+    if client:IsSpeaking() then
+        local amp = client:VoiceVolume() or 0.5
+
+        -- Only send if changed significantly (reduce network traffic)
+        if math.abs(amp - lastAmplitudeSent) > 0.05 then
+            net.Start("ixVoiceAmplitude")
+            net.WriteFloat(amp)
+            net.SendToServer()
+            lastAmplitudeSent = amp
+        end
+    end
+end)
+
+-- ============================================================================
 -- RADIO VOLUME SLIDER
 -- ============================================================================
 

@@ -11,6 +11,64 @@ ix.log.AddType("battering_ram_breach", function(client, doorClass, doorIndex)
 end)
 
 -- ============================================================================
+-- DOUBLE DOOR SYNC
+-- When a player uses a door, sync the action to its partner (double doors)
+-- Source Engine's slavename linking doesn't work for dynamically spawned doors
+-- ============================================================================
+
+-- Handle double door sync by taking full control of door usage
+-- This fires BEFORE the native door use, so we can handle both doors simultaneously
+function Schema:CanPlayerUseDoor(client, door)
+	if not IsValid(door) then return end
+
+	-- Get the partner door (double doors are linked via ixPartner)
+	local partner = door:GetDoorPartner()
+
+	-- Single door - let native handling work
+	if not IsValid(partner) then return end
+
+	-- Double door - we handle it ourselves for perfect sync
+	-- Check current door state
+	-- m_eDoorState: 0=closed, 1=opening, 2=open, 3=closing
+	local doorState = door:GetInternalVariable("m_eDoorState")
+
+	if doorState == 0 then
+		-- Both doors closed - open both away from player
+		local tempTarget = ents.Create("info_target")
+		if IsValid(tempTarget) then
+			tempTarget:SetPos(client:GetPos())
+			tempTarget:SetName("ix_door_activator_" .. client:EntIndex())
+			tempTarget:Spawn()
+
+			-- Fire OpenAwayFrom on BOTH doors simultaneously
+			door:Fire("OpenAwayFrom", tempTarget:GetName())
+			partner:Fire("OpenAwayFrom", tempTarget:GetName())
+
+			-- Remove temp entity after doors start opening
+			timer.Simple(0.1, function()
+				if IsValid(tempTarget) then
+					tempTarget:Remove()
+				end
+			end)
+		else
+			-- Fallback: just fire open on both
+			door:Fire("open")
+			partner:Fire("open")
+		end
+	elseif doorState == 2 then
+		-- Both doors open - close both
+		door:Fire("close")
+		partner:Fire("close")
+	elseif doorState == 1 or doorState == 3 then
+		-- Door is in motion (opening or closing) - ignore
+		return false
+	end
+
+	-- Return false to PREVENT native door use - we handled it ourselves
+	return false
+end
+
+-- ============================================================================
 -- LADDER INTEGRATION
 -- ============================================================================
 
@@ -482,14 +540,14 @@ hook.Add("PlayerStartVoice", "ixTrackVoiceAmplitude", function(client)
     Schema.voiceAmplitudes[client] = 0.5  -- Default to medium
 end)
 
--- Update amplitude during voice (called by Think)
-timer.Create("ixVoiceAmplitudeUpdate", 0.1, 0, function()
-    for _, client in ipairs(player.GetAll()) do
-        if client:IsSpeaking() then
-            local amp = client:VoiceVolume() or 0.5
-            Schema.voiceAmplitudes[client] = amp
-        end
-    end
+-- Receive amplitude from client (VoiceVolume() is CLIENT-only)
+net.Receive("ixVoiceAmplitude", function(len, client)
+    if not IsValid(client) then return end
+
+    local amp = net.ReadFloat()
+    -- Clamp to valid range
+    amp = math.Clamp(amp, 0, 1)
+    Schema.voiceAmplitudes[client] = amp
 end)
 
 -- Helper: Check if speaker is within voice range of a position (for stationary radio pickup)

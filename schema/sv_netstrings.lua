@@ -142,6 +142,7 @@ util.AddNetworkString("ixRadioVolume")        -- Server->Client: open volume sli
 util.AddNetworkString("ixRadioVolumeSet")     -- Client->Server: set volume value
 util.AddNetworkString("ixRadioVoiceStart")    -- Client->Server: started transmitting
 util.AddNetworkString("ixRadioVoiceStop")     -- Client->Server: stopped transmitting
+util.AddNetworkString("ixVoiceAmplitude")     -- Client->Server: voice amplitude update
 
 -- =============================================================================
 -- STATIONARY RADIO (entities/entities/ix_stationary_radio/)

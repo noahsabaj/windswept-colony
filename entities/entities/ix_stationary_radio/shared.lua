@@ -3,10 +3,12 @@
 ]]--
 
 ENT.Type = "anim"
+ENT.Base = "base_gmodentity"
 ENT.PrintName = "Stationary Radio"
 ENT.Author = "Windswept"
-ENT.Spawnable = false
-ENT.AdminOnly = false
+ENT.Spawnable = true
+ENT.AdminSpawnable = true
+ENT.Category = "Windswept"
 
 -- Max distance from console before UI closes
 ENT.MaxUseDistance = 200
