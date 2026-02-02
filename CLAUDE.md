@@ -39,6 +39,7 @@ windswept/
 │   │   ├── sh_physical.lua  # Physical appearance system
 │   │   ├── sh_doors.lua     # Door system library
 │   │   ├── sh_wallet.lua    # Wallet/currency library
+│   │   ├── sh_radio.lua     # Radio utilities (frequency validation, etc.)
 │   │   └── thirdparty/      # Third-party libs
 │   │       └── sh_netstream2.lua
 │   ├── languages/           # Localization
@@ -142,6 +143,33 @@ garrysmod/addons/
   - **Battering ram hit counter persists**: When a door is hit, the hit counter (`ixBatteringRamRequired`, `ixBatteringRamHits`) persists until the door is **repaired** or **destroyed**. No time-based reset. Saved to persistence file.
   - **Repair resets damage**: `ix.doors.RepairDoor()` resets health AND clears the battering ram hit counter.
 
+- **Radio System** (`schema/items/equipment/sh_handheld_radio.lua`): Battery-powered radio with text and voice transmission.
+  - **Model**: `models/radio/w_radio.mdl` (Workshop ID: 635535045)
+  - **Battery drain**: Idle 0.033up/sec (~50 min), Active 0.056up/sec (~30 min). Active = transmitting or receiving.
+  - **Text radio**: `/r <message>` or `/radio <message>`. Drains battery based on message length (15 chars/sec speaking rate).
+  - **Voice radio**: Hold H to transmit voice over frequency. All players on same frequency hear you regardless of distance.
+  - **Volume control**: 0-100%, affects how loud you hear incoming transmissions and eavesdrop range around you.
+  - **Eavesdrop**: Players near someone with a receiving radio can hear transmissions. Range = `400 * receiverVolume * transmitterAmplitude`.
+  - **Incapacitated states**: Can't transmit if knocked/gagged/restrained/dead, but radio still receives.
+  - **One radio at a time**: Only one radio can be active per character.
+
+- **Stationary Radio** (`entities/entities/ix_stationary_radio/`, `schema/items/equipment/sh_stationary_radio.lua`): Multi-channel dispatch console.
+  - **Model**: `models/props_lab/citizenradio.mdl` (built-in HL2 model)
+  - **4 channels**: Each channel has independent frequency (100.0-999.9), TX toggle, RX toggle, and volume (0-100).
+  - **Wired power**: No battery required. Always powered when placed.
+  - **Drop to place**: Drop item (standard Helix), position with hands, press E to open config UI.
+  - **Hold E to pickup**: Uses standard `itemPickupTime` config. Channel settings persist on item.
+  - **Single user**: Only one player can use the UI at a time. Others get "Console in use" message.
+  - **Text transmission**: Message broadcasts to ALL TX-enabled frequencies simultaneously.
+  - **Voice MIC mode**: Toggle MIC on to broadcast all sound reaching the entity's position. Acts as a "virtual ear" at its world position.
+  - **Eavesdrop from stationary**: Players near a stationary radio can hear incoming transmissions on RX channels.
+  - **Shared library**: `schema/libs/sh_radio.lua` provides `ix.radio.ValidateFrequency()`, `ix.radio.FormatFrequency()`, `ix.radio.GetDefaultChannels()`.
+
+- **Voice System** (`schema/sv_hooks.lua`, `schema/cl_hooks.lua`): Custom voice with amplitude-based distance and anti-metagaming.
+  - **Voice HUD removed**: No player names shown when speaking (CHudVoiceStatus hidden). Anti-metagaming.
+  - **Amplitude-based distance**: Voice range scales with how loud you speak. Whisper ~100u, normal ~300u, yelling ~800u.
+  - **Uses `Player:VoiceVolume()`**: Returns 0-1 amplitude, updated every 0.1 seconds while speaking.
+
 ## Item Base Classes
 
 ### base_battery_device (`schema/items/base/sh_battery_device.lua`)
@@ -209,6 +237,46 @@ ITEM.canDestroy = true
 
 **Provided item functions:** Split, MergeAll, MergeWith, Give, Destroy (if canDestroy=true)
 
+### base_equippable (`schema/items/base/sh_equippable.lua`)
+
+For items that equip as SWEPs. Provides Equip/Unequip functions, transfer blocking, persistence.
+
+**Configuration options:**
+```lua
+ITEM.equipWeaponClass = "ix_binoculars"  -- SWEP class to give (REQUIRED)
+ITEM.equipPlayerKey = "ixBinocularsItem" -- Key on player to store item ref (REQUIRED)
+ITEM.equipNotifyKey = "binocularsEquipped" -- Localization key for notifications (REQUIRED)
+ITEM.equipSound = "items/ammo_pickup.wav"  -- Sound on equip (default)
+ITEM.equipSoundVolume = 0.5   -- Equip sound volume
+ITEM.unequipSoundVolume = 0.3 -- Unequip sound volume
+ITEM.equipTip = "Equip this item."  -- Tooltip for equip button
+ITEM.unequipTip = "Put this item away."  -- Tooltip for unequip button
+```
+
+**Example child item (binoculars):**
+```lua
+ITEM.name = "Binoculars"
+ITEM.model = Model("models/weapons/w_binocularsbp.mdl")
+ITEM.base = "base_equippable"
+
+ITEM.equipWeaponClass = "ix_binoculars"
+ITEM.equipPlayerKey = "ixBinocularsItem"
+ITEM.equipNotifyKey = "binocularsEquipped"
+ITEM.equipTip = "Hold the binoculars in your hands."
+```
+
+**Optional override method:**
+```lua
+-- Return false to prevent equipping (e.g., item not programmed)
+function ITEM:CanEquip()
+    return self:IsProgrammed()
+end
+```
+
+**Provided:** Equip/Unequip functions, PaintOver (equipped indicator), postHooks.drop, OnTransferred, CanTransfer, OnLoadout
+
+**Items using this base:** binoculars, battering_ram, ladder, lockbreaker, personal_id, lockpick, toolkit, key, lock
+
 ## Workflows
 
 ### How Workshop Addons Work
@@ -239,7 +307,7 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 
 - **Hook data flow in character creation**: In hooks like `AdjustCreationPayload`, Helix's OnAdjust functions run BEFORE your hook and populate `newPayload` with processed values. Use `newPayload.model` (the path) not `payload.model` (the index).
 
-- **Weapon equip data key is "equip" not "equipped"**: The base_weapons item uses `item:GetData("equip")` and `item:SetData("equip", true/nil)`. Do NOT use `"equipped"` - that's a different key used by some custom items (like Personal ID). Using the wrong key causes `CanTransfer` to block operations with "You cannot move a weapon that is currently equipped!"
+- **Equip data key is standardized to "equipped"**: All equippable items (weapons, outfits, custom equipment) use `item:GetData("equipped")` and `item:SetData("equipped", true/nil)`. This was standardized across both Helix base classes and custom items for consistency.
 
 - **HOOKS_CACHE execution order**: Helix hook execution order: (1) HOOKS_CACHE plugin hooks, (2) Schema hooks, (3) Regular hook.Add hooks. To run before a Helix plugin, inject into HOOKS_CACHE directly. See ix_camera.lua lines 225-269.
 
@@ -396,8 +464,6 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 - **Entity/weapon naming conflict**: Don't name a scripted entity the same as a weapon class. If weapon `ix_lantern` exists, an entity named `ix_lantern` will have broken NetworkVars (SetupDataTables doesn't register methods properly). Use distinct names like `ix_lantern` (weapon) and `ix_lantern_dropped` (entity).
 
 - **SWEP.Drop = false is intentional**: Prevents GMod's native drop (raw weapon entities). Permadeath handles drops via `item:Transfer()` in `CreateKnockout()`, preserving item data. Only active weapon drops on knockout; other equipped items stay. Protected weapons (ix_hands, ix_handsup) never drop.
-
-- **Equip data key inconsistency**: Helix's `base_weapons` uses `"equip"` while custom items (flashlight, binoculars, camera, etc.) use `"equipped"`. When writing code that handles both (like knockout drops), clear BOTH keys: `item:SetData("equip", nil)` and `item:SetData("equipped", nil)`.
 
 - **TFA/addon weapon models have broken collision for item pickup**: Workshop weapon models have razor-thin collision meshes (designed as attachments, not physics props). Eye traces can't hit dropped items → no pickup. Fix in `ix_item.lua`: detect thin bounds (<4 units), use OBB-based fallback physics with `COLLISION_GROUP_WEAPON`.
 
@@ -563,6 +629,25 @@ local buttonWidth = maxTextW + ScreenScale(10) * 2
 ```
 
 - **Helix auto-includes `schema/derma/`**: Files in this folder are automatically loaded by the framework (via `ix.util.IncludeDir` in sh_plugin.lua). No manual includes needed.
+
+## Third-Party Addon Configuration
+
+### TFA Base (Workshop ID: 2840031720)
+
+**Inspection Menu Disabled**: The TFA weapon inspection menu (opens when pressing C while holding a TFA weapon) is disabled via `sv_tfa_cmenu 0` in `sv_schema.lua`.
+
+**Why disabled:**
+- Shows exact weapon stats (accuracy, damage, fire rate) - violates fog of war principle
+- Displays ammo type selector allowing players to swap between ammo types they don't physically have - violates scarcity principle (nothing appears from nowhere, conservation of matter)
+- Shows damage drop-off graphs - too much metagame information
+
+**Result:** Pressing C while holding a TFA weapon now opens the normal GMod context menu instead of the TFA inspection panel.
+
+**ConVar reference** (from `tfa/modules/tfa_commands.lua`):
+- `sv_tfa_cmenu` - Enable/disable inspection menu (default: 1, we set to 0)
+- `sv_tfa_cmenu_key` - Override inspection key (-1 = use default C key)
+
+**Extracted addon location:** `D:/SteamLibrary/steamapps/workshop/content/4000/2840031720/extracted/`
 
 ## Persistence & Save Files
 
