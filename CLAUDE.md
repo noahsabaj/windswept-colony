@@ -4,7 +4,7 @@
 
 A Garry's Mod SeriousRP gamemode set in 2200 on Zephyrus, a hostile mining planet. Players work in Redrock City, a carbon mining colony owned by Eagle Extraction Conglomerate (EEC). The Carbon Miners Union (CMU-RC) controls mine access. Currency: CEG Dollars ($50).
 
-**Map:** Windswept | **Framework:** Helix (Nutscript fork)
+**Map:** Windswept | **Framework:** Helix (Nutscript fork) (We have our own fork of Helix)
 
 ## Architecture
 
@@ -73,25 +73,25 @@ garrysmod/addons/
 
 - Redrock City is where the gameplay takes place. It is a mining-colony right underneath the surface of Zephyrus. 
 
-### Primary Roles (No term limits)
-| Role | Appointment Type | Term Length | Description |
-|------|------------------|-------------|-------------|
-| Mayor | Elected | 3 weeks (21 days) | The Mayor of Redrock City is elected by the citizens of Redrock City every three weeks. The Mayor is the Chief Executive of the Redrock City Administration. |
-| Commissioner | Elected | 3 weeks (21 days) | The Commissioner of the Redrock City Security Department is the Chief Executive of the city security arm, responsible for policing the city. Elected every 3 weeks by the citizens of Redrock City. |
-| Miners Union President | Elected | 3 weeks (21 days) | The President is elected by all members of the miners union every 3 weeks and is responsible for representing the miners and the miners union, and is its Chief Executive of the CMU-RC. |
-
-### Secondary Roles
+### Primary Roles (Elected, 3-week terms)
 | Role | Description |
 |------|-------------|
-| Deputy Mayor | The Deputy Mayor of Redrock City is appointed by the Mayor. |
-| Deputy Commissioner | The Deputy Commissioner of the Redrock City Security Department is appointed by the Commissioner. |
-| Chief Medical Officer | The Chief Medical Officer is in charge of the Redrock City Medical Department, overseeing the operations at Redrock City General Hospital and all medical-related affairs on Redrock City. The CMO is directly appointed by the Mayor, and can be recalled at any time. |
-| Warden | The Warden is in charge of the Redrock City Corrections Department, overseeing operations at Skarn Prison. The Warden is directly appointed by the Commissioner.
-| Fire Chief | The Fire Chief is in charge of the Redrock City Fire Brigade, and is appointed by the Mayor. |
+| Mayor | Chief Executive of Redrock City Administration |
+| Commissioner | Chief Executive of Security Department (policing) |
+| Miners Union President | Chief Executive of CMU-RC, represents miners |
+
+### Secondary Roles (Appointed)
+| Role | Appointed By | Description |
+|------|--------------|-------------|
+| Deputy Mayor | Mayor | Assists Mayor |
+| Deputy Commissioner | Commissioner | Assists Commissioner |
+| Chief Medical Officer | Mayor | Runs Medical Department, Redrock City General Hospital |
+| Warden | Commissioner | Runs Corrections Department, Skarn Prison |
+| Fire Chief | Mayor | Runs Fire Brigade |
 
 ## Design Principles
 
-- Fog of War principle. Because this is SeriousRP, nothing is free. Here's an example that will tell you a lot. The defibrillator has a 45-95% chance of successfully reviving someone that has been knocked and is actively dying. The player DOES NOT KNOW of the 45-95% chance at all, the player only knows (from experience, from seeing others, from being told, from intuition) that it has decent odds but can fail just as easily. The backend knows its between 45-95% chance (we call it probability^2, it's not guaranteed that the defib will pass or fail, AND the chance itself is also not guaranteed, it can be anywhere from a 45% odds of succeeding to a 95% odds of succeeding, but never 100%). Nothing is 100% certain, ever. This is another principle of good SeriousRP.
+- **Fog of War**: Players never see exact numbers. Example: defibrillator has 45-95% success chance (probability² - even the chance itself varies), but players only know "decent odds, can fail." Nothing is 100% certain.
 
 - Always be Helix-idiomatic. Before implementing any feature, check if Helix already provides it or has an established pattern for it. Read the framework source code in helix/gamemode/core/ to understand how things are done. For example, when we created custom character creation panels, we initially added our own labels and height logic, but Helix already auto-creates labels above OnDisplay panels and uses font-based height sizing (see ixTextEntry and ixNumSlider in cl_generic.lua). Following existing patterns avoids bugs and keeps code consistent.
 
@@ -281,22 +281,11 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 
 - **ix.log.AddType is SERVER-only**: The logging system only exists on the server. If you call `ix.log.AddType()` on the client (e.g., in a shared plugin hook like `InitializedPlugins`), you'll get "attempt to call field 'AddType' (a nil value)". Fix: Wrap in `if SERVER then` or add `if not SERVER then return end` at the start of the function.
 
-- **CharacterLoaded vs PlayerLoadedCharacter execution order**: These hooks run in a specific order during character loading:
-  1. `character:Setup()` → calls `CharacterLoaded` hook
-  2. `client:Spawn()`
-  3. `GM:PlayerLoadedCharacter()` → creates Helix salary timer here
-  4. `PlayerLoadedCharacter` hook (hook.Add listeners)
-
-  **Critical for timer overrides**: If you need to remove/replace Helix's salary timer (`ixSalary..steamID64`), you MUST use `PlayerLoadedCharacter` hook, NOT `CharacterLoaded`. The timer doesn't exist yet when `CharacterLoaded` runs, so `timer.Remove()` does nothing, and both timers run = double salary.
+- **CharacterLoaded vs PlayerLoadedCharacter execution order**: Order: (1) `CharacterLoaded` hook, (2) `client:Spawn()`, (3) `GM:PlayerLoadedCharacter()` creates Helix salary timer, (4) `PlayerLoadedCharacter` hook. To override Helix's salary timer, use `PlayerLoadedCharacter` (timer exists) not `CharacterLoaded` (timer doesn't exist yet = double salary):
   ```lua
-  -- WRONG: CharacterLoaded runs BEFORE Helix creates its timer
-  hook.Add("CharacterLoaded", "myHook", function(character)
-      timer.Remove("ixSalary" .. character:GetPlayer():SteamID64())  -- Does nothing!
-  end)
-
-  -- CORRECT: PlayerLoadedCharacter runs AFTER Helix's GM function
+  -- Use PlayerLoadedCharacter, NOT CharacterLoaded (timer doesn't exist yet in CharacterLoaded)
   hook.Add("PlayerLoadedCharacter", "myHook", function(client, character, lastChar)
-      timer.Remove("ixSalary" .. client:SteamID64())  -- Timer exists, removal works
+      timer.Remove("ixSalary" .. client:SteamID64())
   end)
   ```
 
@@ -402,15 +391,15 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 
 - **SWEP properties don't network to client**: Setting `weapon.ixItem = item` on SERVER doesn't make it available on CLIENT. The client's SWEP copy has no knowledge of server-set properties. Fix: Client must find the data another way - look up equipped item from inventory, use networked vars, or send via net message.
 
-- **Worldmodel not visible in third person**: Workshop prop models used as SWEP world models lack proper bone attachments - the model won't render on the player's hand automatically. Fix: Override `DrawWorldModel()` on CLIENT to manually position using `owner:LookupBone("ValveBiped.Bip01_R_Hand")` and `GetBoneMatrix()`, then offset with `ang:Forward()/Right()/Up()` and rotate with `RotateAroundAxis()`. Offset values require trial and error to position correctly in the grip. See `entities/weapons/ix_personalid.lua` or `plugins/prisoner/entities/weapons/ix_gavel.lua` for working examples.
+- **Worldmodel not visible in third person**: Workshop prop models lack bone attachments. Fix: Override `DrawWorldModel()` on CLIENT, manually position via `LookupBone("ValveBiped.Bip01_R_Hand")` + `GetBoneMatrix()`, offset with `ang:Forward()/Right()/Up()`. See `ix_personalid.lua` or `ix_gavel.lua` for examples.
 
 - **Entity/weapon naming conflict**: Don't name a scripted entity the same as a weapon class. If weapon `ix_lantern` exists, an entity named `ix_lantern` will have broken NetworkVars (SetupDataTables doesn't register methods properly). Use distinct names like `ix_lantern` (weapon) and `ix_lantern_dropped` (entity).
 
-- **SWEP.Drop = false is intentional**: All custom SWEPs use `SWEP.Drop = false` to prevent GMod's native weapon drop (which creates raw weapon entities). Instead, the permadeath system handles drops via `item:Transfer()` in `CreateKnockout()`, which properly creates Helix item entities that preserve all item data. When a player is knocked while holding an item, only the actively held weapon drops - other equipped items stay in inventory. Protected weapons (ix_hands, ix_handsup) never drop.
+- **SWEP.Drop = false is intentional**: Prevents GMod's native drop (raw weapon entities). Permadeath handles drops via `item:Transfer()` in `CreateKnockout()`, preserving item data. Only active weapon drops on knockout; other equipped items stay. Protected weapons (ix_hands, ix_handsup) never drop.
 
 - **Equip data key inconsistency**: Helix's `base_weapons` uses `"equip"` while custom items (flashlight, binoculars, camera, etc.) use `"equipped"`. When writing code that handles both (like knockout drops), clear BOTH keys: `item:SetData("equip", nil)` and `item:SetData("equipped", nil)`.
 
-- **TFA/addon weapon models have broken collision for item pickup**: Workshop weapon models (TFA, M9K, CW, etc.) are designed as weapon attachments, not physics props. Their collision meshes are often razor-thin (1-2 units) because collision doesn't matter when attached to a player's hand. When used as Helix items dropped on the ground, eye traces can't hit them → no tooltip, no pickup. Fix is in `ix_item.lua`: detect thin collision bounds (<4 units in any dimension), replace with OBB-based fallback box physics, and use `COLLISION_GROUP_WEAPON` to prevent trapping players.
+- **TFA/addon weapon models have broken collision for item pickup**: Workshop weapon models have razor-thin collision meshes (designed as attachments, not physics props). Eye traces can't hit dropped items → no pickup. Fix in `ix_item.lua`: detect thin bounds (<4 units), use OBB-based fallback physics with `COLLISION_GROUP_WEAPON`.
 
 ### Source Engine Entities
 
@@ -430,15 +419,15 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
   - `distance`, `speed`, `returndelay`: Door movement settings
   - `soundopenoverride`, `soundcloseoverride`, etc.: Custom sounds
 
-- **Double door synchronization**: Double doors use `targetname`/`slavename` to sync. The master door's `slavename` references the slave door's `targetname`. Without capturing BOTH keyvalues when replacing map doors, double doors will open/close independently and may open in opposite directions.
+- **Double door synchronization**: Master's `slavename` references slave's `targetname`. Must capture BOTH keyvalues when replacing map doors or doors operate independently.
 
-- **ixPartner vs targetname/slavename**: Source Engine uses `targetname`/`slavename` keyvalues for engine-level door sync (open/close together). Helix uses `door.ixPartner` (a Lua property) for Lua-level partner lookup (`GetDoorPartner()`). These are SEPARATE systems. Setting keyvalues does NOT set `ixPartner`. If you spawn doors with keyvalues but don't set `ixPartner`, Helix functions like `BlastDoor()` won't find partners. Our `ix.doors.LinkPartners()` builds `ixPartner` links after spawning by matching `slavename` to `targetname`.
+- **ixPartner vs targetname/slavename**: Source uses keyvalues for engine-level sync; Helix uses `door.ixPartner` for Lua-level lookup (`GetDoorPartner()`). SEPARATE systems - setting keyvalues doesn't set `ixPartner`. Our `ix.doors.LinkPartners()` builds `ixPartner` links by matching `slavename` to `targetname`.
 
 - **Door handles are NOT separate entities**: They're part of the door model, controlled by the `hardware` keyvalue and model bodygroups. The model has a "handle" bone that can be queried via `LookupBone("handle")`.
 
-- **Brush-based doors vs prop-based doors**: Source maps have two door types. `prop_door_rotating` uses model files (`models/props/door01.mdl`). `func_door`/`func_door_rotating` use brush geometry with models like `*90`, `*57` - these are BSP brush references. You CANNOT spawn a prop entity with a brush model (`ent:SetModel("*90")` fails with "CBreakableProp::Spawn - GetModelPtr returned NULL!"). When detecting map doors with `ent:IsDoor()`, check if the model starts with `*` and skip those - they can't be replaced with prop entities.
+- **Brush-based doors vs prop-based doors**: `prop_door_rotating` uses model files. `func_door`/`func_door_rotating` use brush geometry (models like `*90`, `*57` = BSP refs). Cannot spawn props with brush models (`ent:SetModel("*90")` fails). When using `ent:IsDoor()`, skip models starting with `*`.
 
-- **MapIO infinite loop warnings**: Firing events (`door:Fire("unlock")`) on map entities can trigger I/O chains. If the map has circular I/O connections, Source emits "Breaking out of potential MapIO infinite loop!" warnings. This is map design, not a code bug - Source is protecting itself.
+- **MapIO infinite loop warnings**: Firing events (`door:Fire("unlock")`) can trigger I/O chains. Circular map I/O causes "Breaking out of potential MapIO infinite loop!" - map design issue, Source self-protects.
 
 - **Door lock/unlock sounds**: Use `doors/door_latch3.wav` for locking (heavier click) and `doors/door_latch1.wav` for unlocking (lighter click).
 
@@ -488,50 +477,29 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 
 - **.gma filename ≠ workshop ID**: The .gma file inside `workshop/content/4000/<id>/` may have a different name (e.g., `new_camera.gma` not `2898276668.gma`). Always `ls` the folder first to find the actual filename before extracting.
 
-- **Legacy workshop format (_legacy.bin)**: Some older workshop addons use `_legacy.bin` files instead of `.gma`. The gmad.exe tool cannot extract these. Fix: Use GMPublisher (https://github.com/WilliamVenner/gmpublisher) - open the legacy.bin file and extract from there.
+- **Legacy workshop format (_legacy.bin)**: gmad.exe can't extract these. Use GMPublisher (https://github.com/WilliamVenner/gmpublisher) instead.
 
 ### Code Organization
 
-- **Custom addons go in `garrysmod/addons/`**: GMod only auto-loads addons from `garrysmod/addons/`, NOT from inside gamemode folders. If you put an addon in `gamemodes/windswept/addons/`, it won't load. Example: `windswept_fire` must be at `garrysmod/addons/windswept_fire/`, not `gamemodes/windswept/addons/windswept_fire/`.
+- **Custom addons go in `garrysmod/addons/`**: GMod only auto-loads from this path, NOT gamemode folders. `windswept_fire` must be at `garrysmod/addons/windswept_fire/`.
 
 - **Autorun files load alphabetically**: GMod loads `lua/autorun/*.lua` files in alphabetical order. If `api.lua` depends on `init.lua` creating a global table, but "a" comes before "i", you get nil errors. Fix: prefix files with numbers to control order: `00_init.lua`, `01_assets.lua`, `02_api.lua`.
 
 - **Plugins vs schema folders**: Plugins are for **cohesive gameplay systems** (prisoner, permadeath) where related code lives together. General items and weapons that aren't part of a specific system go in `schema/items/` and `entities/weapons/`, not in their own plugin. Don't create a plugin just to hold one item.
 
-- **Item folder structure**: Items are organized into domain-based subdirectories under `schema/items/`:
-  - `base/` - Base classes that other items inherit from
-  - `clothing/` - Clothing outfits (casual, work, uniforms)
-  - `currency/` - Money items (cash, coins, wallet)
-  - `documents/` - ID cards, photos, albums
-  - `doors/` - Installable door items
-  - `equipment/` - Tools and devices (flashlight, camera, etc.)
-  - `locks/` - Lock system items (keys, locks, lockpick, toolkit)
-  - `materials/` - Crafting materials
-  - `misc/` - Miscellaneous items
-  - `weapons/` - Ammo and weapon items
+- **Item folder structure**: Items organized in domain subdirectories under `schema/items/` (see Architecture tree). Helix auto-loads recursively. **Base file naming**: New folder (e.g., `consumables/`) requires matching `sh_<foldername>.lua` in `items/base/`. Helix adds `base_` prefix automatically. See "Helix auto-assigns ITEM.base" gotcha.
 
-  Helix auto-loads items recursively from all subdirectories, so no code changes are needed when moving files.
+- **Network string centralization**: All schema/entity strings in `sv_netstrings.lua`. Plugin strings stay in plugins. Third-party libs (netstream2) keep their own strings. Never add `util.AddNetworkString()` to entity/item files. Naming: `ixCamelCase` not underscores. GMod has 4096 string limit - centralizing prevents duplicates.
 
-  **IMPORTANT - Base file naming**: When you create a new item folder (e.g., `consumables/`), you MUST also create a matching base file named `sh_<foldername>.lua` (e.g., `sh_consumables.lua`) in `items/base/`. Helix automatically adds `base_` prefix when loading from the base folder, so `sh_consumables.lua` becomes `base_consumables`. See the "Helix auto-assigns ITEM.base" gotcha above.
-
-- **Network string centralization**: All schema and entity network strings are registered in `schema/sv_netstrings.lua`. Plugin network strings (permadeath, factions, prisoner) remain in their respective plugins for modularity.
-  - **Never add `util.AddNetworkString()` to entity or item files** - add them to sv_netstrings.lua instead
-  - **Naming convention**: Use `ixCamelCase` (e.g., `ixFlashlightSetLight`), NOT underscores (`ix_flashlight_SetLight`)
-  - Third-party libs (netstream2) keep their own strings
-  - GMod has a 4096 network string limit - centralizing prevents duplicates and makes auditing easy
-
-- **Base class pattern for items**: When multiple items share significant logic, extract a base class to `schema/items/base/`:
-  - `sh_battery_device.lua` → `base_battery_device` - For battery-powered equipment (flashlight, lantern, camera, defibrillator). Items must explicitly set `ITEM.base = "base_battery_device"` to use this.
-  - `sh_currency.lua` → `base_currency` - For stackable currency (cash, coins). Auto-assigned to items in `currency/` folder.
-  - `sh_doors.lua` → `base_doors` - For installable door items. Auto-assigned to items in `doors/` folder.
-  - `sh_clothing.lua` → `base_clothing` - For clothing items. Auto-assigned to items in `clothing/` folder.
-  - Stub bases (`sh_equipment.lua`, `sh_locks.lua`, etc.) - Minimal bases for folders that don't need special shared logic.
-
-  Child items become pure configuration (~15-30 lines) instead of duplicating hundreds of lines of logic.
+- **Base class pattern for items**: Extract shared logic to `schema/items/base/`:
+  - `sh_battery_device.lua` → `base_battery_device` - Battery equipment. Must explicitly set `ITEM.base`.
+  - `sh_currency.lua`, `sh_doors.lua`, `sh_clothing.lua` - Auto-assigned by folder name.
+  - Stub bases (`sh_equipment.lua`, `sh_locks.lua`, etc.) - Minimal bases for folders without special logic.
+  Child items become pure config (~15-30 lines).
 
 ### Derma/UI Development
 
-- **NEVER hardcode pixel sizes**: Treat hardcoded pixel values like magic numbers in web dev - they don't scale across resolutions and lead to "pixel whack-a-mole" debugging. ALL UI should be dynamically/responsively sized based on content.
+- **NEVER hardcode pixel sizes**: They don't scale across resolutions. ALL UI should be dynamically sized based on content.
 
 - **Dynamic box sizing pattern (PREFERRED)**: Measure content first, then size container to fit:
 ```lua
@@ -571,24 +539,20 @@ local lineSpacing = ScreenScale(2)
 
 - **Helix font reference**: `ixBigFont` = 36px, `ixMediumFont` = 25px, `ixSmallFont` = scales with `ScreenScale(6)` minimum 17px. Always use these for consistency.
 
-- **HUD text line spacing**: When drawing multiple lines of HUD text (status indicators, action hints, etc.), use `y + 30` for consistent vertical spacing between lines. Progress bars should be placed at the next `+ 30` increment after all text to avoid overlap:
+- **HUD text line spacing**: Use `y + 30` increments for vertical spacing. Progress bars go at next increment after last text:
 ```lua
--- Standard HUD text + progress bar spacing pattern
 draw.SimpleTextOutlined("[STATUS]", "ixMediumFont", pos.x, pos.y, statusColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
 draw.SimpleTextOutlined("E: Action", "ixSmallFont", pos.x, pos.y + 30, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
 draw.SimpleTextOutlined("Hold LMB: Other", "ixSmallFont", pos.x, pos.y + 60, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
--- Progress bar at pos.y + 90 (next increment after last text line)
-local barY = pos.y + 90
+local barY = pos.y + 90  -- Progress bar after all text
 
--- Or with yOffset for conditional lines:
+-- For conditional lines, use yOffset pattern:
 local yOffset = 30
 if showExtra then
     draw.SimpleTextOutlined("Extra", "ixSmallFont", pos.x, pos.y + yOffset, color, ...)
     yOffset = yOffset + 30
 end
-draw.SimpleTextOutlined("Next Line", "ixSmallFont", pos.x, pos.y + yOffset, color, ...)
--- Progress bar after all text
-local barY = pos.y + yOffset + 30
+local barY = pos.y + yOffset  -- Progress bar after all conditional text
 ```
 
 - **Button width from text**: Measure the longest button label, add padding:
@@ -623,4 +587,4 @@ When a save file is missing, systems typically run a bootstrap function to initi
 
 - **How I give items to myself when in game playing**: If we make a new item, to test it in game, I'll write into the text chat bar: /chargiveitem playername item quantity.
 
-- **Use developer.valvesoftware.com docs**: Use whenever you need help with anything like for example when we were implementing custom doors entity we read through https://developer.valvesoftware.com/wiki/Prop_door_rotating and it really helped us solve the problems with all the doors on the map
+- **Use developer.valvesoftware.com docs**: Invaluable for Source Engine features (e.g., Prop_door_rotating wiki helped with door system).
