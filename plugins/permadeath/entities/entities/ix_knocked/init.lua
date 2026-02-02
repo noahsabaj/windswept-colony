@@ -106,7 +106,7 @@ end
 -- CREMATION SYSTEM
 -- ============================================================================
 
--- Check if ragdoll is on fire (supports windswept_fire, vFire, and GMod native)
+-- Check if ragdoll is on fire (uses windswept_fire API with GMod native fallback)
 function ENT:IsRagdollOnFire()
     local ragdoll = self.ixRagdoll
     if not IsValid(ragdoll) then return false end
@@ -116,7 +116,7 @@ function ENT:IsRagdollOnFire()
         return ws_fire.IsOnFire(ragdoll)
     end
 
-    -- Fallback: Check .fires table (works with vFire and windswept_fire)
+    -- Fallback: Check .fires table (windswept_fire maintains this for compatibility)
     if ragdoll.fires and next(ragdoll.fires) then
         return true
     end
@@ -145,48 +145,87 @@ function ENT:ReigniteRagdoll()
     -- (in case re-ignition doesn't immediately stick, e.g., body in water)
     self.ixLastBurnThink = CurTime()
 
-    -- Use GMod native ignite - vFire will detect and take over if installed
-    ragdoll:Ignite(30)
+    -- Prefer ws_fire API if available (better particles and performance)
+    if ws_fire and ws_fire.constants then
+        local c = ws_fire.constants
+        ws_fire.CreateOnEntity(ragdoll, {
+            life = c.CREMATION_FIRE_LIFE,
+            feed = c.CREMATION_FIRE_FEED,
+            state = ws_fire.STATE_SMALL  -- Campfire-sized, not inferno
+        })
+    elseif ws_fire and ws_fire.CreateOnEntity then
+        -- Fallback if constants not loaded yet
+        ws_fire.CreateOnEntity(ragdoll, {
+            life = 10,
+            feed = 5,
+            state = ws_fire.STATE_SMALL
+        })
+    else
+        -- Fallback: Use GMod native ignite
+        ragdoll:Ignite(30)
+    end
 end
 
 -- Sustain fire at consistent intensity (body is fuel)
 -- Call periodically to prevent fire from dying down
--- Supports windswept_fire, vFire, and GMod native fire
+-- Uses windswept_fire API with GMod native fallback
 function ENT:SustainFire()
     local ragdoll = self.ixRagdoll
     if not IsValid(ragdoll) then return end
 
     local curTime = CurTime()
 
-    -- Only sustain every 5 seconds
+    -- Get sustain interval from constants or use default
+    local sustainInterval = (ws_fire and ws_fire.constants) and ws_fire.constants.CREMATION_SUSTAIN_INTERVAL or 2
+
+    -- Sustain periodically to keep fire consistently burning
     if self.ixNextFireSustain and curTime < self.ixNextFireSustain then
         return
     end
-    self.ixNextFireSustain = curTime + 5
+    self.ixNextFireSustain = curTime + sustainInterval
 
-    -- Check for fires via .fires table (works with vFire and windswept_fire)
+    -- Get target values from constants
+    local targetLife = (ws_fire and ws_fire.constants) and ws_fire.constants.CREMATION_FIRE_LIFE or 10
+    local targetFeed = (ws_fire and ws_fire.constants) and ws_fire.constants.CREMATION_FIRE_FEED or 5
+
+    -- Check for fires via .fires table (windswept_fire maintains this)
     if ragdoll.fires and next(ragdoll.fires) then
         for fire, _ in pairs(ragdoll.fires) do
             if IsValid(fire) then
-                -- Boost fire life to maintain intensity
-                -- Both vFire and windswept_fire expose .life and .feed as direct properties
-                if fire.life and fire.life < 30 then
-                    fire.life = 30
+                -- Boost fire to maintain cremation intensity (body is fuel)
+                -- windswept_fire exposes .life and .feed as direct properties
+                if fire.life ~= nil and fire.life < targetLife then
+                    fire.life = targetLife
                 end
-                -- Also add feed (fuel) so fire sustains itself
-                if fire.feed ~= nil then
-                    fire.feed = (fire.feed or 0) + 20
+                if fire.feed ~= nil and fire.feed < targetFeed then
+                    fire.feed = targetFeed
                 end
             end
         end
     else
-        -- Native GMod fire - refresh ignite to prevent dying
-        ragdoll:Ignite(30)
+        -- No fires table - create fire using ws_fire or native fallback
+        if ws_fire and ws_fire.CreateOnEntity then
+            ws_fire.CreateOnEntity(ragdoll, {
+                life = targetLife,
+                feed = targetFeed,
+                state = ws_fire.STATE_SMALL
+            })
+        else
+            -- Native GMod fire fallback
+            ragdoll:Ignite(30)
+        end
     end
 end
 
 -- Handle cremation progress tracking
 function ENT:HandleCremation()
+    -- Safety: If ragdoll was removed externally, abort cremation
+    if not IsValid(self.ixRagdoll) then
+        self.ixBurnStartTime = nil
+        self.ixLastBurnThink = nil
+        return
+    end
+
     local curTime = CurTime()
 
     -- Initialize burn tracking
@@ -291,32 +330,39 @@ function ENT:Think()
     -- (burial, cremation, disposal, etc.)
     if self:GetPermadead() then
         -- Check for cremation (burning)
-        -- Note: SustainFire() in HandleCremation keeps fire alive, so if fire
-        -- goes out it means it was actively extinguished - don't auto-reignite
-        if self:IsRagdollOnFire() then
+        local isOnFire = self:IsRagdollOnFire()
+        local burnProgress = self:GetBurnProgress()
+
+        if isOnFire then
             self:HandleCremation()
-        else
-            -- Fire not burning - clear burn tracking so resuming doesn't count gap time
-            self.ixLastBurnThink = nil
+        elseif burnProgress > 0 then
+            -- Cremation started but fire went out - body is fuel, reignite!
+            self:ReigniteRagdoll()
+            self:HandleCremation()
         end
+        -- Note: if never ignited (burnProgress == 0), don't auto-ignite
+
         self:NextThink(CurTime() + 0.5)
         return true
     end
 
     -- Check for cremation on knocked (alive but unconscious) bodies
-    -- Note: SustainFire() keeps fire alive, so if fire goes out it was
-    -- actively extinguished - don't auto-reignite, progress is preserved
-    if self:IsRagdollOnFire() then
+    local isOnFire = self:IsRagdollOnFire()
+    local burnProgress = self:GetBurnProgress()
+
+    if isOnFire then
         self:HandleCremation()
         -- Fire also halves knockout timer periodically
         if not self.ixLastFireDamage or CurTime() - self.ixLastFireDamage >= 2 then
             self:HalveTimer()
             self.ixLastFireDamage = CurTime()
         end
-    else
-        -- Fire not burning - clear burn tracking so resuming doesn't count gap time
-        self.ixLastBurnThink = nil
+    elseif burnProgress > 0 then
+        -- Cremation started but fire went out - body is fuel, reignite!
+        self:ReigniteRagdoll()
+        self:HandleCremation()
     end
+    -- Note: if never ignited (burnProgress == 0), don't auto-ignite
 
     -- Check knockout timer expiration (for knocked but not dead bodies)
     local remaining = self:GetRemainingTime()

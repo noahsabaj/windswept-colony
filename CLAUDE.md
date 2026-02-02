@@ -129,8 +129,10 @@ garrysmod/addons/
   - **API**: `ws_fire.Create(pos, opts)`, `ws_fire.CreateOnEntity(ent, opts)`, `ws_fire.Extinguish(ent)`, `ws_fire.IsOnFire(ent)`
   - **Compatibility**: Maintains `.fires` table on entities and `.life`/`.feed` properties for permadeath integration.
   - **Performance**: Cluster-level rendering (1 particle system per cluster vs per-fire), spatial hashing for O(1) neighbor lookups, batched Think processing.
-  - **entityflame override**: Kills GMod's ugly native fire so only our particles render.
-  - **Smoke effect**: `ws_fire_smoke` triggers when fire is extinguished (water, life=0, API call).
+  - **GMod native fire sync**: `CreateOnEntity()` also calls `ent:Ignite()` so `ent:IsOnFire()` returns true and context menus show "extinguish". The `Entity:Extinguish()` metatable is overridden to also remove our fires.
+  - **entityflame override**: Kills GMod's ugly native fire sprite so only our vFire particles render.
+  - **World vs entity fires**: Entity fires (with parent) decay slowly and get sustained by cremation. World fires (no parent, e.g. ceiling/walls) decay 4-5x faster and have a 60-second maximum lifetime.
+  - **Cremation integration**: The permadeath plugin's `ix_knocked` entity uses `ws_fire.CreateOnEntity()` to ignite bodies and `SustainFire()` to keep them burning until cremation completes (240 seconds).
 
 - **Door & Lock System**: Physical lock and key system replacing Helix's door ownership. Key points:
   - **Brush-based doors are ignored**: Doors with models starting with `*` (func_door, func_door_rotating) are skipped by the entire system - detection, tools, battering ram, everything. Only `prop_door_rotating` doors are managed.
@@ -453,6 +455,22 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 - **Frame timing for HUD-free captures**: Hiding HUD takes effect NEXT frame. Skip one frame before capturing: set flag, return early first PostRender call, capture on second.
 
 - **light_dynamic networks to clients**: Server-created dynamic lights DO illuminate client scenes. Brief delay (~50ms) ensures entity networks before dependent actions.
+
+### Fire System (windswept_fire)
+
+- **Particle registration is CLIENT-only**: `game.AddParticles()`, `PrecacheParticleSystem()`, and `game.AddDecal()` only work on CLIENT. Calling them on SERVER causes errors that break addon loading. Always wrap in `if CLIENT then`.
+
+- **Particle names are case-sensitive**: vFire particles use exact capitalization like `vFire_Flames_Medium` (capital M). Using lowercase (`medium`) silently fails - particles won't render.
+
+- **CreateParticleSystem requires 4 parameters**: GMod's `CreateParticleSystem(ent, name, attachType, attachIndex)` needs all 4 args. Missing the 4th parameter causes particles to not render.
+
+- **GMod native fire state must be synced**: GMod's context menu checks `ent:IsOnFire()` for ignite/extinguish options. Our fire system must call `ent:Ignite()` when creating fire and override `Entity:Extinguish()` to remove our fires. Without this, context menu shows "ignite" even when body is burning.
+
+- **World fires need faster decay**: Entity fires (bodies, props) get sustained by the cremation system, but world fires (ceilings, walls) have no fuel source. World fires must decay 4-5x faster AND have a maximum lifetime (60 seconds) or they burn forever.
+
+- **Cluster batch processing must cap to fire count**: When processing fires in batches, `batchSize = math.min(convar, count)` prevents the loop from processing the same fire multiple times per tick when fire count < batch size.
+
+- **RenderGroup for particles**: Entities rendering particles need `ENT.RenderGroup = RENDERGROUP_TRANSLUCENT` or particles may not render correctly.
 
 ### Lua Basics
 

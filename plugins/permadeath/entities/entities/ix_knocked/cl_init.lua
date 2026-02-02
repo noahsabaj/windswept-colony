@@ -330,37 +330,61 @@ end)
 -- CREMATION VISUAL FEEDBACK (Body Darkening)
 -- ============================================================================
 
--- Cache ragdoll lookup (ents.FindByClass is expensive every frame)
-local cachedRagdolls = {}
+-- Cache for knocked ragdolls only (not ALL ragdolls)
+-- Structure: { ragdoll = knockedEntity, ... }
+local knockedRagdollCache = {}
+local knockedRagdollCount = 0
 local lastRagdollUpdate = 0
-local RAGDOLL_CACHE_INTERVAL = 0.5 -- Update every 0.5 seconds
+local RAGDOLL_CACHE_INTERVAL = 0.5
+
+-- Pre-allocate color object to avoid GC pressure
+local COLOR_WHITE = Color(255, 255, 255)
+local CREMATION_DURATION = 240
 
 -- Darken burning ragdolls based on cremation progress
 hook.Add("PreDrawOpaqueRenderables", "ixKnockedBurnDarkening", function()
-    -- Update ragdoll cache periodically instead of every frame
     local curTime = RealTime()
+
+    -- Update cache periodically - only find KNOCKED ragdolls, not all ragdolls
     if curTime - lastRagdollUpdate > RAGDOLL_CACHE_INTERVAL then
-        cachedRagdolls = ents.FindByClass("prop_ragdoll")
+        -- Clear old cache
+        knockedRagdollCache = {}
+        knockedRagdollCount = 0
+
+        -- Only iterate ragdolls once per cache interval
+        for _, ragdoll in ipairs(ents.FindByClass("prop_ragdoll")) do
+            if IsValid(ragdoll) then
+                local knockedEnt = ragdoll:GetNetVar("ixKnockedEntity")
+                if IsValid(knockedEnt) then
+                    knockedRagdollCache[ragdoll] = knockedEnt
+                    knockedRagdollCount = knockedRagdollCount + 1
+                end
+            end
+        end
+
         lastRagdollUpdate = curTime
     end
 
-    for _, ragdoll in ipairs(cachedRagdolls) do
-        if IsValid(ragdoll) then
-            local knockedEnt = ragdoll:GetNetVar("ixKnockedEntity")
-            if IsValid(knockedEnt) then
-                local burnProgress = knockedEnt:GetBurnProgress()
-                if burnProgress and burnProgress > 0 then
-                    local duration = 240 -- Standard cremation time
-                    local progress = math.Clamp(burnProgress / duration, 0, 1)
-                    local darkness = 255 - (progress * 225) -- 255 -> 30
-                    ragdoll:SetColor(Color(darkness, darkness, darkness))
-                else
-                    -- Reset color if not burning
-                    local curColor = ragdoll:GetColor()
-                    if curColor.r ~= 255 or curColor.g ~= 255 or curColor.b ~= 255 then
-                        ragdoll:SetColor(Color(255, 255, 255))
-                    end
-                end
+    -- Early return if no knocked ragdolls (common case - saves per-frame iteration)
+    if knockedRagdollCount == 0 then return end
+
+    -- Only process knocked ragdolls (not all ragdolls on map)
+    for ragdoll, knockedEnt in pairs(knockedRagdollCache) do
+        if not IsValid(ragdoll) or not IsValid(knockedEnt) then
+            -- Stale cache entry, will be cleaned on next cache update
+            continue
+        end
+
+        local burnProgress = knockedEnt:GetBurnProgress()
+        if burnProgress and burnProgress > 0 then
+            local progress = math.Clamp(burnProgress / CREMATION_DURATION, 0, 1)
+            local darkness = 255 - (progress * 225)
+            ragdoll:SetColor(Color(darkness, darkness, darkness))
+        else
+            -- Reset color if not burning (check first to avoid unnecessary SetColor)
+            local curColor = ragdoll:GetColor()
+            if curColor.r ~= 255 then
+                ragdoll:SetColor(COLOR_WHITE)
             end
         end
     end
