@@ -108,6 +108,7 @@ function PLUGIN:InitializedPlugins()
 end
 
 -- Include server and client files
+ix.util.Include("sh_factionperms.lua")  -- Permission system (must load before commands)
 ix.util.Include("sv_plugin.lua")
 ix.util.Include("cl_plugin.lua")
 ix.util.Include("sv_commands.lua")
