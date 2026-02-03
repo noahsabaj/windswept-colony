@@ -144,25 +144,21 @@ function PANEL:SetExistingContent(content)
     self.existingText:SizeToContentsY()
 end
 
-function PANEL:SetWritingTool(toolType)
+function PANEL:SetWritingTool(toolType, toolItem)
     self.toolType = toolType
-
-    -- Get resource amount from equipped item
-    local client = LocalPlayer()
+    self.toolItem = toolItem
 
     if toolType == "pen" then
-        local item = client.ixPenItem
-        if item then
-            self.resourceRemaining = item:GetInk()
-            self.maxResource = item.maxInk
+        if toolItem then
+            self.resourceRemaining = toolItem:GetInk()
+            self.maxResource = toolItem.maxInk or 1000
         end
         self.signBtn:SetEnabled(true)
         self.signBtn:SetText("Add Signature")
     else
-        local item = client.ixPencilItem
-        if item then
-            self.resourceRemaining = item:GetData("lead", 500)
-            self.maxResource = item.maxLead or 500
+        if toolItem then
+            self.resourceRemaining = toolItem:GetLead()
+            self.maxResource = toolItem.maxLead or 500
         end
         -- Pencils cannot sign
         self.signBtn:SetEnabled(false)
@@ -222,14 +218,14 @@ function PANEL:SaveDocument()
     local totalCost = contentLength + signatureCost
 
     if totalCost > self.resourceRemaining then
-        local resourceName = self.toolType == "pen" and "ink" or "lead"
         LocalPlayer():NotifyLocalized("notEnough" .. (self.toolType == "pen" and "Ink" or "Lead"))
         return
     end
 
-    -- Send to server
+    -- Send to server (include tool item ID for resource consumption)
     net.Start("ixDocumentWrite")
         net.WriteUInt(self.paperItem:GetID(), 32)
+        net.WriteUInt(self.toolItem and self.toolItem:GetID() or 0, 32)  -- Tool item ID
         net.WriteString(content)
         net.WriteBool(self.signatureData ~= nil)
         if self.signatureData then

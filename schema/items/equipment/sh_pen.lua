@@ -4,6 +4,8 @@
     A ballpoint pen for writing on paper.
     Ink-based, cannot be erased. Can be used for signatures.
     Ink capacity: 1000 characters.
+
+    NOT equippable - just needs to be in inventory to write.
 ]]--
 
 ITEM.name = "Pen"
@@ -12,13 +14,6 @@ ITEM.model = "models/props_lab/clipboard.mdl"  -- Placeholder
 ITEM.width = 1
 ITEM.height = 1
 ITEM.category = "Equipment"
-
-ITEM.base = "base_equippable"
-ITEM.equipWeaponClass = "ix_pen"
-ITEM.equipPlayerKey = "ixPenItem"
-ITEM.equipNotifyKey = "penEquipped"
-ITEM.equipTip = "Hold the pen in your hand."
-ITEM.unequipTip = "Put the pen away."
 
 -- Ink capacity
 ITEM.maxInk = 1000
@@ -53,17 +48,6 @@ function ITEM:GetInkPercent()
     return self:GetInk() / self.maxInk
 end
 
--- Override CanEquip from base
-function ITEM:CanEquip()
-    if not self:HasInk() then
-        if CLIENT then
-            LocalPlayer():NotifyLocalized("penOutOfInk")
-        end
-        return false
-    end
-    return true
-end
-
 -- ============================================================================
 -- DESCRIPTION
 -- ============================================================================
@@ -87,12 +71,6 @@ end
 
 if CLIENT then
     function ITEM:PaintOver(item, w, h)
-        -- Equipped indicator (from base)
-        if item:GetData("equipped") then
-            surface.SetDrawColor(110, 255, 110, 200)
-            surface.DrawRect(w - 14, h - 14, 8, 8)
-        end
-
         -- Ink level bar
         local ink = item:GetData("ink", item.maxInk)
         local inkPercent = ink / item.maxInk

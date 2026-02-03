@@ -3,6 +3,8 @@
 
     A rubber eraser for erasing pencil marks from papers.
     Durability: 500 characters worth of erasing.
+
+    NOT equippable - just needs to be in inventory to erase.
 ]]--
 
 ITEM.name = "Eraser"
@@ -11,13 +13,6 @@ ITEM.model = "models/props_lab/box01a.mdl"  -- Placeholder (small box)
 ITEM.width = 1
 ITEM.height = 1
 ITEM.category = "Equipment"
-
-ITEM.base = "base_equippable"
-ITEM.equipWeaponClass = "ix_eraser"
-ITEM.equipPlayerKey = "ixEraserItem"
-ITEM.equipNotifyKey = "eraserEquipped"
-ITEM.equipTip = "Hold the eraser in your hand."
-ITEM.unequipTip = "Put the eraser away."
 
 -- Eraser properties
 ITEM.maxDurability = 500
@@ -45,17 +40,6 @@ function ITEM:GetDurabilityPercent()
     return self:GetDurability() / self.maxDurability
 end
 
--- Override CanEquip from base
-function ITEM:CanEquip()
-    if not self:HasDurability() then
-        if CLIENT then
-            LocalPlayer():NotifyLocalized("eraserWornOut")
-        end
-        return false
-    end
-    return true
-end
-
 -- ============================================================================
 -- DESCRIPTION
 -- ============================================================================
@@ -79,12 +63,6 @@ end
 
 if CLIENT then
     function ITEM:PaintOver(item, w, h)
-        -- Equipped indicator (from base)
-        if item:GetData("equipped") then
-            surface.SetDrawColor(110, 255, 110, 200)
-            surface.DrawRect(w - 14, h - 14, 8, 8)
-        end
-
         -- Durability bar
         local durability = item:GetData("durability", item.maxDurability)
         local durPercent = durability / item.maxDurability

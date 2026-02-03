@@ -11,6 +11,7 @@
 
 net.Receive("ixDocumentWrite", function(len, client)
     local itemID = net.ReadUInt(32)
+    local toolItemID = net.ReadUInt(32)
     local content = net.ReadString()
     local hasSignature = net.ReadBool()
     local signatureJSON = hasSignature and net.ReadString() or nil
@@ -21,7 +22,7 @@ net.Receive("ixDocumentWrite", function(len, client)
     local char = client:GetCharacter()
     if not char then return end
 
-    -- Validate item
+    -- Validate paper item
     local item = ix.item.instances[itemID]
     if not item then return end
     if item.uniqueID ~= "paper" then return end
@@ -30,15 +31,15 @@ net.Receive("ixDocumentWrite", function(len, client)
     local inv = char:GetInventory()
     if not inv then return end
 
-    local found = false
+    local foundPaper = false
     for _, invItem in pairs(inv:GetItems()) do
         if invItem:GetID() == itemID then
-            found = true
+            foundPaper = true
             break
         end
     end
 
-    if not found then return end
+    if not foundPaper then return end
 
     -- Handle rename-only operation
     if isRename and newTitle ~= "" then
@@ -57,31 +58,38 @@ net.Receive("ixDocumentWrite", function(len, client)
         return
     end
 
-    -- Validate writing tool
-    local weapon = client:GetActiveWeapon()
-    if not IsValid(weapon) then
+    -- Validate writing tool from inventory
+    local toolItem = ix.item.instances[toolItemID]
+    if not toolItem then
         client:NotifyLocalized("needWritingTool")
         return
     end
 
+    -- Verify tool is in player's inventory
+    local foundTool = false
+    for _, invItem in pairs(inv:GetItems()) do
+        if invItem:GetID() == toolItemID then
+            foundTool = true
+            break
+        end
+    end
+
+    if not foundTool then
+        client:NotifyLocalized("needWritingTool")
+        return
+    end
+
+    -- Determine tool type and resource
     local toolType
-    local toolItem
     local resourceKey
 
-    if weapon:GetClass() == "ix_pen" then
+    if toolItem.uniqueID == "pen" then
         toolType = "handwritten"
-        toolItem = client.ixPenItem
         resourceKey = "ink"
-    elseif weapon:GetClass() == "ix_pencil" then
+    elseif toolItem.uniqueID == "pencil" or toolItem.uniqueID == "pencil_eraser" then
         toolType = "pencil"
-        toolItem = client.ixPencilItem
         resourceKey = "lead"
     else
-        client:NotifyLocalized("needWritingTool")
-        return
-    end
-
-    if not toolItem then
         client:NotifyLocalized("needWritingTool")
         return
     end
@@ -96,7 +104,7 @@ net.Receive("ixDocumentWrite", function(len, client)
     if resourceKey == "ink" then
         currentResource = toolItem:GetInk()
     else
-        currentResource = toolItem:GetData("lead", 500)
+        currentResource = toolItem:GetLead()
     end
 
     if totalCost > currentResource then
@@ -177,12 +185,11 @@ net.Receive("ixDocumentWrite", function(len, client)
         item:SetData("signatureAuthor", char:GetName())
     end
 
-    -- Consume resource
+    -- Consume resource from tool
     if resourceKey == "ink" then
         toolItem:UseInk(totalCost)
     else
-        local newLead = math.max(0, toolItem:GetData("lead", 500) - totalCost)
-        toolItem:SetData("lead", newLead)
+        toolItem:UseLead(totalCost)
     end
 
     client:NotifyLocalized("documentSaved")
@@ -244,15 +251,15 @@ net.Receive("ixDocumentErase", function(len, client)
     local inv = char:GetInventory()
     if not inv then return end
 
-    local found = false
+    local foundPaper = false
     for _, invItem in pairs(inv:GetItems()) do
         if invItem:GetID() == itemID then
-            found = true
+            foundPaper = true
             break
         end
     end
 
-    if not found then return end
+    if not foundPaper then return end
 
     -- Check if document is erasable (pencil only)
     if item:GetDocumentType() ~= "pencil" then
@@ -260,28 +267,19 @@ net.Receive("ixDocumentErase", function(len, client)
         return
     end
 
-    -- Validate eraser tool
-    local weapon = client:GetActiveWeapon()
-    if not IsValid(weapon) then
-        client:NotifyLocalized("needEraser")
-        return
-    end
-
-    local hasEraser = false
+    -- Find eraser in inventory (standalone eraser or pencil with eraser)
     local eraserItem = nil
-
-    if weapon:GetClass() == "ix_eraser" then
-        hasEraser = true
-        eraserItem = client.ixEraserItem
-    elseif weapon:GetClass() == "ix_pencil" then
-        local pencilItem = client.ixPencilItem
-        if pencilItem and pencilItem.hasEraser then
-            hasEraser = true
-            eraserItem = pencilItem
+    for _, invItem in pairs(inv:GetItems()) do
+        if invItem.uniqueID == "eraser" and invItem:GetDurability() > 0 then
+            eraserItem = invItem
+            break
+        elseif invItem.uniqueID == "pencil_eraser" then
+            eraserItem = invItem
+            break
         end
     end
 
-    if not hasEraser then
+    if not eraserItem then
         client:NotifyLocalized("needEraser")
         return
     end
@@ -295,17 +293,18 @@ net.Receive("ixDocumentErase", function(len, client)
 
     local contentLength = #(docData.content or "")
 
-    -- Check eraser durability (if standalone eraser)
-    if eraserItem and eraserItem.uniqueID == "eraser" then
-        local durability = eraserItem:GetData("durability", 500)
+    -- Check and consume eraser durability (if standalone eraser)
+    if eraserItem.uniqueID == "eraser" then
+        local durability = eraserItem:GetDurability()
         if durability < contentLength then
             client:NotifyLocalized("eraserNotEnoughDurability")
             return
         end
 
         -- Consume durability
-        eraserItem:SetData("durability", durability - contentLength)
+        eraserItem:UseDurability(contentLength)
     end
+    -- Pencil with eraser has unlimited erasing (no durability cost)
 
     -- Delete the document file
     ix.documents.Delete(paperID)

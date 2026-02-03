@@ -312,17 +312,14 @@ LANGUAGE = {
     selectPaperFirst = "Select a paper first.",
 
     -- Pen
-    penEquipped = "Unequip the pen first.",
     penOutOfInk = "This pen is out of ink.",
     penRefilled = "Pen refilled.",
     penAlreadyFull = "Pen is already full.",
 
     -- Pencil
-    pencilEquipped = "Unequip the pencil first.",
     pencilOutOfLead = "This pencil is out of lead.",
 
     -- Eraser
-    eraserEquipped = "Unequip the eraser first.",
     eraserWornOut = "This eraser is worn out.",
     eraserNotEnoughDurability = "Eraser doesn't have enough durability.",
 

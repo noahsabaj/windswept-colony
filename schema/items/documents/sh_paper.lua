@@ -162,34 +162,45 @@ ITEM.functions.Read = {
     end
 }
 
--- Write: Open editor to write on paper (requires pen/pencil equipped)
+-- Write: Open editor to write on paper (requires pen/pencil in inventory)
 ITEM.functions.Write = {
     name = "Write",
     tip = "Write on this paper.",
     icon = "icon16/pencil.png",
     OnClick = function(item)
         local client = LocalPlayer()
-        local weapon = client:GetActiveWeapon()
+        local char = client:GetCharacter()
+        if not char then return false end
 
-        -- Check for writing tool
-        if not IsValid(weapon) then
+        local inv = char:GetInventory()
+        if not inv then return false end
+
+        -- Find writing tool in inventory (pen or pencil with ink/lead)
+        local toolType = nil
+        local toolItem = nil
+
+        for _, invItem in pairs(inv:GetItems()) do
+            if invItem.uniqueID == "pen" and invItem:GetInk() > 0 then
+                toolType = "pen"
+                toolItem = invItem
+                break  -- Prefer pen
+            elseif (invItem.uniqueID == "pencil" or invItem.uniqueID == "pencil_eraser") and invItem:GetLead() > 0 then
+                if not toolType then  -- Only use pencil if no pen found
+                    toolType = "pencil"
+                    toolItem = invItem
+                end
+            end
+        end
+
+        if not toolType then
             client:NotifyLocalized("needWritingTool")
             return false
         end
-
-        local weaponClass = weapon:GetClass()
-        if weaponClass ~= "ix_pen" and weaponClass ~= "ix_pencil" then
-            client:NotifyLocalized("needWritingTool")
-            return false
-        end
-
-        -- Determine tool type
-        local toolType = weaponClass == "ix_pen" and "pen" or "pencil"
 
         -- Open editor
         local editor = vgui.Create("ixDocumentEditor")
         editor:SetPaper(item)
-        editor:SetWritingTool(toolType)
+        editor:SetWritingTool(toolType, toolItem)
 
         return false
     end,
@@ -198,11 +209,22 @@ ITEM.functions.Write = {
         if not CLIENT then return true end
 
         local client = LocalPlayer()
-        local weapon = client:GetActiveWeapon()
-        if not IsValid(weapon) then return false end
+        local char = client:GetCharacter()
+        if not char then return false end
 
-        local weaponClass = weapon:GetClass()
-        return weaponClass == "ix_pen" or weaponClass == "ix_pencil"
+        local inv = char:GetInventory()
+        if not inv then return false end
+
+        -- Check for any writing tool with resource
+        for _, invItem in pairs(inv:GetItems()) do
+            if invItem.uniqueID == "pen" and invItem:GetInk() > 0 then
+                return true
+            elseif (invItem.uniqueID == "pencil" or invItem.uniqueID == "pencil_eraser") and invItem:GetLead() > 0 then
+                return true
+            end
+        end
+
+        return false
     end
 }
 
@@ -245,31 +267,32 @@ ITEM.functions.Rename = {
     end
 }
 
--- Erase: Erase pencil content (requires eraser)
+-- Erase: Erase pencil content (requires eraser in inventory)
 ITEM.functions.Erase = {
     name = "Erase",
     tip = "Erase the pencil writing from this paper.",
     icon = "icon16/page_white_delete.png",
     OnClick = function(item)
         local client = LocalPlayer()
-        local weapon = client:GetActiveWeapon()
+        local char = client:GetCharacter()
+        if not char then return false end
 
-        -- Check for eraser tool
-        local canErase = false
-        if IsValid(weapon) then
-            local weaponClass = weapon:GetClass()
-            if weaponClass == "ix_eraser" then
-                canErase = true
-            elseif weaponClass == "ix_pencil" then
-                -- Check if pencil has eraser
-                local pencilItem = client.ixPencilItem
-                if pencilItem and pencilItem.hasEraser then
-                    canErase = true
-                end
+        local inv = char:GetInventory()
+        if not inv then return false end
+
+        -- Check for eraser in inventory (standalone or pencil with eraser)
+        local hasEraser = false
+        for _, invItem in pairs(inv:GetItems()) do
+            if invItem.uniqueID == "eraser" and invItem:GetDurability() > 0 then
+                hasEraser = true
+                break
+            elseif invItem.uniqueID == "pencil_eraser" then
+                hasEraser = true
+                break
             end
         end
 
-        if not canErase then
+        if not hasEraser then
             client:NotifyLocalized("needEraser")
             return false
         end
@@ -296,17 +319,20 @@ ITEM.functions.Erase = {
         if IsValid(item.entity) then return false end
         if not CLIENT then return true end
 
-        -- Check for eraser tool
         local client = LocalPlayer()
-        local weapon = client:GetActiveWeapon()
-        if not IsValid(weapon) then return false end
+        local char = client:GetCharacter()
+        if not char then return false end
 
-        local weaponClass = weapon:GetClass()
-        if weaponClass == "ix_eraser" then return true end
+        local inv = char:GetInventory()
+        if not inv then return false end
 
-        if weaponClass == "ix_pencil" then
-            local pencilItem = client.ixPencilItem
-            return pencilItem and pencilItem.hasEraser
+        -- Check for eraser in inventory
+        for _, invItem in pairs(inv:GetItems()) do
+            if invItem.uniqueID == "eraser" and invItem:GetDurability() > 0 then
+                return true
+            elseif invItem.uniqueID == "pencil_eraser" then
+                return true
+            end
         end
 
         return false
