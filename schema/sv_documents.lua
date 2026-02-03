@@ -394,6 +394,74 @@ net.Receive("ixDocumentDestroy", function(len, client)
 end)
 
 -- ============================================================================
+-- CONTAINER RENAME HANDLER (envelopes, folders)
+-- ============================================================================
+
+net.Receive("ixContainerRename", function(len, client)
+    local itemID = net.ReadUInt(32)
+    local newName = net.ReadString()
+
+    -- Validate character
+    local char = client:GetCharacter()
+    if not char then return end
+
+    -- Validate item
+    local item = ix.item.instances[itemID]
+    if not item then return end
+
+    -- Only allow renaming containers (envelopes, folders)
+    local validContainers = {
+        envelope_small = true,
+        envelope_large = true,
+        folder = true
+    }
+
+    if not validContainers[item.uniqueID] then return end
+
+    -- Validate ownership
+    local inv = char:GetInventory()
+    if not inv then return end
+
+    local foundItem = false
+    for _, invItem in pairs(inv:GetItems()) do
+        if invItem:GetID() == itemID then
+            foundItem = true
+            break
+        end
+    end
+
+    if not foundItem then return end
+
+    -- Check for writing tool in inventory
+    local penTypes = {pen = true, pen_black = true, pen_red = true, pen_green = true}
+    local hasWritingTool = false
+
+    for _, invItem in pairs(inv:GetItems()) do
+        if penTypes[invItem.uniqueID] and invItem:GetInk() > 0 then
+            hasWritingTool = true
+            break
+        elseif (invItem.uniqueID == "pencil" or invItem.uniqueID == "pencil_eraser") and invItem:GetLead() > 0 then
+            hasWritingTool = true
+            break
+        end
+    end
+
+    if not hasWritingTool then
+        client:NotifyLocalized("needWritingTool")
+        return
+    end
+
+    -- Set the custom name (empty string clears it)
+    if newName == "" then
+        item:SetData("customName", nil)
+    else
+        item:SetData("customName", string.sub(newName, 1, 32))
+    end
+
+    client:NotifyLocalized("containerRenamed")
+end)
+
+-- ============================================================================
 -- PEN REFILL HANDLER
 -- ============================================================================
 

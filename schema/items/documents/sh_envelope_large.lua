@@ -185,6 +185,18 @@ function ITEM:OnRegistered()
 end
 
 -- ============================================================================
+-- NAME OVERRIDE
+-- ============================================================================
+
+function ITEM:GetName()
+    local customName = self:GetData("customName")
+    if customName and customName ~= "" then
+        return customName
+    end
+    return self.name
+end
+
+-- ============================================================================
 -- DESCRIPTION
 -- ============================================================================
 
@@ -221,6 +233,66 @@ if CLIENT then
         end
     end
 end
+
+-- ============================================================================
+-- RENAME FUNCTION (requires pen/pencil in inventory)
+-- ============================================================================
+
+local function hasWritingTool(client)
+    local char = client:GetCharacter()
+    if not char then return false end
+
+    local inv = char:GetInventory()
+    if not inv then return false end
+
+    local penTypes = {pen = true, pen_black = true, pen_red = true, pen_green = true}
+
+    for _, invItem in pairs(inv:GetItems()) do
+        if penTypes[invItem.uniqueID] and invItem:GetInk() > 0 then
+            return true
+        elseif (invItem.uniqueID == "pencil" or invItem.uniqueID == "pencil_eraser") and invItem:GetLead() > 0 then
+            return true
+        end
+    end
+
+    return false
+end
+
+ITEM.functions.Rename = {
+    name = "Name",
+    tip = "Write a name on this envelope.",
+    icon = "icon16/textfield_rename.png",
+    OnRun = function(item)
+        return false
+    end,
+    OnClick = function(item)
+        local currentName = item:GetData("customName", "")
+
+        Derma_StringRequest(
+            "Name Envelope",
+            "Write a name on this envelope (max 32 characters):",
+            currentName,
+            function(text)
+                if text then
+                    net.Start("ixContainerRename")
+                        net.WriteUInt(item:GetID(), 32)
+                        net.WriteString(string.sub(text, 1, 32))
+                    net.SendToServer()
+                end
+            end,
+            function() end,
+            "Write",
+            "Cancel"
+        )
+        return false
+    end,
+    OnCanRun = function(item)
+        if IsValid(item.entity) then return false end
+        if not CLIENT then return true end
+
+        return hasWritingTool(LocalPlayer())
+    end
+}
 
 -- ============================================================================
 -- VIEW FUNCTION (Helix auto-bag-open)

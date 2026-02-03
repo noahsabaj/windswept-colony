@@ -40,14 +40,6 @@ function ITEM:HasContent()
     return self:GetPaperID() ~= nil
 end
 
-function ITEM:GetTitle()
-    return self:GetData("title", "")
-end
-
-function ITEM:HasTitle()
-    return self:GetData("titleSet", false)
-end
-
 function ITEM:GetAuthor()
     return self:GetData("author", "Unknown")
 end
@@ -77,13 +69,8 @@ function ITEM:IsErasable()
     return self:GetDocumentType() == "pencil"
 end
 
--- Override GetName to show title if set
+-- Override GetName to show if written
 function ITEM:GetName()
-    local title = self:GetTitle()
-    if title and title ~= "" then
-        return title
-    end
-
     if self:HasContent() then
         return "Written Paper"
     end
@@ -239,45 +226,6 @@ ITEM.functions.Write = {
         end
 
         return false
-    end
-}
-
--- Rename: Set a title for the paper (once only)
-ITEM.functions.Rename = {
-    name = "Name Document",
-    tip = "Give this document a title.",
-    icon = "icon16/textfield_rename.png",
-    OnRun = function(item)
-        return false  -- Handled via derma
-    end,
-    OnClick = function(item)
-        Derma_StringRequest(
-            "Name Document",
-            "Enter a title for this document (max 64 characters):",
-            item:GetTitle() ~= "" and item:GetTitle() or "",
-            function(text)
-                if text and text ~= "" then
-                    net.Start("ixDocumentWrite")
-                        net.WriteUInt(item:GetID(), 32)
-                        net.WriteString("")  -- Empty content (just renaming)
-                        net.WriteBool(false)  -- No signature
-                        net.WriteBool(true)   -- Is rename operation
-                        net.WriteString(string.sub(text, 1, 64))
-                    net.SendToServer()
-                end
-            end,
-            function() end,
-            "Confirm",
-            "Cancel"
-        )
-        return false
-    end,
-    OnCanRun = function(item)
-        -- Can only rename if paper has content and not already named
-        if not item:GetData("paperID") then return false end
-        if item:HasTitle() then return false end
-        if IsValid(item.entity) then return false end
-        return true
     end
 }
 

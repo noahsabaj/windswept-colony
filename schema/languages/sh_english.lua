@@ -309,6 +309,7 @@ LANGUAGE = {
     notEnoughLead = "Not enough lead!",
     paperBlank = "This paper is blank.",
     paperOnly = "Only paper can be stored here.",
+    containerRenamed = "Name written.",
     signatureEmpty = "Draw a signature first.",
     selectPaperFirst = "Select a paper first.",
 

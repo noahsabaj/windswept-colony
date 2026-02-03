@@ -18,7 +18,7 @@ function PANEL:Init()
     -- Header panel
     local headerPanel = vgui.Create("DPanel", self)
     headerPanel:Dock(TOP)
-    headerPanel:SetTall(70)
+    headerPanel:SetTall(40)
     headerPanel.Paint = function(pnl, w, h)
         surface.SetDrawColor(35, 35, 35)
         surface.DrawRect(0, 0, w, h)
@@ -26,18 +26,10 @@ function PANEL:Init()
         surface.DrawLine(0, h - 1, w, h - 1)
     end
 
-    -- Title
-    self.titleLabel = vgui.Create("DLabel", headerPanel)
-    self.titleLabel:Dock(TOP)
-    self.titleLabel:DockMargin(15, 10, 15, 0)
-    self.titleLabel:SetFont("ixMediumFont")
-    self.titleLabel:SetText("Untitled Document")
-    self.titleLabel:SetTextColor(Color(220, 220, 220))
-
     -- Metadata (type, word count) - NO author shown (fog of war)
     self.metaLabel = vgui.Create("DLabel", headerPanel)
     self.metaLabel:Dock(TOP)
-    self.metaLabel:DockMargin(15, 5, 15, 10)
+    self.metaLabel:DockMargin(15, 10, 15, 10)
     self.metaLabel:SetText("Handwritten | 0 words")
     self.metaLabel:SetTextColor(Color(150, 150, 150))
 
@@ -90,14 +82,6 @@ end
 
 function PANEL:SetDocument(data)
     if not data then return end
-
-    -- Title
-    local title = data.title
-    if not title or title == "" then
-        title = "Untitled Document"
-    end
-    self.titleLabel:SetText(title)
-    self:SetTitle(title)
 
     -- Metadata (NO author - fog of war)
     local docType = ix.documents and ix.documents.FormatType(data.documentType) or (data.documentType or "Unknown")
