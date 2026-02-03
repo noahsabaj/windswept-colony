@@ -152,3 +152,16 @@ util.AddNetworkString("ixStationaryRadioClose")     -- Client->Server: client cl
 util.AddNetworkString("ixStationaryRadioConfig")    -- Client->Server: channel config change
 util.AddNetworkString("ixStationaryRadioTransmit")  -- Client->Server: text message
 util.AddNetworkString("ixStationaryRadioMic")       -- Client->Server: mic toggle
+
+-- =============================================================================
+-- DOCUMENT SYSTEM (schema/libs/sh_documents.lua, schema/sv_documents.lua)
+-- =============================================================================
+util.AddNetworkString("ixDocumentWrite")       -- Client->Server: write content to paper
+util.AddNetworkString("ixDocumentRead")        -- Client->Server: request document content
+util.AddNetworkString("ixDocumentData")        -- Server->Client: send document content
+util.AddNetworkString("ixDocumentErase")       -- Client->Server: erase pencil content
+util.AddNetworkString("ixDocumentSign")        -- Client->Server: add signature to document
+util.AddNetworkString("ixPenRefill")           -- Client->Server: refill pen with ink
+util.AddNetworkString("ixTypewriterOpen")      -- Server->Client: open typewriter UI
+util.AddNetworkString("ixTypewriterWrite")     -- Client->Server: type content on paper
+util.AddNetworkString("ixTypewriterClose")     -- Client->Server: close typewriter UI

@@ -293,4 +293,41 @@ LANGUAGE = {
     walletOnlyCurrency = "Only cash, coins, and ID cards can be stored in wallets.",
     walletCashOnly = "This wallet only accepts cash.",
     walletCoinsOnly = "This wallet only accepts coins.",
+
+    -- Document System
+    needWritingTool = "You need a pen or pencil equipped.",
+    needEraser = "You need an eraser to erase pencil writing.",
+    documentSaved = "Document saved.",
+    documentEmpty = "Nothing to save.",
+    documentErased = "Paper erased.",
+    documentRenamed = "Document renamed: %s",
+    documentAlreadyNamed = "This document has already been named.",
+    documentSaveFailed = "Failed to save document.",
+    cannotErasePen = "Pen writing cannot be erased.",
+    notEnoughInk = "Not enough ink!",
+    notEnoughLead = "Not enough lead!",
+    paperBlank = "This paper is blank.",
+    paperOnly = "Only paper can be stored here.",
+    signatureEmpty = "Draw a signature first.",
+    selectPaperFirst = "Select a paper first.",
+
+    -- Pen
+    penEquipped = "Unequip the pen first.",
+    penOutOfInk = "This pen is out of ink.",
+    penRefilled = "Pen refilled.",
+    penAlreadyFull = "Pen is already full.",
+
+    -- Pencil
+    pencilEquipped = "Unequip the pencil first.",
+    pencilOutOfLead = "This pencil is out of lead.",
+
+    -- Eraser
+    eraserEquipped = "Unequip the eraser first.",
+    eraserWornOut = "This eraser is worn out.",
+    eraserNotEnoughDurability = "Eraser doesn't have enough durability.",
+
+    -- Typewriter
+    typewriterPlaced = "Typewriter placed.",
+    typewriterPickedUp = "Typewriter picked up.",
+    typewriterInUse = "Someone is using this typewriter.",
 }

@@ -20,6 +20,9 @@ ix.util.Include("libs/sh_wallet.lua")
 -- Include radio utilities library (for handheld and stationary radios)
 ix.util.Include("libs/sh_radio.lua")
 
+-- Include document system library (for paper, writing tools, document containers)
+ix.util.Include("libs/sh_documents.lua")
+
 -- Include centralized constants (must be early, before other files use them)
 ix.util.Include("sh_constants.lua")
 

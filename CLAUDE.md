@@ -38,6 +38,7 @@ windswept/
 │   │   ├── sh_doors.lua     # Door system library
 │   │   ├── sh_wallet.lua    # Wallet/currency library
 │   │   ├── sh_radio.lua     # Radio utilities (frequency validation, etc.)
+│   │   ├── sh_documents.lua # Document system library (file-based storage)
 │   │   └── thirdparty/      # Third-party libs
 │   │       └── sh_netstream2.lua
 │   ├── languages/           # Localization
@@ -95,13 +96,14 @@ garrysmod/addons/
   - `BATTERY_FULL_CHARGE` - 100up
   - Helper functions: `ix.constants.WithinRange()`, `ix.constants.CanInteract()`
 
-- **Network String Registry** (`schema/sv_netstrings.lua`): All schema and entity network strings are centralized here. This file is included by sv_schema.lua and registers 60 strings for:
+- **Network String Registry** (`schema/sv_netstrings.lua`): All schema and entity network strings are centralized here. This file is included by sv_schema.lua and registers 70+ strings for:
   - Currency system (ixMoneyDestroy, ixMoneyGive, ixCurrencySplit, etc.)
   - Photo system (ixPhotoRename, ixPhotoRequest, ixPhotoAlbumView, etc.)
   - Door system (ixDoorsSync, ixDoorInstall, etc.)
   - Lock system (ixLockInstall, ixLockpickStart, ixKeyringLock, etc.)
   - Equipment (ixFlashlightSetLight, ixLanternSetLight, ixCameraRequestPhoto, etc.)
   - Locksmith machine (ixLocksmithOpen, ixLocksmithProgramLock, etc.)
+  - Document system (ixDocumentWrite, ixDocumentRead, ixDocumentData, ixDocumentErase, ixTypewriterOpen, etc.)
 
   Plugin strings remain in their plugins: permadeath (10), prisoner/restraint (4).
 
@@ -159,6 +161,30 @@ garrysmod/addons/
   - **Leash**: Hold RMB on restrained player near a surface to anchor them to it. Leashed players can't move.
   - **Unleash**: Press E on leashed player to release anchor (still restrained).
   - **Gavel**: RP prop that makes slam noise on LMB. Anyone can use.
+
+- **Document System** (`schema/libs/sh_documents.lua`, `schema/items/documents/`): Paper and writing tools for creating physical documents.
+  - **File-based storage**: Document content stored in `data/ix_documents/` as JSON files (like photo system). Items only store reference IDs to prevent inventory sync overflow.
+  - **Writing tools**:
+    - **Pen** (`sh_pen.lua`, `ix_pen`): Ink-based (1000 chars). Permanent writing, can sign. Refillable with ink cartridge.
+    - **Pencil** (`sh_pencil.lua`, `ix_pencil`): Lead-based (500 chars). Writing can be erased by anyone with an eraser.
+    - **Pencil with Eraser** (`sh_pencil_eraser.lua`): Same as pencil but can also erase.
+    - **Eraser** (`sh_eraser.lua`, `ix_eraser`): Standalone eraser (500 durability). Erases pencil content only.
+  - **Paper** (`sh_paper.lua`): Blank sheets that can be written on. Stores: paperID, documentType, author, title, wordCount, hasSignature, signatureAuthor, timestamp.
+  - **Typewriter** (`sh_typewriter.lua`, `ix_typewriter`): Placeable entity for typed documents. Drop to place, E to use, Hold E to pick up. Typed content is monospace, no signatures.
+  - **Document containers** (paper-only bags):
+    - **Small Envelope** (5x1): 5 papers
+    - **Large Envelope** (10x5): 50 papers
+    - **Document Folder** (25x10): 250 papers
+  - **Writing rules**:
+    - Append-only: Cannot modify existing content, only add below it
+    - Pen = permanent (handwritten), Pencil = erasable
+    - Signatures: Mouse-drawn strokes, pen only, stored as normalized coordinates
+    - Title: Can be set once per document
+  - **UI panels** (`schema/derma/`):
+    - `cl_document_editor.lua`: Write/append content, add signature
+    - `cl_document_viewer.lua`: Read documents with signature display
+    - `cl_signature_pad.lua`: Mouse-drawn signature canvas
+    - `cl_typewriter.lua`: Typewriter typing interface
 
 ## Item Base Classes
 

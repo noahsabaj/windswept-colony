@@ -26,6 +26,9 @@ ix.util.Include("sv_migration.lua")
 -- Centralized network string registry (schema + entities)
 ix.util.Include("sv_netstrings.lua")
 
+-- Document system server handlers
+ix.util.Include("sv_documents.lua")
+
 -- Money destroy handler
 net.Receive("ixMoneyDestroy", function(len, client)
     local itemID = net.ReadUInt(32)
