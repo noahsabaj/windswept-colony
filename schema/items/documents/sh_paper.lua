@@ -23,9 +23,10 @@ ITEM.model = "models/props_c17/paper01.mdl"
 ITEM.width = 1
 ITEM.height = 1
 ITEM.category = "Documents"
-
--- Papers don't stack (each is unique)
 ITEM.noBusiness = true
+
+-- Blank papers stack up to 20
+ITEM.maxStack = 20
 
 -- ============================================================================
 -- HELPER FUNCTIONS
@@ -120,9 +121,10 @@ function ITEM:GetDescription()
     return desc
 end
 
--- Papers don't stack
+-- Only blank papers can stack (written papers are unique)
 function ITEM:CanStack(other)
-    return false
+    -- Both must be blank (no paperID) to stack
+    return not self:HasContent() and not other:HasContent()
 end
 
 -- ============================================================================
