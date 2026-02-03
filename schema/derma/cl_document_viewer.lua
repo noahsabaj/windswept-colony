@@ -13,9 +13,7 @@ function PANEL:Init()
     self:SetTitle("Document")
     self:SetDraggable(true)
     self:ShowCloseButton(true)
-    self:SetKeyboardInputEnabled(true)
-
-    self.closeKeys = {KEY_ESCAPE}
+    self:SetKeyboardInputEnabled(false)
 
     -- Header panel
     local headerPanel = vgui.Create("DPanel", self)
@@ -85,7 +83,7 @@ function PANEL:Init()
     local closeLabel = vgui.Create("DLabel", self)
     closeLabel:Dock(BOTTOM)
     closeLabel:DockMargin(10, 5, 10, 5)
-    closeLabel:SetText("Press ESC or click X to close")
+    closeLabel:SetText("Click X to close")
     closeLabel:SetTextColor(Color(100, 100, 100))
     closeLabel:SetContentAlignment(5)
 end
@@ -184,15 +182,6 @@ function PANEL:CreateSignaturePanels(signatures)
     end
 
     self.signaturesContainer:SetTall(totalHeight)
-end
-
-function PANEL:OnKeyCodePressed(key)
-    for _, closeKey in ipairs(self.closeKeys) do
-        if key == closeKey then
-            self:Remove()
-            return
-        end
-    end
 end
 
 function PANEL:OnRemove()
