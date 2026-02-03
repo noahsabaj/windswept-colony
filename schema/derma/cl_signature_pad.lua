@@ -18,6 +18,7 @@ function PANEL:Init()
     self.strokes = {}
     self.currentStroke = nil
     self.isDrawing = false
+    self.strokeColor = {200, 200, 200}  -- Default gray, set by SetStrokeColor
 
     -- Instructions label
     local instructions = vgui.Create("DLabel", self)
@@ -36,8 +37,9 @@ function PANEL:Init()
         surface.SetDrawColor(40, 40, 40)
         surface.DrawRect(0, 0, w, h)
 
-        -- Draw existing strokes
-        surface.SetDrawColor(200, 200, 200)
+        -- Draw existing strokes with color
+        local color = self.strokeColor
+        surface.SetDrawColor(color[1], color[2], color[3])
         for _, stroke in ipairs(self.strokes) do
             self:DrawStroke(stroke, w, h)
         end
@@ -155,6 +157,10 @@ end
 
 function PANEL:GetStrokes()
     return self.strokes
+end
+
+function PANEL:SetStrokeColor(color)
+    self.strokeColor = color or {200, 200, 200}
 end
 
 function PANEL:OnRemove()

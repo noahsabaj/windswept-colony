@@ -160,7 +160,7 @@ util.AddNetworkString("ixDocumentWrite")       -- Client->Server: write content 
 util.AddNetworkString("ixDocumentRead")        -- Client->Server: request document content
 util.AddNetworkString("ixDocumentData")        -- Server->Client: send document content
 util.AddNetworkString("ixDocumentErase")       -- Client->Server: erase pencil content
-util.AddNetworkString("ixDocumentSign")        -- Client->Server: add signature to document
+util.AddNetworkString("ixDocumentDestroy")     -- Client->Server: destroy paper item
 util.AddNetworkString("ixPenRefill")           -- Client->Server: refill pen with ink
 util.AddNetworkString("ixTypewriterOpen")      -- Server->Client: open typewriter UI
 util.AddNetworkString("ixTypewriterWrite")     -- Client->Server: type content on paper

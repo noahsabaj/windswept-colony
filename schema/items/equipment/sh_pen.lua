@@ -8,8 +8,8 @@
     NOT equippable - just needs to be in inventory to write.
 ]]--
 
-ITEM.name = "Pen"
-ITEM.description = "A ballpoint pen for writing documents."
+ITEM.name = "Pen (Blue)"
+ITEM.description = "A ballpoint pen with blue ink."
 ITEM.model = "models/props_lab/clipboard.mdl"  -- Placeholder
 ITEM.width = 1
 ITEM.height = 1
@@ -17,6 +17,9 @@ ITEM.category = "Equipment"
 
 -- Ink capacity
 ITEM.maxInk = 1000
+
+-- Ink color (RGB) - default blue
+ITEM.inkColor = {100, 100, 200}
 
 -- ============================================================================
 -- INK MANAGEMENT
@@ -48,13 +51,17 @@ function ITEM:GetInkPercent()
     return self:GetInk() / self.maxInk
 end
 
+function ITEM:GetInkColor()
+    return self.inkColor or {100, 100, 200}  -- Default blue
+end
+
 -- ============================================================================
 -- DESCRIPTION
 -- ============================================================================
 
 function ITEM:GetDescription()
     local ink = self:GetInk()
-    local desc = "A ballpoint pen for writing documents.\n"
+    local desc = self.description .. "\n"
 
     if ink == 0 then
         desc = desc .. "Ink: EMPTY (needs refill)"
@@ -83,9 +90,10 @@ if CLIENT then
         surface.SetDrawColor(50, 50, 50, 200)
         surface.DrawRect(barX, barY, barW, barH)
 
-        -- Ink level (blue)
+        -- Ink level (pen color)
         if inkPercent > 0 then
-            surface.SetDrawColor(100, 100, 200, 255)
+            local color = item:GetInkColor()
+            surface.SetDrawColor(color[1], color[2], color[3], 255)
             surface.DrawRect(barX, barY, barW * inkPercent, barH)
         end
     end

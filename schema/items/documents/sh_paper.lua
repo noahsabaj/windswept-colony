@@ -63,8 +63,8 @@ function ITEM:HasSignature()
     return self:GetData("hasSignature", false)
 end
 
-function ITEM:GetSignatureAuthor()
-    return self:GetData("signatureAuthor", "Unknown")
+function ITEM:GetSignatureCount()
+    return self:GetData("signatureCount", 0)
 end
 
 function ITEM:GetTimestamp()
@@ -104,7 +104,12 @@ function ITEM:GetDescription()
     local desc = string.format("%s document by %s.\nWords: %d", docType, author, wordCount)
 
     if self:HasSignature() then
-        desc = desc .. "\nSigned by: " .. self:GetSignatureAuthor()
+        local sigCount = self:GetSignatureCount()
+        if sigCount > 1 then
+            desc = desc .. string.format("\nSignatures: %d", sigCount)
+        else
+            desc = desc .. "\nSigned"
+        end
     end
 
     local timestamp = self:GetTimestamp()
@@ -179,8 +184,14 @@ ITEM.functions.Write = {
         local toolType = nil
         local toolItem = nil
 
+        -- Check if item is a pen type (base or colored variants)
+        local function isPenType(uniqueID)
+            return uniqueID == "pen" or uniqueID == "pen_black" or
+                   uniqueID == "pen_red" or uniqueID == "pen_green"
+        end
+
         for _, invItem in pairs(inv:GetItems()) do
-            if invItem.uniqueID == "pen" and invItem:GetInk() > 0 then
+            if isPenType(invItem.uniqueID) and invItem:GetInk() > 0 then
                 toolType = "pen"
                 toolItem = invItem
                 break  -- Prefer pen
@@ -215,9 +226,15 @@ ITEM.functions.Write = {
         local inv = char:GetInventory()
         if not inv then return false end
 
+        -- Check if item is a pen type (base or colored variants)
+        local function isPenType(uniqueID)
+            return uniqueID == "pen" or uniqueID == "pen_black" or
+                   uniqueID == "pen_red" or uniqueID == "pen_green"
+        end
+
         -- Check for any writing tool with resource
         for _, invItem in pairs(inv:GetItems()) do
-            if invItem.uniqueID == "pen" and invItem:GetInk() > 0 then
+            if isPenType(invItem.uniqueID) and invItem:GetInk() > 0 then
                 return true
             elseif (invItem.uniqueID == "pencil" or invItem.uniqueID == "pencil_eraser") and invItem:GetLead() > 0 then
                 return true
@@ -352,16 +369,9 @@ ITEM.functions.Destroy = {
             "Destroy Paper",
             "Yes, Destroy",
             function()
-                -- Send destroy through standard item removal
-                local char = LocalPlayer():GetCharacter()
-                if char then
-                    net.Start("ixInventoryAction")
-                        net.WriteString("drop")
-                        net.WriteUInt(item:GetID(), 32)
-                        net.WriteUInt(1, 8)
-                        net.WriteTable({destroy = true})
-                    net.SendToServer()
-                end
+                net.Start("ixDocumentDestroy")
+                    net.WriteUInt(item:GetID(), 32)
+                net.SendToServer()
             end,
             "Cancel",
             function() end
@@ -419,14 +429,22 @@ hook.Add("PlayerUse", "ixPaperGroundView", function(client, entity)
     local docData = ix.documents.Load(paperID)
     if not docData then return end
 
-    -- Build response
+    -- Build response (support both old signatureData and new signatures array)
+    local signatures = docData.signatures or {}
+
+    -- Backwards compatibility: convert old single signature to array
+    if docData.signatureData and #signatures == 0 then
+        table.insert(signatures, docData.signatureData)
+    end
+
     local response = {
         content = docData.content or "",
         title = item:GetTitle(),
         author = item:GetAuthor(),
         documentType = item:GetDocumentType(),
         wordCount = item:GetWordCount(),
-        signatureData = docData.signatureData,
+        signatures = signatures,
+        entries = docData.entries or {},
         fromGround = true
     }
 

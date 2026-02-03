@@ -79,16 +79,25 @@ net.Receive("ixDocumentWrite", function(len, client)
         return
     end
 
-    -- Determine tool type and resource
+    -- Determine tool type, resource, and color
     local toolType
     local resourceKey
+    local strokeColor
 
-    if toolItem.uniqueID == "pen" then
+    -- Check if it's a pen (base pen or colored variants)
+    local isPen = toolItem.uniqueID == "pen" or
+                  toolItem.uniqueID == "pen_black" or
+                  toolItem.uniqueID == "pen_red" or
+                  toolItem.uniqueID == "pen_green"
+
+    if isPen then
         toolType = "handwritten"
         resourceKey = "ink"
+        strokeColor = toolItem:GetInkColor()
     elseif toolItem.uniqueID == "pencil" or toolItem.uniqueID == "pencil_eraser" then
         toolType = "pencil"
         resourceKey = "lead"
+        strokeColor = {150, 150, 150}  -- Gray for pencil
     else
         client:NotifyLocalized("needWritingTool")
         return
@@ -133,11 +142,12 @@ net.Receive("ixDocumentWrite", function(len, client)
 
     -- Append new content
     if content ~= "" then
-        -- Add entry record
+        -- Add entry record with color
         table.insert(docData.entries, {
             author = char:GetName(),
             timestamp = os.time(),
             type = toolType,
+            color = strokeColor,
             length = #content
         })
 
@@ -149,15 +159,21 @@ net.Receive("ixDocumentWrite", function(len, client)
         end
     end
 
-    -- Add signature
+    -- Add signature (supports multiple signatures)
     if hasSignature and signatureJSON then
         local sigData = util.JSONToTable(signatureJSON)
         if sigData then
-            docData.signatureData = {
+            -- Initialize signatures array if not present
+            docData.signatures = docData.signatures or {}
+
+            -- Add new signature with color
+            table.insert(docData.signatures, {
                 strokes = sigData,
                 authorName = char:GetName(),
-                timestamp = os.time()
-            }
+                timestamp = os.time(),
+                color = strokeColor,
+                type = toolType  -- "handwritten" for pen, "pencil" for pencil
+            })
         end
     end
 
@@ -182,7 +198,8 @@ net.Receive("ixDocumentWrite", function(len, client)
 
     if hasSignature then
         item:SetData("hasSignature", true)
-        item:SetData("signatureAuthor", char:GetName())
+        -- Store count of signatures for display
+        item:SetData("signatureCount", #(docData.signatures or {}))
     end
 
     -- Consume resource from tool
@@ -215,15 +232,21 @@ net.Receive("ixDocumentRead", function(len, client)
     local docData = ix.documents.Load(paperID)
     if not docData then return end
 
-    -- Build response
+    -- Build response (support both old signatureData and new signatures array)
     local response = {
         content = docData.content or "",
         title = item:GetTitle(),
         author = item:GetAuthor(),
         documentType = item:GetDocumentType(),
         wordCount = item:GetWordCount(),
-        signatureData = docData.signatureData
+        signatures = docData.signatures or {},
+        entries = docData.entries or {}  -- Include entries for color info
     }
+
+    -- Backwards compatibility: convert old single signature to array
+    if docData.signatureData and #response.signatures == 0 then
+        table.insert(response.signatures, docData.signatureData)
+    end
 
     net.Start("ixDocumentData")
         net.WriteBool(forEditor)
@@ -322,6 +345,52 @@ net.Receive("ixDocumentErase", function(len, client)
     item:SetData("lastEdited", nil)
 
     client:NotifyLocalized("documentErased")
+end)
+
+-- ============================================================================
+-- PEN REFILL HANDLER
+-- ============================================================================
+
+-- ============================================================================
+-- DOCUMENT DESTROY HANDLER
+-- ============================================================================
+
+net.Receive("ixDocumentDestroy", function(len, client)
+    local itemID = net.ReadUInt(32)
+
+    -- Validate character
+    local char = client:GetCharacter()
+    if not char then return end
+
+    -- Validate item
+    local item = ix.item.instances[itemID]
+    if not item then return end
+    if item.uniqueID ~= "paper" then return end
+
+    -- Validate ownership
+    local inv = char:GetInventory()
+    if not inv then return end
+
+    local foundPaper = false
+    for _, invItem in pairs(inv:GetItems()) do
+        if invItem:GetID() == itemID then
+            foundPaper = true
+            break
+        end
+    end
+
+    if not foundPaper then return end
+
+    -- Delete document file if exists
+    local paperID = item:GetPaperID()
+    if paperID then
+        ix.documents.Delete(paperID)
+    end
+
+    -- Remove the item
+    item:Remove()
+
+    client:NotifyLocalized("documentDestroyed")
 end)
 
 -- ============================================================================

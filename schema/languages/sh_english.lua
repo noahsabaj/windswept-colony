@@ -300,6 +300,7 @@ LANGUAGE = {
     documentSaved = "Document saved.",
     documentEmpty = "Nothing to save.",
     documentErased = "Paper erased.",
+    documentDestroyed = "Paper destroyed.",
     documentRenamed = "Document renamed: %s",
     documentAlreadyNamed = "This document has already been named.",
     documentSaveFailed = "Failed to save document.",

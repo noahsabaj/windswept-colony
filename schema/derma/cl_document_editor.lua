@@ -22,6 +22,7 @@ function PANEL:Init()
     self.signatureData = nil
     self.existingContent = ""
     self.hasExistingContent = false
+    self.strokeColor = {100, 100, 200}  -- Default blue
 
     -- Existing content section (read-only)
     self.existingLabel = vgui.Create("DLabel", self)
@@ -152,6 +153,9 @@ function PANEL:SetWritingTool(toolType, toolItem)
         if toolItem then
             self.resourceRemaining = toolItem:GetInk()
             self.maxResource = toolItem.maxInk or 1000
+            self.strokeColor = toolItem:GetInkColor()
+        else
+            self.strokeColor = {100, 100, 200}  -- Default blue
         end
         self.signBtn:SetEnabled(true)
         self.signBtn:SetText("Add Signature")
@@ -160,9 +164,10 @@ function PANEL:SetWritingTool(toolType, toolItem)
             self.resourceRemaining = toolItem:GetLead()
             self.maxResource = toolItem.maxLead or 500
         end
-        -- Pencils cannot sign
-        self.signBtn:SetEnabled(false)
-        self.signBtn:SetText("Pen Required")
+        self.strokeColor = {150, 150, 150}  -- Gray for pencil
+        -- Pencils CAN sign (but signature will be erasable)
+        self.signBtn:SetEnabled(true)
+        self.signBtn:SetText("Add Signature")
     end
 
     self:UpdateResourceCounter()
@@ -194,6 +199,7 @@ function PANEL:OpenSignaturePad()
     end
 
     self.sigPad = vgui.Create("ixSignaturePad")
+    self.sigPad:SetStrokeColor(self.strokeColor)
     self.sigPad.OnConfirm = function(strokes)
         self.signatureData = strokes
         self.sigStatus:SetText("Signature added")

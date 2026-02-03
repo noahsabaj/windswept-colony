@@ -72,61 +72,14 @@ function PANEL:Init()
         contentBg:SetTall(lbl:GetTall() + 30)
     end
 
-    -- Signature panel (hidden by default)
-    self.signaturePanel = vgui.Create("DPanel", self.scroll)
-    self.signaturePanel:Dock(TOP)
-    self.signaturePanel:DockMargin(0, 15, 0, 0)
-    self.signaturePanel:SetTall(120)
-    self.signaturePanel:SetVisible(false)
+    -- Signatures container (hidden by default)
+    self.signaturesContainer = vgui.Create("DPanel", self.scroll)
+    self.signaturesContainer:Dock(TOP)
+    self.signaturesContainer:DockMargin(0, 15, 0, 0)
+    self.signaturesContainer:SetVisible(false)
+    self.signaturesContainer.Paint = function() end
 
-    self.signatureData = nil
-
-    self.signaturePanel.Paint = function(pnl, w, h)
-        if not self.signatureData then return end
-
-        -- Background
-        surface.SetDrawColor(45, 45, 45)
-        surface.DrawRect(0, 0, w, h)
-
-        -- Label
-        draw.SimpleText("Signature:", "ixSmallFont", 15, 10, Color(150, 150, 150), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-
-        -- Signature area
-        local sigX = 15
-        local sigY = 30
-        local sigW = w - 30
-        local sigH = h - 55
-
-        -- Signature background
-        surface.SetDrawColor(35, 35, 35)
-        surface.DrawRect(sigX, sigY, sigW, sigH)
-
-        -- Draw strokes
-        surface.SetDrawColor(200, 200, 200)
-        local strokes = self.signatureData.strokes or {}
-        for _, stroke in ipairs(strokes) do
-            if #stroke >= 2 then
-                for i = 2, #stroke do
-                    local x1 = sigX + stroke[i - 1].x * sigW
-                    local y1 = sigY + stroke[i - 1].y * sigH
-                    local x2 = sigX + stroke[i].x * sigW
-                    local y2 = sigY + stroke[i].y * sigH
-                    surface.DrawLine(x1, y1, x2, y2)
-                end
-            end
-        end
-
-        -- Border
-        surface.SetDrawColor(80, 80, 80)
-        surface.DrawOutlinedRect(sigX, sigY, sigW, sigH)
-    end
-
-    -- Signature author label
-    self.sigAuthorLabel = vgui.Create("DLabel", self.signaturePanel)
-    self.sigAuthorLabel:SetPos(15, 95)
-    self.sigAuthorLabel:SetSize(300, 20)
-    self.sigAuthorLabel:SetText("")
-    self.sigAuthorLabel:SetTextColor(Color(150, 150, 150))
+    self.signatures = {}
 
     -- Close instructions
     local closeLabel = vgui.Create("DLabel", self)
@@ -163,14 +116,81 @@ function PANEL:SetDocument(data)
     self.contentLabel:SetText(content)
     self.contentLabel:SizeToContentsY()
 
-    -- Signature
-    if data.signatureData then
-        self.signatureData = data.signatureData
-        self.signaturePanel:SetVisible(true)
+    -- Signatures (supports multiple)
+    local signatures = data.signatures or {}
 
-        local sigAuthor = data.signatureData.authorName or "Unknown"
-        self.sigAuthorLabel:SetText("Signed by: " .. sigAuthor)
+    -- Backwards compatibility: convert old single signature to array
+    if data.signatureData and #signatures == 0 then
+        table.insert(signatures, data.signatureData)
     end
+
+    if #signatures > 0 then
+        self.signaturesContainer:SetVisible(true)
+        self:CreateSignaturePanels(signatures)
+    end
+end
+
+function PANEL:CreateSignaturePanels(signatures)
+    local totalHeight = 0
+    local sigHeight = 100
+    local spacing = 10
+
+    for i, sigData in ipairs(signatures) do
+        local sigPanel = vgui.Create("DPanel", self.signaturesContainer)
+        sigPanel:Dock(TOP)
+        sigPanel:DockMargin(0, i > 1 and spacing or 0, 0, 0)
+        sigPanel:SetTall(sigHeight)
+
+        -- Get stroke color (default to gray for backwards compatibility)
+        local strokeColor = sigData.color or {200, 200, 200}
+        local isPencil = sigData.type == "pencil"
+
+        sigPanel.Paint = function(pnl, w, h)
+            -- Background
+            surface.SetDrawColor(45, 45, 45)
+            surface.DrawRect(0, 0, w, h)
+
+            -- Signature area
+            local sigX = 15
+            local sigY = 5
+            local sigW = w - 30
+            local sigH = h - 30
+
+            -- Signature background
+            surface.SetDrawColor(35, 35, 35)
+            surface.DrawRect(sigX, sigY, sigW, sigH)
+
+            -- Draw strokes with color
+            surface.SetDrawColor(strokeColor[1], strokeColor[2], strokeColor[3])
+            local strokes = sigData.strokes or {}
+            for _, stroke in ipairs(strokes) do
+                if #stroke >= 2 then
+                    for j = 2, #stroke do
+                        local x1 = sigX + stroke[j - 1].x * sigW
+                        local y1 = sigY + stroke[j - 1].y * sigH
+                        local x2 = sigX + stroke[j].x * sigW
+                        local y2 = sigY + stroke[j].y * sigH
+                        surface.DrawLine(x1, y1, x2, y2)
+                    end
+                end
+            end
+
+            -- Border
+            surface.SetDrawColor(80, 80, 80)
+            surface.DrawOutlinedRect(sigX, sigY, sigW, sigH)
+
+            -- Author label
+            local authorText = sigData.authorName or "Unknown"
+            if isPencil then
+                authorText = authorText .. " (pencil)"
+            end
+            draw.SimpleText(authorText, "ixSmallFont", 15, h - 18, Color(150, 150, 150), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+        end
+
+        totalHeight = totalHeight + sigHeight + (i > 1 and spacing or 0)
+    end
+
+    self.signaturesContainer:SetTall(totalHeight)
 end
 
 function PANEL:OnKeyCodePressed(key)
