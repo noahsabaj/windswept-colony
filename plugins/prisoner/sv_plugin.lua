@@ -1,39 +1,31 @@
 --[[
-    Prisoner System - Server Side
+    Restraint System - Server Side
 
     Handles:
+    - Ziptie restraining
     - Untying mechanics
     - Gagging mechanics
-    - Sentencing logic
-    - Timer system (pause on disconnect)
-    - Cell spawning
-    - Release mechanics
+    - Drag mechanics
+    - Leash mechanics (tie to surfaces)
 ]]--
 
-print("[Prisoner] sv_plugin.lua is loading...")
+print("[Restraint] sv_plugin.lua is loading...")
 
-util.AddNetworkString("ixPrisonerSentence")
-util.AddNetworkString("ixPrisonerSentenceSubmit")
-util.AddNetworkString("ixPrisonerManage")
-util.AddNetworkString("ixPrisonerManageSubmit")
-util.AddNetworkString("ixPrisonerRelease")
-util.AddNetworkString("ixPrisonerAdjust")
-util.AddNetworkString("ixPrisonCardView")
 util.AddNetworkString("ixDragStart")
 util.AddNetworkString("ixDragStop")
+util.AddNetworkString("ixLeashStart")
+util.AddNetworkString("ixLeashStop")
 
 -- Store reference to plugin for use in net.Receive handlers
 -- (PLUGIN global is only available during initial load)
-local prisonerPlugin = PLUGIN
+local restraintPlugin = PLUGIN
 
 -- Track active drags for efficient Think iteration (avoid scanning all players)
 PLUGIN.activeDrags = PLUGIN.activeDrags or {}
 
 -- Give Hands Up weapon to all players on spawn
 function PLUGIN:PostPlayerLoadout(client)
-    print("[Prisoner] PostPlayerLoadout called for " .. client:Name())
-    local wep = client:Give("ix_handsup")
-    print("[Prisoner] Give returned: " .. tostring(wep))
+    client:Give("ix_handsup")
 end
 
 -- Handle untying when using a restricted player
@@ -42,6 +34,15 @@ function PLUGIN:PlayerUse(client, entity)
     if client:IsRestricted() then return end
     if not entity:IsRestricted() then return end
     if entity:GetNetVar("untying") then return end
+
+    -- Check if target is leashed - offer unleash instead
+    if entity:GetNetVar("leashed") then
+        -- Unleash the player
+        self:UnleashPlayer(entity)
+        client:Notify("You have unleashed " .. entity:Name() .. ".")
+        entity:Notify("You have been unleashed.")
+        return
+    end
 
     -- Start untie action
     entity:SetAction("@beingUntied", 5)
@@ -117,25 +118,8 @@ function PLUGIN:PrePlayerMessageSend(speaker, chatType, text, anonymous, receive
     end
 end
 
--- Start sentence timer when prisoner loads character
-function PLUGIN:PlayerLoadedCharacter(client, character)
-    local factionIndex = character:GetFaction()
-    if (factionIndex and factionIndex == FACTION_PRISONERS) then
-        self:StartSentenceTimer(client)
-        -- Spawn in cell
-        timer.Simple(0.5, function()
-            if IsValid(client) then
-                self:SendToCell(client)
-            end
-        end)
-    end
-end
-
--- Clean up timer and drag on disconnect
+-- Clean up on disconnect
 function PLUGIN:PlayerDisconnected(client)
-    local timerName = "ixSentence_" .. client:SteamID64()
-    timer.Remove(timerName)
-
     -- Stop any active drag (this player as dragger)
     self:StopDrag(client)
 
@@ -147,299 +131,11 @@ function PLUGIN:PlayerDisconnected(client)
             self:StopDrag(dragger)
         end
     end
-end
 
--- Start the sentence countdown timer
-function PLUGIN:StartSentenceTimer(client)
-    local timerName = "ixSentence_" .. client:SteamID64()
-
-    -- Remove any existing timer
-    timer.Remove(timerName)
-
-    timer.Create(timerName, 1, 0, function()
-        if not IsValid(client) then
-            timer.Remove(timerName)
-            return
-        end
-
-        local character = client:GetCharacter()
-        if not character then return end
-
-        local sentence = character:GetData("sentence")
-        if not sentence then
-            timer.Remove(timerName)
-            return
-        end
-
-        sentence.timeServed = (sentence.timeServed or 0) + 1
-        character:SetData("sentence", sentence)
-
-        if sentence.timeServed >= sentence.duration then
-            timer.Remove(timerName)
-            self:ReleasePlayer(client)
-        end
-    end)
-end
-
--- Sentence a player to prison
-function PLUGIN:SentencePlayer(target, judge, duration, reason)
-    local character = target:GetCharacter()
-    if not character then return false end
-
-    local oldModel = character:GetModel()
-
-    -- Store sentence data (including original model and faction for restoration on release)
-    character:SetData("sentence", {
-        duration = duration,
-        timeServed = 0,
-        reason = reason,
-        judge = judge:GetCharacter():GetName(),
-        date = os.date("%Y-%m-%d %H:%M"),
-        originalModel = oldModel,
-        originalFaction = character:GetFaction() -- Can be nil for factionless
-    })
-
-    -- Transfer to Prisoners faction
-    character:SetFaction(FACTION_PRISONERS)
-
-    -- Give prison card
-    character:GetInventory():Add("prison_card", 1, {
-        prisoner = character:GetName(),
-        duration = duration,
-        reason = reason,
-        judge = judge:GetCharacter():GetName(),
-        date = os.date("%Y-%m-%d %H:%M")
-    })
-
-    -- Remove current outfit and set default model
-    self:EquipPrisonJumpsuit(target)
-
-    -- Start the timer
-    self:StartSentenceTimer(target)
-
-    -- Teleport to cell
-    self:SendToCell(target)
-
-    -- Notify
-    target:NotifyLocalized("sentenced", tostring(duration), reason)
-    judge:Notify("You have sentenced " .. character:GetName() .. " to " .. duration .. " seconds.")
-
-    return true
-end
-
--- Get the matching prisoner model for a civilian model
--- Extracts gender and variant number, maps to corresponding prisoner model path
-function PLUGIN:GetPrisonerModelForCivilian(civilianModel)
-    -- Extract the gender and number from civilian model
-    -- Civilian pattern: models/player/group01/male_XX.mdl or female_XX.mdl
-    local gender, num = string.match(civilianModel, "models/player/group%d+/(%a+)_(%d+)%.mdl")
-
-    if not gender or not num then
-        -- Fallback: return first prisoner model
-        local factionTable = ix.faction.Get(FACTION_PRISONERS)
-        return factionTable and factionTable.models and factionTable.models[1]
+    -- Unleash if leashed
+    if client:GetNetVar("leashed") then
+        self:UnleashPlayer(client)
     end
-
-    -- Build the prisoner model path
-    local prisonerModel
-    if gender == "male" then
-        -- Male prisoners: models/player/aperture_science/male_XX.mdl
-        prisonerModel = "models/player/aperture_science/male_" .. num .. ".mdl"
-    else
-        -- Female prisoners: models/humans/testsubject_pm/female_XX.mdl
-        -- Note: Prisoner females skip 05, so if civilian is 05 or 06, we need to adjust
-        local prisonerNum = num
-        if num == "05" then
-            prisonerNum = "06" -- female_05 civilian → female_06 prisoner (05 doesn't exist)
-        elseif num == "06" then
-            prisonerNum = "07" -- female_06 civilian → female_07 prisoner
-        end
-        prisonerModel = "models/humans/testsubject_pm/female_" .. prisonerNum .. ".mdl"
-    end
-
-    -- Validate the model exists before returning
-    if util.IsValidModel(prisonerModel) then
-        return prisonerModel
-    end
-
-    -- Model doesn't exist - fall back to first faction model
-    local factionTable = ix.faction.Get(FACTION_PRISONERS)
-    return factionTable and factionTable.models and factionTable.models[1]
-end
-
--- Equip prison jumpsuit (removes outfit and sets matching prisoner model)
-function PLUGIN:EquipPrisonJumpsuit(client)
-    local character = client:GetCharacter()
-    if not character then return end
-
-    -- Remove any currently equipped outfit
-    local inventory = character:GetInventory()
-    if inventory then
-        for _, item in pairs(inventory:GetItems()) do
-            if item.isOutfit and item:GetData("equipped") then
-                item:SetData("equipped", false)
-                if item.OnUnequipped then
-                    item:OnUnequipped(client)
-                end
-            end
-        end
-    end
-
-    -- Get matching prisoner model based on current model variant
-    local currentModel = character:GetModel()
-    local prisonerModel = self:GetPrisonerModelForCivilian(currentModel)
-
-    if prisonerModel then
-        character:SetModel(prisonerModel)
-    else
-        -- Ultimate fallback
-        local factionTable = ix.faction.Get(FACTION_PRISONERS)
-        if factionTable and factionTable.models and #factionTable.models > 0 then
-            character:SetModel(factionTable.models[1])
-        end
-    end
-end
-
--- Remove prison jumpsuit on release (restores original model from sentence data)
-function PLUGIN:RemovePrisonJumpsuit(client)
-    local character = client:GetCharacter()
-    if not character then return end
-
-    -- Get the original model from sentence data
-    local sentence = character:GetData("sentence")
-    if sentence and sentence.originalModel then
-        character:SetModel(sentence.originalModel)
-    else
-        -- Fallback: set to first model from original faction or factionless models
-        local originalFaction = sentence and sentence.originalFaction
-        local factionTable = originalFaction and ix.faction.Get(originalFaction)
-        if factionTable and factionTable.models and #factionTable.models > 0 then
-            character:SetModel(factionTable.models[1])
-        else
-            -- Factionless fallback - use config factionlessModels
-            local factionlessModels = ix.config.Get("factionlessModels", {})
-            if #factionlessModels > 0 then
-                character:SetModel(factionlessModels[1])
-            end
-        end
-    end
-end
-
--- Release a player from prison
-function PLUGIN:ReleasePlayer(client)
-    local character = client:GetCharacter()
-    if not character then return end
-
-    local sentence = character:GetData("sentence")
-
-    -- Remove prison card
-    local inventory = character:GetInventory()
-    if inventory then
-        for _, item in pairs(inventory:GetItems()) do
-            if item.uniqueID == "prison_card" then
-                item:Remove()
-            end
-        end
-    end
-
-    -- Remove jumpsuit, restore model
-    self:RemovePrisonJumpsuit(client)
-
-    -- Restore original faction (or stay factionless)
-    local originalFaction = sentence and sentence.originalFaction
-    if (originalFaction) then
-        character:SetFaction(originalFaction)
-    else
-        character:SetFaction(nil)
-        client:SetTeam(TEAM_UNASSIGNED)
-    end
-
-    -- Clear sentence data
-    character:SetData("sentence", nil)
-
-    -- Unrestrict if still restricted
-    if client:IsRestricted() then
-        client:SetRestricted(false)
-    end
-    client:SetNetVar("gagged", nil)
-
-    -- Teleport to release point
-    local releasePos = self:GetReleasePoint()
-    if releasePos then
-        client:SetPos(releasePos)
-    end
-
-    client:NotifyLocalized("released")
-end
-
--- Adjust a prisoner's sentence
-function PLUGIN:AdjustSentence(target, judge, adjustment)
-    local character = target:GetCharacter()
-    if not character then return false end
-
-    local sentence = character:GetData("sentence")
-    if not sentence then return false end
-
-    sentence.duration = math.max(0, sentence.duration + adjustment)
-    character:SetData("sentence", sentence)
-
-    -- Check if sentence is now complete
-    if sentence.timeServed >= sentence.duration then
-        local timerName = "ixSentence_" .. target:SteamID64()
-        timer.Remove(timerName)
-        self:ReleasePlayer(target)
-    end
-
-    return true
-end
-
--- Find an empty cell
-function PLUGIN:FindEmptyCell()
-    for name, area in pairs(ix.area.stored) do
-        if area.type == "cell" then
-            local occupied = false
-            for _, ply in player.Iterator() do
-                if ply:GetArea() == name and ply:Team() == FACTION_PRISONERS then
-                    occupied = true
-                    break
-                end
-            end
-            if not occupied then
-                return name, area
-            end
-        end
-    end
-
-    -- All full - return first cell (shared)
-    for name, area in pairs(ix.area.stored) do
-        if area.type == "cell" then
-            return name, area
-        end
-    end
-
-    return nil
-end
-
--- Send player to a cell
-function PLUGIN:SendToCell(client)
-    local cellName, area = self:FindEmptyCell()
-    if area then
-        local center = LerpVector(0.5, area.startPosition, area.endPosition)
-        center.z = area.startPosition.z + 10
-        client:SetPos(center)
-    end
-end
-
--- Get the release point position
-function PLUGIN:GetReleasePoint()
-    for name, area in pairs(ix.area.stored) do
-        if area.type == "release" then
-            local center = LerpVector(0.5, area.startPosition, area.endPosition)
-            center.z = area.startPosition.z + 10
-            return center
-        end
-    end
-    return nil
 end
 
 -- ============================================================================
@@ -451,6 +147,12 @@ function PLUGIN:StartDrag(dragger, target)
     if not IsValid(dragger) or not IsValid(target) then return false end
     if not target:IsRestricted() then return false end
     if dragger:IsRestricted() then return false end
+
+    -- Can't drag a leashed player
+    if target:GetNetVar("leashed") then
+        dragger:Notify("You must unleash them first.")
+        return false
+    end
 
     -- Must be holding ix_hands weapon
     local weapon = dragger:GetActiveWeapon()
@@ -559,108 +261,143 @@ function PLUGIN:Think()
     end
 end
 
--- Stop drag when target is unrestrained
-hook.Add("OnPlayerUnRestricted", "ixStopDragOnUnrestrain", function(target)
+-- ============================================================================
+-- LEASH MECHANIC
+-- ============================================================================
+
+-- Leash a restrained player to a surface
+function PLUGIN:LeashPlayer(client, target, hitPos, hitNormal)
+    if not IsValid(target) or not target:IsPlayer() then return false end
+    if not target:IsRestricted() then return false end
+    if target:GetNetVar("leashed") then return false end
+
+    -- Stop any active drag first
     local draggedBy = target:GetNetVar("ixDraggedBy")
     if draggedBy then
         local dragger = Entity(draggedBy)
         if IsValid(dragger) then
-            local plugin = ix.plugin.Get("prisoner")
-            if plugin then
-                plugin:StopDrag(dragger)
-            end
+            self:StopDrag(dragger)
         end
+    end
+
+    -- Store leash data
+    target:SetNetVar("leashed", true)
+    target:SetNetVar("leashPos", hitPos)
+    target:SetNetVar("leashNormal", hitNormal)
+
+    -- Freeze movement completely
+    target:SetMoveType(MOVETYPE_NONE)
+
+    -- Position them near the leash point
+    local offset = hitNormal * 40
+    target:SetPos(hitPos + offset)
+
+    -- Face away from wall
+    local ang = hitNormal:Angle()
+    ang.p = 0
+    target:SetEyeAngles(ang)
+
+    target:EmitSound("physics/metal/chain_impact_soft1.wav")
+    return true
+end
+
+-- Release a leashed player
+function PLUGIN:UnleashPlayer(target)
+    if not IsValid(target) or not target:IsPlayer() then return false end
+    if not target:GetNetVar("leashed") then return false end
+
+    target:SetNetVar("leashed", nil)
+    target:SetNetVar("leashPos", nil)
+    target:SetNetVar("leashNormal", nil)
+
+    -- Restore movement (still restricted, just not anchored)
+    target:SetMoveType(MOVETYPE_WALK)
+
+    target:EmitSound("physics/metal/chain_impact_soft2.wav")
+    return true
+end
+
+-- ============================================================================
+-- HOOKS
+-- ============================================================================
+
+-- Stop drag and unleash when target is unrestrained
+hook.Add("OnPlayerUnRestricted", "ixStopDragOnUnrestrain", function(target)
+    local plugin = ix.plugin.Get("prisoner")
+    if not plugin then return end
+
+    -- Stop drag
+    local draggedBy = target:GetNetVar("ixDraggedBy")
+    if draggedBy then
+        local dragger = Entity(draggedBy)
+        if IsValid(dragger) then
+            plugin:StopDrag(dragger)
+        end
+    end
+
+    -- Unleash if leashed
+    if target:GetNetVar("leashed") then
+        plugin:UnleashPlayer(target)
     end
 end)
 
--- Net receivers for drag
+-- ============================================================================
+-- NETWORK RECEIVERS
+-- ============================================================================
+
 net.Receive("ixDragStart", function(len, client)
     local target = net.ReadEntity()
-    local plugin = ix.plugin.Get("prisoner")
-    if plugin then
-        plugin:StartDrag(client, target)
+    if restraintPlugin then
+        restraintPlugin:StartDrag(client, target)
     end
 end)
 
 net.Receive("ixDragStop", function(len, client)
-    local plugin = ix.plugin.Get("prisoner")
-    if plugin then
-        plugin:StopDrag(client)
+    if restraintPlugin then
+        restraintPlugin:StopDrag(client)
     end
 end)
 
--- ============================================================================
--- SENTENCING UI NETWORK RECEIVERS
--- ============================================================================
+net.Receive("ixLeashStart", function(len, client)
+    if not IsValid(client) then return end
+    if client:IsRestricted() then return end
 
--- Network receivers for sentencing UI
-net.Receive("ixPrisonerSentenceSubmit", function(len, client)
     local target = net.ReadEntity()
-    local duration = net.ReadUInt(32)
-    local reason = net.ReadString()
-
     if not IsValid(target) or not target:IsPlayer() then return end
-    if not target:IsRestricted() then
-        client:Notify("The target must be restrained first.")
+
+    -- Range check
+    if client:GetPos():DistToSqr(target:GetPos()) > (96 * 96) then return end
+
+    -- Trace from client to find surface
+    local tr = util.TraceLine({
+        start = client:EyePos(),
+        endpos = client:EyePos() + client:GetAimVector() * 200,
+        filter = {client, target}
+    })
+
+    if not tr.Hit then
+        client:Notify("No surface found to leash to.")
         return
     end
 
-    -- Verify client is a judge
-    local character = client:GetCharacter()
-    if not character then return end
-    local class = character:GetClass()
-    if class ~= CLASS_JUDGE then
-        client:NotifyLocalized("judgeOnly")
-        return
+    if restraintPlugin:LeashPlayer(client, target, tr.HitPos, tr.HitNormal) then
+        client:Notify("You have leashed " .. target:Name() .. " to the surface.")
+        target:Notify("You have been leashed to a surface.")
     end
-
-    -- Validate duration
-    if duration < 1 then
-        client:Notify("Sentence must be at least 1 second.")
-        return
-    end
-
-    -- Sentence the player
-    prisonerPlugin:SentencePlayer(target, client, duration, reason)
 end)
 
-net.Receive("ixPrisonerRelease", function(len, client)
+net.Receive("ixLeashStop", function(len, client)
+    if not IsValid(client) then return end
+    if client:IsRestricted() then return end
+
     local target = net.ReadEntity()
-
     if not IsValid(target) or not target:IsPlayer() then return end
-    if target:Team() ~= FACTION_PRISONERS then return end
 
-    -- Verify client is a judge
-    local character = client:GetCharacter()
-    if not character then return end
-    local class = character:GetClass()
-    if class ~= CLASS_JUDGE then
-        client:NotifyLocalized("judgeOnly")
-        return
-    end
+    -- Range check
+    if client:GetPos():DistToSqr(target:GetPos()) > (96 * 96) then return end
 
-    prisonerPlugin:ReleasePlayer(target)
-    client:Notify("You have released " .. target:Name() .. " from prison.")
-end)
-
-net.Receive("ixPrisonerAdjust", function(len, client)
-    local target = net.ReadEntity()
-    local adjustment = net.ReadInt(32)
-
-    if not IsValid(target) or not target:IsPlayer() then return end
-    if target:Team() ~= FACTION_PRISONERS then return end
-
-    -- Verify client is a judge
-    local character = client:GetCharacter()
-    if not character then return end
-    local class = character:GetClass()
-    if class ~= CLASS_JUDGE then
-        client:NotifyLocalized("judgeOnly")
-        return
-    end
-
-    if prisonerPlugin:AdjustSentence(target, client, adjustment) then
-        local action = adjustment > 0 and "added" or "removed"
-        client:Notify("You have " .. action .. " " .. math.abs(adjustment) .. " seconds to " .. target:Name() .. "'s sentence.")
+    if restraintPlugin:UnleashPlayer(target) then
+        client:Notify("You have unleashed " .. target:Name() .. ".")
+        target:Notify("You have been unleashed.")
     end
 end)

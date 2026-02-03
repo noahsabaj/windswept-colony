@@ -1,14 +1,15 @@
 --[[
-    Prisoner System - Client Side
+    Restraint System - Client Side
 
     Handles:
     - Blindness effect when gagged
-    - Sentencing UI
-    - Prison management UI
-    - Prison card view UI
+    - Restrained player status indicators
+    - Drag input detection
+    - Leash input detection
+    - Leash visual indicator
 ]]--
 
-print("[Prisoner] cl_plugin.lua is loading...")
+print("[Restraint] cl_plugin.lua is loading...")
 
 -- Blindness effect when gagged (like a bag over the head)
 -- Knockout screen takes priority - gag persists but blindness yields to knockout UI
@@ -49,288 +50,6 @@ function PLUGIN:HUDShouldDraw(name)
     end
 end
 
--- Sentencing UI Panel
-local PANEL = {}
-
-function PANEL:Init()
-    self:SetSize(400, 250)
-    self:Center()
-    self:SetTitle("Sentencing")
-    self:MakePopup()
-
-    self.target = nil
-
-    -- Target name label
-    self.nameLabel = self:Add("DLabel")
-    self.nameLabel:SetPos(10, 30)
-    self.nameLabel:SetSize(380, 20)
-    self.nameLabel:SetFont("ixMediumFont")
-    self.nameLabel:SetText("Sentencing: Unknown")
-
-    -- Duration label
-    local durLabel = self:Add("DLabel")
-    durLabel:SetPos(10, 60)
-    durLabel:SetSize(100, 20)
-    durLabel:SetText("Duration (seconds):")
-
-    -- Duration entry
-    self.durationEntry = self:Add("DTextEntry")
-    self.durationEntry:SetPos(120, 60)
-    self.durationEntry:SetSize(270, 25)
-    self.durationEntry:SetNumeric(true)
-    self.durationEntry:SetText("300")
-
-    -- Reason label
-    local reasonLabel = self:Add("DLabel")
-    reasonLabel:SetPos(10, 95)
-    reasonLabel:SetSize(100, 20)
-    reasonLabel:SetText("Reason:")
-
-    -- Reason entry
-    self.reasonEntry = self:Add("DTextEntry")
-    self.reasonEntry:SetPos(10, 115)
-    self.reasonEntry:SetSize(380, 60)
-    self.reasonEntry:SetMultiline(true)
-    self.reasonEntry:SetText("")
-
-    -- Confirm button
-    self.confirmButton = self:Add("DButton")
-    self.confirmButton:SetPos(10, 185)
-    self.confirmButton:SetSize(380, 40)
-    self.confirmButton:SetText("Confirm Sentence")
-    self.confirmButton.DoClick = function()
-        self:SubmitSentence()
-    end
-end
-
-function PANEL:SetTarget(target)
-    self.target = target
-    if IsValid(target) then
-        self.nameLabel:SetText("Sentencing: " .. target:Name())
-    end
-end
-
-function PANEL:SubmitSentence()
-    if not IsValid(self.target) then
-        self:Close()
-        return
-    end
-
-    local duration = tonumber(self.durationEntry:GetValue()) or 0
-    local reason = self.reasonEntry:GetValue()
-
-    if duration < 1 then
-        Derma_Message("Duration must be at least 1 second.", "Error", "OK")
-        return
-    end
-
-    if reason == "" then
-        reason = "No reason specified"
-    end
-
-    net.Start("ixPrisonerSentenceSubmit")
-    net.WriteEntity(self.target)
-    net.WriteUInt(duration, 32)
-    net.WriteString(reason)
-    net.SendToServer()
-
-    self:Close()
-end
-
-vgui.Register("ixSentencingPanel", PANEL, "DFrame")
-
--- Prison Management UI Panel
-PANEL = {}
-
-function PANEL:Init()
-    self:SetSize(400, 350)
-    self:Center()
-    self:SetTitle("Prison Management")
-    self:MakePopup()
-
-    self.target = nil
-
-    -- Prisoner name
-    self.nameLabel = self:Add("DLabel")
-    self.nameLabel:SetPos(10, 30)
-    self.nameLabel:SetSize(380, 20)
-    self.nameLabel:SetFont("ixMediumFont")
-    self.nameLabel:SetText("Prisoner: Unknown")
-
-    -- Sentence info
-    self.infoLabel = self:Add("DLabel")
-    self.infoLabel:SetPos(10, 55)
-    self.infoLabel:SetSize(380, 100)
-    self.infoLabel:SetWrap(true)
-    self.infoLabel:SetAutoStretchVertical(true)
-    self.infoLabel:SetText("Loading...")
-
-    -- Adjust label
-    local adjustLabel = self:Add("DLabel")
-    adjustLabel:SetPos(10, 165)
-    adjustLabel:SetSize(200, 20)
-    adjustLabel:SetText("Adjust sentence (+/- seconds):")
-
-    -- Adjust entry
-    self.adjustEntry = self:Add("DTextEntry")
-    self.adjustEntry:SetPos(10, 185)
-    self.adjustEntry:SetSize(270, 25)
-    self.adjustEntry:SetText("0")
-
-    -- Apply adjustment button
-    self.adjustButton = self:Add("DButton")
-    self.adjustButton:SetPos(290, 185)
-    self.adjustButton:SetSize(100, 25)
-    self.adjustButton:SetText("Apply")
-    self.adjustButton.DoClick = function()
-        self:ApplyAdjustment()
-    end
-
-    -- Release button
-    self.releaseButton = self:Add("DButton")
-    self.releaseButton:SetPos(10, 230)
-    self.releaseButton:SetSize(380, 40)
-    self.releaseButton:SetText("Release Now")
-    self.releaseButton:SetColor(Color(255, 100, 100))
-    self.releaseButton.DoClick = function()
-        self:ReleaseNow()
-    end
-
-    -- Close button
-    self.closeButton = self:Add("DButton")
-    self.closeButton:SetPos(10, 280)
-    self.closeButton:SetSize(380, 30)
-    self.closeButton:SetText("Close")
-    self.closeButton.DoClick = function()
-        self:Close()
-    end
-end
-
-function PANEL:SetTarget(target)
-    self.target = target
-    if not IsValid(target) then return end
-
-    self.nameLabel:SetText("Prisoner: " .. target:Name())
-
-    local character = target:GetCharacter()
-    if not character then return end
-
-    local sentence = character:GetData("sentence")
-    if sentence then
-        local remaining = math.max(0, sentence.duration - (sentence.timeServed or 0))
-        local info = string.format(
-            "Original Sentence: %d seconds\n" ..
-            "Time Served: %d seconds\n" ..
-            "Time Remaining: %d seconds\n\n" ..
-            "Reason: %s\n" ..
-            "Judge: %s\n" ..
-            "Date: %s",
-            sentence.duration,
-            sentence.timeServed or 0,
-            remaining,
-            sentence.reason or "Unknown",
-            sentence.judge or "Unknown",
-            sentence.date or "Unknown"
-        )
-        self.infoLabel:SetText(info)
-    else
-        self.infoLabel:SetText("No sentence data found.")
-    end
-end
-
-function PANEL:ApplyAdjustment()
-    if not IsValid(self.target) then
-        self:Close()
-        return
-    end
-
-    local adjustment = tonumber(self.adjustEntry:GetValue()) or 0
-    if adjustment == 0 then return end
-
-    net.Start("ixPrisonerAdjust")
-    net.WriteEntity(self.target)
-    net.WriteInt(adjustment, 32)
-    net.SendToServer()
-
-    -- Refresh panel
-    timer.Simple(0.5, function()
-        if IsValid(self) and IsValid(self.target) then
-            self:SetTarget(self.target)
-        end
-    end)
-end
-
-function PANEL:ReleaseNow()
-    if not IsValid(self.target) then
-        self:Close()
-        return
-    end
-
-    Derma_Query(
-        "Are you sure you want to release " .. self.target:Name() .. "?",
-        "Confirm Release",
-        "Yes", function()
-            net.Start("ixPrisonerRelease")
-            net.WriteEntity(self.target)
-            net.SendToServer()
-            self:Close()
-        end,
-        "No", function() end
-    )
-end
-
-vgui.Register("ixPrisonerManagePanel", PANEL, "DFrame")
-
--- Prison Card View Panel
-PANEL = {}
-
-function PANEL:Init()
-    self:SetSize(350, 280)
-    self:Center()
-    self:SetTitle("Prison Sentence Card")
-    self:MakePopup()
-
-    -- Card background
-    self.cardPanel = self:Add("DPanel")
-    self.cardPanel:SetPos(10, 30)
-    self.cardPanel:SetSize(330, 230)
-    self.cardPanel.Paint = function(pnl, w, h)
-        draw.RoundedBox(4, 0, 0, w, h, Color(50, 50, 50, 255))
-        draw.RoundedBox(4, 2, 2, w - 4, h - 4, Color(80, 80, 80, 255))
-
-        -- Header
-        draw.RoundedBoxEx(4, 2, 2, w - 4, 30, Color(200, 100, 0, 255), true, true, false, false)
-        draw.SimpleText("PRISON SENTENCE CARD", "ixMediumFont", w / 2, 17, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-    end
-
-    -- Info label
-    self.infoLabel = self.cardPanel:Add("DLabel")
-    self.infoLabel:SetPos(15, 45)
-    self.infoLabel:SetSize(300, 170)
-    self.infoLabel:SetWrap(true)
-    self.infoLabel:SetAutoStretchVertical(true)
-    self.infoLabel:SetFont("ixSmallFont")
-    self.infoLabel:SetText("")
-end
-
-function PANEL:SetCardData(data)
-    local text = string.format(
-        "Prisoner: %s\n\n" ..
-        "Sentence: %s seconds\n\n" ..
-        "Reason:\n%s\n\n" ..
-        "Sentenced by: %s\n" ..
-        "Date: %s",
-        data.prisoner or "Unknown",
-        data.duration or "0",
-        data.reason or "None",
-        data.judge or "Unknown",
-        data.date or "Unknown"
-    )
-    self.infoLabel:SetText(text)
-end
-
-vgui.Register("ixPrisonCardPanel", PANEL, "DFrame")
-
 -- ============================================================================
 -- RESTRAINED PLAYER STATUS & ACTION HINTS
 -- ============================================================================
@@ -360,11 +79,18 @@ hook.Add("HUDDrawTargetID", "ixRestrainedTargetID", function()
     local statusColor = Color(255, 150, 50)  -- Orange
     draw.SimpleTextOutlined(statusText, "ixMediumFont", pos.x, pos.y, statusColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
 
-    -- Draw [GAGGED] if gagged
     local yOffset = 30
+
+    -- Draw [GAGGED] if gagged
     if target:GetNetVar("gagged") then
         draw.SimpleTextOutlined("[GAGGED]", "ixSmallFont", pos.x, pos.y + yOffset, Color(200, 100, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
-        yOffset = yOffset + 30
+        yOffset = yOffset + 25
+    end
+
+    -- Draw [LEASHED] if leashed
+    if target:GetNetVar("leashed") then
+        draw.SimpleTextOutlined("[LEASHED]", "ixSmallFont", pos.x, pos.y + yOffset, Color(150, 150, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+        yOffset = yOffset + 25
     end
 
     -- Don't show action hints if we're also restrained
@@ -372,18 +98,45 @@ hook.Add("HUDDrawTargetID", "ixRestrainedTargetID", function()
 
     -- Draw action hints
     local gagText = target:GetNetVar("gagged") and "Ungag" or "Gag"
+    local isLeashed = target:GetNetVar("leashed")
 
     -- Check if we're currently dragging this target
     local isDragging = client:GetNetVar("ixDragging") == target:EntIndex()
 
     if isDragging then
         draw.SimpleTextOutlined("Release LMB: Stop dragging", "ixSmallFont", pos.x, pos.y + yOffset, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+    elseif isLeashed then
+        -- Leashed player - show unleash hint
+        draw.SimpleTextOutlined("E: Unleash | R: " .. gagText, "ixSmallFont", pos.x, pos.y + yOffset, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
     else
+        -- Not leashed - show untie/drag/leash hints
         draw.SimpleTextOutlined("E: Untie | R: " .. gagText, "ixSmallFont", pos.x, pos.y + yOffset, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
-        -- Show drag hint only if holding hands and lowered
+        yOffset = yOffset + 25
+
+        -- Show drag/leash hint only if holding hands and lowered
         local weapon = client:GetActiveWeapon()
         if IsValid(weapon) and weapon:GetClass() == "ix_hands" and not client:IsWepRaised() then
-            draw.SimpleTextOutlined("Hold LMB: Drag", "ixSmallFont", pos.x, pos.y + yOffset + 30, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+            draw.SimpleTextOutlined("Hold LMB: Drag | Hold RMB: Leash", "ixSmallFont", pos.x, pos.y + yOffset, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+        end
+    end
+end)
+
+-- ============================================================================
+-- LEASH VISUAL INDICATOR
+-- ============================================================================
+
+-- Draw a rope/chain line from leashed players to their anchor point
+hook.Add("PostDrawOpaqueRenderables", "ixLeashVisual", function()
+    for _, ply in ipairs(player.GetAll()) do
+        if ply:GetNetVar("leashed") then
+            local leashPos = ply:GetNetVar("leashPos")
+            if leashPos then
+                -- Draw a simple line (chain effect)
+                local playerPos = ply:GetPos() + Vector(0, 0, 40)  -- Chest height
+
+                render.SetMaterial(Material("cable/rope"))
+                render.DrawBeam(playerPos, leashPos, 2, 0, 1, Color(100, 80, 60, 255))
+            end
         end
     end
 end)
@@ -393,10 +146,15 @@ end)
 -- ============================================================================
 
 local wasLMBDown = false
+local wasRMBDown = false
 local currentDragTarget = nil
 local cachedDraggingState = nil  -- Cache to avoid GetNetVar every frame
 local lastDragCheckTime = 0
 local DRAG_CHECK_INTERVAL = 0.1  -- Only check NetVar every 0.1 seconds
+
+-- Leash action tracking
+local leashHoldStart = nil
+local LEASH_HOLD_TIME = 1.0  -- Hold RMB for 1 second to leash
 
 hook.Add("Think", "ixDragInput", function()
     local client = LocalPlayer()
@@ -405,12 +163,16 @@ hook.Add("Think", "ixDragInput", function()
     -- Don't process input if UI is open
     if vgui.CursorVisible() then
         wasLMBDown = false
+        wasRMBDown = false
+        leashHoldStart = nil
         return
     end
 
-    -- Can't drag if we're restrained
+    -- Can't drag/leash if we're restrained
     if client:IsRestricted() then
         wasLMBDown = false
+        wasRMBDown = false
+        leashHoldStart = nil
         return
     end
 
@@ -418,16 +180,21 @@ hook.Add("Think", "ixDragInput", function()
     local weapon = client:GetActiveWeapon()
     if not IsValid(weapon) or weapon:GetClass() ~= "ix_hands" then
         wasLMBDown = false
+        wasRMBDown = false
+        leashHoldStart = nil
         return
     end
 
     -- Hands must be lowered (not raised)
     if client:IsWepRaised() then
         wasLMBDown = false
+        wasRMBDown = false
+        leashHoldStart = nil
         return
     end
 
     local lmbDown = input.IsMouseDown(MOUSE_LEFT)
+    local rmbDown = input.IsMouseDown(MOUSE_RIGHT)
 
     -- Throttle NetVar lookup - only check periodically or on input change
     local now = CurTime()
@@ -436,6 +203,7 @@ hook.Add("Think", "ixDragInput", function()
         lastDragCheckTime = now
     end
 
+    -- ==================== DRAG (LMB) ====================
     if lmbDown then
         if not wasLMBDown and not cachedDraggingState then
             -- Just pressed LMB - check if looking at restrained player
@@ -444,12 +212,15 @@ hook.Add("Think", "ixDragInput", function()
 
             if IsValid(target) and target:IsPlayer() and target:IsRestricted() then
                 if trace.HitPos:Distance(client:GetShootPos()) <= 96 then
-                    -- Start dragging
-                    currentDragTarget = target
-                    net.Start("ixDragStart")
-                    net.WriteEntity(target)
-                    net.SendToServer()
-                    cachedDraggingState = target:EntIndex()  -- Optimistic update
+                    -- Can't drag if leashed
+                    if not target:GetNetVar("leashed") then
+                        -- Start dragging
+                        currentDragTarget = target
+                        net.Start("ixDragStart")
+                        net.WriteEntity(target)
+                        net.SendToServer()
+                        cachedDraggingState = target:EntIndex()  -- Optimistic update
+                    end
                 end
             end
         end
@@ -463,43 +234,74 @@ hook.Add("Think", "ixDragInput", function()
         end
     end
 
+    -- ==================== LEASH (RMB Hold) ====================
+    if rmbDown then
+        if not wasRMBDown then
+            -- Just pressed RMB - check if looking at restrained player
+            local trace = client:GetEyeTrace()
+            local target = trace.Entity
+
+            if IsValid(target) and target:IsPlayer() and target:IsRestricted() and not target:GetNetVar("leashed") then
+                if trace.HitPos:Distance(client:GetShootPos()) <= 96 then
+                    -- Start leash hold
+                    leashHoldStart = now
+                end
+            else
+                leashHoldStart = nil
+            end
+        elseif leashHoldStart then
+            -- Holding RMB - check if hold time reached
+            if now - leashHoldStart >= LEASH_HOLD_TIME then
+                -- Leash the target
+                local trace = client:GetEyeTrace()
+                local target = trace.Entity
+
+                if IsValid(target) and target:IsPlayer() and target:IsRestricted() then
+                    net.Start("ixLeashStart")
+                    net.WriteEntity(target)
+                    net.SendToServer()
+                end
+
+                leashHoldStart = nil  -- Reset so we don't spam
+            end
+        end
+    else
+        leashHoldStart = nil
+    end
+
     wasLMBDown = lmbDown
+    wasRMBDown = rmbDown
 end)
 
 -- ============================================================================
--- NETWORK RECEIVERS
+-- LEASH PROGRESS INDICATOR
 -- ============================================================================
 
--- Network receivers
-net.Receive("ixPrisonerSentence", function()
-    local target = net.ReadEntity()
+hook.Add("HUDPaint", "ixLeashProgress", function()
+    if not leashHoldStart then return end
 
-    if IsValid(ix.gui.sentencing) then
-        ix.gui.sentencing:Remove()
-    end
+    local client = LocalPlayer()
+    local weapon = client:GetActiveWeapon()
+    if not IsValid(weapon) or weapon:GetClass() ~= "ix_hands" then return end
+    if client:IsWepRaised() then return end
 
-    ix.gui.sentencing = vgui.Create("ixSentencingPanel")
-    ix.gui.sentencing:SetTarget(target)
-end)
+    local progress = (CurTime() - leashHoldStart) / LEASH_HOLD_TIME
+    progress = math.Clamp(progress, 0, 1)
 
-net.Receive("ixPrisonerManage", function()
-    local target = net.ReadEntity()
+    -- Draw progress bar at center bottom
+    local barW = 200
+    local barH = 10
+    local x = (ScrW() - barW) / 2
+    local y = ScrH() * 0.6
 
-    if IsValid(ix.gui.prisonerManage) then
-        ix.gui.prisonerManage:Remove()
-    end
+    -- Background
+    surface.SetDrawColor(30, 30, 30, 200)
+    surface.DrawRect(x - 2, y - 2, barW + 4, barH + 4)
 
-    ix.gui.prisonerManage = vgui.Create("ixPrisonerManagePanel")
-    ix.gui.prisonerManage:SetTarget(target)
-end)
+    -- Progress fill
+    surface.SetDrawColor(150, 150, 200, 255)
+    surface.DrawRect(x, y, barW * progress, barH)
 
-net.Receive("ixPrisonCardView", function()
-    local data = net.ReadTable()
-
-    if IsValid(ix.gui.prisonCard) then
-        ix.gui.prisonCard:Remove()
-    end
-
-    ix.gui.prisonCard = vgui.Create("ixPrisonCardPanel")
-    ix.gui.prisonCard:SetCardData(data)
+    -- Text
+    draw.SimpleText("Leashing...", "ixSmallFont", ScrW() / 2, y - 15, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
 end)
