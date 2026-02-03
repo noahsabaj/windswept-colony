@@ -191,12 +191,11 @@ function ix.physical.GetAgeDescriptor(age)
     return "elderly"
 end
 
--- Get model path from faction and model index
+-- Get model path from model index
+-- factionIndex parameter is kept for backwards compatibility but ignored
 function ix.physical.GetModelPath(factionIndex, modelIndex)
-    local faction = ix.faction.indices[factionIndex]
-    if not faction then return nil end
-
-    local models = faction:GetModels(CLIENT and LocalPlayer() or nil)
+    -- All characters use factionless models since factions are removed
+    local models = ix.config.Get("factionlessModels") or {}
     local model = models[modelIndex]
 
     if istable(model) then
