@@ -35,15 +35,6 @@ Schema.economy = Schema.economy or {}
 Schema.economy.eecCut = 0.70  -- 70% to Eagle Extraction
 Schema.economy.adminCut = 0.30  -- 30% to Colonial Administration
 
--- Election Configuration
-Schema.elections = Schema.elections or {}
-Schema.elections.termLength = 3 -- weeks
-Schema.elections.positions = {
-    "Mayor",
-    "Commissioner",
-    "Union President"
-}
-
 -- Get the player the client is looking at within range
 function Schema:GetLookAtPlayer(client, maxRange)
     maxRange = maxRange or 100
