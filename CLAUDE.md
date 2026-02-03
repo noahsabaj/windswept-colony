@@ -19,8 +19,6 @@ windswept/
 │   ├── sh_hooks.lua         # Shared hooks
 │   ├── cl_hooks.lua         # Client hooks
 │   ├── sv_hooks.lua         # Server hooks
-│   ├── factions/            # Faction definitions
-│   ├── classes/             # Class definitions
 │   ├── items/               # Item definitions (domain-organized)
 │   │   ├── base/            # Base classes (sh_base_*.lua files)
 │   │   ├── clothing/        # Clothing outfits (casual, work, uniforms)
@@ -46,8 +44,7 @@ windswept/
 │   └── meta/                # Metatable extensions
 ├── plugins/                 # Modular features
 │   ├── permadeath/          # Knockout/death/revival system
-│   ├── factions/            # Faction management, elections, classes
-│   └── prisoner/            # Arrest/detention system
+│   └── prisoner/            # Restraint system (zipties, gag, drag, leash)
 ├── entities/
 │   ├── entities/            # Custom entities
 │   └── weapons/             # Custom weapons (SWEPs)
@@ -72,23 +69,7 @@ garrysmod/addons/
 
 - The reason this colony exists is due to the massive reserves of pure carbon underneath the surface. The EEC operates a massive mine-colony here, exporting high-grade carbon from this colony to be used by humanity elsewhere (the solar system, other colonized locations). Like how Cuba was a massive sugar colony for Europe and America, Redrock City is a massive carbon mining colony for the human market. The EEC owns all the mines and has an agreement with the Miners Union that, officially, only union members are allowed access to the mines, meaning only union members (members of the CMU-RC, Carbon Miners Union-Redrock City) are allowed to extract the carbon, reaping the benefit for them and the union.
 
-- Redrock City is where the gameplay takes place. It is a mining-colony right underneath the surface of Zephyrus. 
-
-### Primary Roles (Elected, 3-week terms)
-| Role | Description |
-|------|-------------|
-| Mayor | Chief Executive of Redrock City Administration |
-| Commissioner | Chief Executive of Security Department (policing) |
-| Miners Union President | Chief Executive of CMU-RC, represents miners |
-
-### Secondary Roles (Appointed)
-| Role | Appointed By | Description |
-|------|--------------|-------------|
-| Deputy Mayor | Mayor | Assists Mayor |
-| Deputy Commissioner | Commissioner | Assists Commissioner |
-| Chief Medical Officer | Mayor | Runs Medical Department, Redrock City General Hospital |
-| Warden | Commissioner | Runs Corrections Department, Skarn Prison |
-| Fire Chief | Mayor | Runs Fire Brigade |
+- Redrock City is where the gameplay takes place. It is a mining-colony right underneath the surface of Zephyrus.
 
 ## Design Principles
 
@@ -96,7 +77,7 @@ garrysmod/addons/
 
 - Always be Helix-idiomatic. Before implementing any feature, check if Helix already provides it or has an established pattern for it. Read the framework source code in helix/gamemode/core/ to understand how things are done. For example, when we created custom character creation panels, we initially added our own labels and height logic, but Helix already auto-creates labels above OnDisplay panels and uses font-based height sizing (see ixTextEntry and ixNumSlider in cl_generic.lua). Following existing patterns avoids bugs and keeps code consistent.
 
-- All characters are created **factionless** by default (no faction assignment). Personal IDs are given to ALL new characters via the `OnCharacterCreated` hook in `sv_schema.lua`. Players join factions (Medical, Security, Corrections, Miners Union, etc.) through in-game faction transfers (`/PlyTransfer`) after their character exists. Factionless characters appear in the "Unaffiliated" section of the scoreboard and use `TEAM_UNASSIGNED` (0) in Source Engine. Citizenship is an RP concept tracked by players, not a faction.
+- **Emergent organizations**: There are NO preset factions, classes, or organizational structures. All characters are permanently **factionless** (`TEAM_UNASSIGNED` / 0) and players must form their own organizations through roleplay. Personal IDs are given to ALL new characters via the `OnCharacterCreated` hook in `sv_schema.lua`. There is no salary system - players must earn money through emergent economic activity. This design enables fully emergent political and economic structures.
 
 - **UI is colorblind (anti-metagaming)**: All game UI systems use uniform gray `Color(200, 200, 200)` for ALL players regardless of faction. Scoreboard headers, tooltips, character info panels, menu buttons - everything is the same color. There are NO faction colors anywhere in the code. If factions want "colors" that's purely an in-character roleplay thing ("We wear red armbands"), not something the game systems know about.
 
@@ -122,7 +103,7 @@ garrysmod/addons/
   - Equipment (ixFlashlightSetLight, ixLanternSetLight, ixCameraRequestPhoto, etc.)
   - Locksmith machine (ixLocksmithOpen, ixLocksmithProgramLock, etc.)
 
-  Plugin strings remain in their plugins: permadeath (10), factions (13), prisoner (10).
+  Plugin strings remain in their plugins: permadeath (10), prisoner/restraint (4).
 
 - **Fire System** (`garrysmod/addons/windswept_fire/`): Performance-optimized fire system forked from vFire. Used for cremation in the permadeath system. Key points:
   - **Location**: Must be in `garrysmod/addons/`, NOT in the gamemode folder. GMod auto-loads addons from this location.
@@ -170,11 +151,14 @@ garrysmod/addons/
   - **Amplitude-based distance**: Voice range scales with how loud you speak. Whisper ~100u, normal ~300u, yelling ~800u.
   - **Uses `Player:VoiceVolume()`**: Returns 0-1 amplitude, updated every 0.1 seconds while speaking.
 
-- **Faction Permissions** (`plugins/factions/sh_factionperms.lua`): Class-based permission system for faction management.
-  - **Rank rules**: Rank 255 (anchor) = all permissions, Rank 0 (default) = none, Ranks 1-254 = based on `classData.permissions` table.
-  - **Rank scope**: Can only affect ranks below yours (`CanAffectRank(char, targetRank)` returns `myRank > targetRank`).
-  - **9 permissions**: `CLASS_CREATE`, `CLASS_DELETE`, `CLASS_UPDATE`, `CLASS_ASSIGN`, `PERM_GRANT`, `PERM_REVOKE`, `FACTION_INVITE`, `FACTION_REMOVE`, `FACTION_INFO`.
-  - **API**: `ix.factionperms.HasPermission(char, perm)`, `ix.factionperms.GetMaxAssignableRank(char)`, `ix.factionperms.CanAffectRank(char, rank)`.
+- **Restraint System** (`plugins/prisoner/`): Physical restraint mechanics for emergent justice/conflict.
+  - **Ziptie**: Consumable item. Equip and use on player to restrain them (5 sec hold). Anyone can use.
+  - **Untie**: Press E on restrained player to release (5 sec, returns ziptie to untier).
+  - **Gag**: Press R on restrained player to toggle blindness + speech block.
+  - **Drag**: Hold LMB with lowered hands near restrained player to drag them. Can't sprint while dragging.
+  - **Leash**: Hold RMB on restrained player near a surface to anchor them to it. Leashed players can't move.
+  - **Unleash**: Press E on leashed player to release anchor (still restrained).
+  - **Gavel**: RP prop that makes slam noise on LMB. Anyone can use.
 
 ## Item Base Classes
 
@@ -354,14 +338,6 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
   ```
 
 - **ix.log.AddType is SERVER-only**: The logging system only exists on the server. If you call `ix.log.AddType()` on the client (e.g., in a shared plugin hook like `InitializedPlugins`), you'll get "attempt to call field 'AddType' (a nil value)". Fix: Wrap in `if SERVER then` or add `if not SERVER then return end` at the start of the function.
-
-- **CharacterLoaded vs PlayerLoadedCharacter execution order**: Order: (1) `CharacterLoaded` hook, (2) `client:Spawn()`, (3) `GM:PlayerLoadedCharacter()` creates Helix salary timer, (4) `PlayerLoadedCharacter` hook. To override Helix's salary timer, use `PlayerLoadedCharacter` (timer exists) not `CharacterLoaded` (timer doesn't exist yet = double salary):
-  ```lua
-  -- Use PlayerLoadedCharacter, NOT CharacterLoaded (timer doesn't exist yet in CharacterLoaded)
-  hook.Add("PlayerLoadedCharacter", "myHook", function(client, character, lastChar)
-      timer.Remove("ixSalary" .. client:SteamID64())
-  end)
-  ```
 
 - **Helix auto-assigns `ITEM.base` based on folder name**: When loading items from subdirectories of `schema/items/`, Helix automatically sets `ITEM.base = "base_" + folder_name`. For example:
   - Items in `currency/` → `ITEM.base = "base_currency"`
