@@ -16,7 +16,6 @@ ITEM.width = 1
 ITEM.height = 1
 ITEM.price = 10
 ITEM.category = "Equipment"
-ITEM.factions = {FACTION_SECURITY, FACTION_ADMINISTRATION}
 
 -- ============================================================================
 -- CLIENT VISUALS
