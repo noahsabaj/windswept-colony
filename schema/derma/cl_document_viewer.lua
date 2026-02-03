@@ -36,11 +36,11 @@ function PANEL:Init()
     self.titleLabel:SetText("Untitled Document")
     self.titleLabel:SetTextColor(Color(220, 220, 220))
 
-    -- Metadata (author, type, word count)
+    -- Metadata (type, word count) - NO author shown (fog of war)
     self.metaLabel = vgui.Create("DLabel", headerPanel)
     self.metaLabel:Dock(TOP)
     self.metaLabel:DockMargin(15, 5, 15, 10)
-    self.metaLabel:SetText("Author: Unknown | Type: Handwritten | Words: 0")
+    self.metaLabel:SetText("Handwritten | 0 words")
     self.metaLabel:SetTextColor(Color(150, 150, 150))
 
     -- Content scroll panel
@@ -101,12 +101,11 @@ function PANEL:SetDocument(data)
     self.titleLabel:SetText(title)
     self:SetTitle(title)
 
-    -- Metadata
-    local author = data.author or "Unknown"
+    -- Metadata (NO author - fog of war)
     local docType = ix.documents and ix.documents.FormatType(data.documentType) or (data.documentType or "Unknown")
     local wordCount = data.wordCount or 0
 
-    self.metaLabel:SetText(string.format("By %s | %s | %d words", author, docType, wordCount))
+    self.metaLabel:SetText(string.format("%s | %d words", docType, wordCount))
 
     -- Content
     local content = data.content or ""
@@ -143,18 +142,17 @@ function PANEL:CreateSignaturePanels(signatures)
 
         -- Get stroke color (default to gray for backwards compatibility)
         local strokeColor = sigData.color or {200, 200, 200}
-        local isPencil = sigData.type == "pencil"
 
         sigPanel.Paint = function(pnl, w, h)
             -- Background
             surface.SetDrawColor(45, 45, 45)
             surface.DrawRect(0, 0, w, h)
 
-            -- Signature area
+            -- Signature area (full height now, no label below)
             local sigX = 15
             local sigY = 5
             local sigW = w - 30
-            local sigH = h - 30
+            local sigH = h - 10
 
             -- Signature background
             surface.SetDrawColor(35, 35, 35)
@@ -179,12 +177,7 @@ function PANEL:CreateSignaturePanels(signatures)
             surface.SetDrawColor(80, 80, 80)
             surface.DrawOutlinedRect(sigX, sigY, sigW, sigH)
 
-            -- Author label
-            local authorText = sigData.authorName or "Unknown"
-            if isPencil then
-                authorText = authorText .. " (pencil)"
-            end
-            draw.SimpleText(authorText, "ixSmallFont", 15, h - 18, Color(150, 150, 150), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+            -- NO author label - fog of war (signature speaks for itself)
         end
 
         totalHeight = totalHeight + sigHeight + (i > 1 and spacing or 0)

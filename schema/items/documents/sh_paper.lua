@@ -98,11 +98,11 @@ function ITEM:GetDescription()
         return "A blank sheet of paper, ready to be written on."
     end
 
-    local author = self:GetAuthor()
+    -- NO author shown (fog of war)
     local docType = ix.documents.FormatType(self:GetDocumentType())
     local wordCount = self:GetWordCount()
 
-    local desc = string.format("%s document by %s.\nWords: %d", docType, author, wordCount)
+    local desc = string.format("%s document.\nWords: %d", docType, wordCount)
 
     if self:HasSignature() then
         local sigCount = self:GetSignatureCount()
@@ -111,11 +111,6 @@ function ITEM:GetDescription()
         else
             desc = desc .. "\nSigned"
         end
-    end
-
-    local timestamp = self:GetTimestamp()
-    if timestamp > 0 then
-        desc = desc .. "\nWritten: " .. os.date("%B %d, %Y", timestamp)
     end
 
     return desc
