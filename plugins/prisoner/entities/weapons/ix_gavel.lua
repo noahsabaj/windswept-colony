@@ -1,10 +1,8 @@
 --[[
     Gavel SWEP
 
-    Judge's tool for sentencing and managing prisoners.
-    - Primary: Gavel slam sound
-    - Secondary: Context-sensitive sentencing/management UI
-    - Only usable by Judge classes
+    A wooden gavel prop for roleplay.
+    - Primary: Gavel slam sound (makes noise)
 ]]--
 
 AddCSLuaFile()
@@ -18,8 +16,8 @@ if CLIENT then
 end
 
 SWEP.Author = "Windswept"
-SWEP.Instructions = "Primary: Slam gavel. Secondary: Sentence/manage prisoner (aim at restrained player)."
-SWEP.Purpose = "Sentencing and managing prisoners."
+SWEP.Instructions = "Primary: Slam gavel to make noise."
+SWEP.Purpose = "Making authoritative noise."
 SWEP.Drop = false
 
 SWEP.Spawnable = false
@@ -49,18 +47,6 @@ function SWEP:SetupDataTables()
     self:NetworkVar("Float", 0, "NextIdle")
 end
 
--- Check if owner is a judge
-function SWEP:IsOwnerJudge()
-    local owner = self:GetOwner()
-    if not IsValid(owner) then return false end
-
-    local character = owner:GetCharacter()
-    if not character then return false end
-
-    local class = character:GetClass()
-    return class == CLASS_JUDGE
-end
-
 function SWEP:Deploy()
     return true
 end
@@ -80,46 +66,9 @@ function SWEP:PrimaryAttack()
     end
 end
 
--- Secondary attack: Context-sensitive sentencing/management (judge only)
+-- Secondary attack: Does nothing (gavel is just for noise)
 function SWEP:SecondaryAttack()
-    if CLIENT then return end
-
-    -- Only judges can sentence/manage prisoners
-    if not self:IsOwnerJudge() then
-        self:GetOwner():NotifyLocalized("judgeOnly")
-        return
-    end
-
-    self:SetNextSecondaryFire(CurTime() + 0.5)
-
-    local owner = self:GetOwner()
-
-    -- Trace to find target
-    local tr = owner:GetEyeTrace()
-    local target = tr.Entity
-
-    if not IsValid(target) or not target:IsPlayer() then
-        owner:Notify("You must be looking at a player.")
-        return
-    end
-
-    if not target:IsRestricted() then
-        owner:NotifyLocalized("cannotSentence")
-        return
-    end
-
-    -- Check if target is already a prisoner
-    if target:Team() == FACTION_PRISONERS then
-        -- Open management UI
-        net.Start("ixPrisonerManage")
-        net.WriteEntity(target)
-        net.Send(owner)
-    else
-        -- Open sentencing UI
-        net.Start("ixPrisonerSentence")
-        net.WriteEntity(target)
-        net.Send(owner)
-    end
+    -- No action
 end
 
 function SWEP:Reload()
@@ -167,34 +116,12 @@ if CLIENT then
         self:DrawModel()
     end
 
-    -- Custom crosshair for judge mode
+    -- Simple crosshair
     function SWEP:DoDrawCrosshair(x, y)
-        local owner = self:GetOwner()
-        if not IsValid(owner) then return end
-
-        local tr = owner:GetEyeTrace()
-        local target = tr.Entity
-
-        local color = Color(255, 255, 255, 200)
-
-        if IsValid(target) and target:IsPlayer() then
-            if target:IsRestricted() then
-                if target:Team() == FACTION_PRISONERS then
-                    color = Color(100, 200, 255, 255) -- Blue for prisoner management
-                else
-                    color = Color(255, 200, 100, 255) -- Orange for sentencing
-                end
-            else
-                color = Color(150, 150, 150, 100) -- Gray for non-restrained
-            end
-        end
-
-        -- Draw simple crosshair
         local size = 8
-        surface.SetDrawColor(color)
+        surface.SetDrawColor(255, 255, 255, 200)
         surface.DrawLine(x - size, y, x + size, y)
         surface.DrawLine(x, y - size, x, y + size)
-
         return true
     end
 end

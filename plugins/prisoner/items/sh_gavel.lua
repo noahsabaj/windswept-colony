@@ -1,13 +1,12 @@
 --[[
     Gavel Item
 
-    Judge's tool for sentencing and managing prisoners.
-    Equip to use as a SWEP.
-    Only usable by Judge class.
+    A wooden gavel prop for roleplay.
+    Equip to slam and make authoritative noise.
 ]]--
 
 ITEM.name = "Gavel"
-ITEM.description = "A wooden gavel used by judges to sentence and manage prisoners."
+ITEM.description = "A wooden gavel. Slam it on a surface to make an authoritative noise."
 ITEM.model = Model("models/judge gavels & more/judge_gavel.mdl")
 ITEM.width = 1
 ITEM.height = 1
