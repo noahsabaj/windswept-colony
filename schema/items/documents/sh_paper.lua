@@ -9,7 +9,6 @@
         paperID: string (file reference)
         documentType: "handwritten" | "pencil" | "typed"
         author: string (first writer's name)
-        title: string (optional, set by owner)
         wordCount: number
         hasSignature: boolean
         signatureAuthor: string
@@ -384,7 +383,6 @@ hook.Add("PlayerUse", "ixPaperGroundView", function(client, entity)
 
     local response = {
         content = docData.content or "",
-        title = item:GetTitle(),
         author = item:GetAuthor(),
         documentType = item:GetDocumentType(),
         wordCount = item:GetWordCount(),
