@@ -15,8 +15,6 @@ net.Receive("ixDocumentWrite", function(len, client)
     local content = net.ReadString()
     local hasSignature = net.ReadBool()
     local signatureJSON = hasSignature and net.ReadString() or nil
-    local isRename = net.ReadBool()
-    local newTitle = net.ReadString()
 
     -- Validate character
     local char = client:GetCharacter()
@@ -40,18 +38,6 @@ net.Receive("ixDocumentWrite", function(len, client)
     end
 
     if not foundPaper then return end
-
-    -- Handle rename-only operation
-    if isRename and newTitle ~= "" then
-        if not item:HasTitle() then
-            item:SetData("title", string.sub(newTitle, 1, 64))
-            item:SetData("titleSet", true)
-            client:NotifyLocalized("documentRenamed", newTitle)
-        else
-            client:NotifyLocalized("documentAlreadyNamed")
-        end
-        return
-    end
 
     -- Check if there's content to write
     if content == "" and not hasSignature then
@@ -235,7 +221,6 @@ net.Receive("ixDocumentRead", function(len, client)
     -- Build response (support both old signatureData and new signatures array)
     local response = {
         content = docData.content or "",
-        title = item:GetTitle(),
         author = item:GetAuthor(),
         documentType = item:GetDocumentType(),
         wordCount = item:GetWordCount(),
@@ -336,8 +321,6 @@ net.Receive("ixDocumentErase", function(len, client)
     item:SetData("paperID", nil)
     item:SetData("documentType", nil)
     item:SetData("author", nil)
-    item:SetData("title", nil)
-    item:SetData("titleSet", nil)
     item:SetData("wordCount", nil)
     item:SetData("hasSignature", nil)
     item:SetData("signatureAuthor", nil)
@@ -459,6 +442,56 @@ net.Receive("ixContainerRename", function(len, client)
     end
 
     client:NotifyLocalized("containerRenamed")
+end)
+
+-- ============================================================================
+-- SIGNATURE SAVE HANDLER
+-- ============================================================================
+
+net.Receive("ixSignatureSave", function(len, client)
+    local signatureJSON = net.ReadString()
+
+    -- Validate character
+    local char = client:GetCharacter()
+    if not char then return end
+
+    -- Parse signature data
+    local strokes = util.JSONToTable(signatureJSON)
+    if not strokes or type(strokes) ~= "table" then return end
+
+    -- Validate and limit stroke data (prevent abuse)
+    local maxStrokes = 50
+    local maxPointsTotal = 500
+    local totalPoints = 0
+
+    if #strokes > maxStrokes then
+        -- Truncate to max strokes
+        local truncated = {}
+        for i = 1, maxStrokes do
+            truncated[i] = strokes[i]
+        end
+        strokes = truncated
+    end
+
+    -- Count and limit total points
+    for i, stroke in ipairs(strokes) do
+        if type(stroke) ~= "table" then
+            strokes[i] = {}
+        else
+            totalPoints = totalPoints + #stroke
+        end
+    end
+
+    if totalPoints > maxPointsTotal then
+        -- Too many points, reject
+        client:NotifyLocalized("signatureTooComplex")
+        return
+    end
+
+    -- Save to character data
+    char:SetData("savedSignature", strokes)
+
+    client:NotifyLocalized("signatureSaved")
 end)
 
 -- ============================================================================

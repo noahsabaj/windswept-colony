@@ -87,14 +87,32 @@ function PANEL:Init()
     btnPanel:SetTall(40)
     btnPanel.Paint = function() end
 
-    -- Sign button (pen only)
+    -- Sign button
     self.signBtn = vgui.Create("DButton", btnPanel)
     self.signBtn:Dock(LEFT)
-    self.signBtn:SetWide(120)
+    self.signBtn:SetWide(100)
     self.signBtn:DockMargin(10, 5, 5, 5)
     self.signBtn:SetText("Add Signature")
     self.signBtn.DoClick = function()
         self:OpenSignaturePad()
+    end
+
+    -- Use Saved button
+    self.useSavedBtn = vgui.Create("DButton", btnPanel)
+    self.useSavedBtn:Dock(LEFT)
+    self.useSavedBtn:SetWide(90)
+    self.useSavedBtn:DockMargin(5, 5, 5, 5)
+    self.useSavedBtn:SetText("Use Saved")
+    self.useSavedBtn.DoClick = function()
+        self:UseSavedSignature()
+    end
+
+    -- Check if character has a saved signature
+    local char = LocalPlayer():GetCharacter()
+    local savedSig = char and char:GetData("savedSignature")
+    self.useSavedBtn:SetEnabled(savedSig ~= nil)
+    if not savedSig then
+        self.useSavedBtn:SetTooltip("No saved signature")
     end
 
     -- Cancel button
@@ -201,12 +219,30 @@ function PANEL:OpenSignaturePad()
     self.sigPad = vgui.Create("ixSignaturePad")
     self.sigPad:SetStrokeColor(self.strokeColor)
     self.sigPad.OnConfirm = function(strokes)
-        self.signatureData = strokes
-        self.sigStatus:SetText("Signature added")
-        self.signBtn:SetText("Signed")
-        self.signBtn:SetEnabled(false)
-        self:UpdateResourceCounter()
+        self:ApplySignature(strokes)
     end
+end
+
+function PANEL:UseSavedSignature()
+    local char = LocalPlayer():GetCharacter()
+    if not char then return end
+
+    local savedSig = char:GetData("savedSignature")
+    if not savedSig then
+        LocalPlayer():NotifyLocalized("noSavedSignature")
+        return
+    end
+
+    self:ApplySignature(savedSig)
+end
+
+function PANEL:ApplySignature(strokes)
+    self.signatureData = strokes
+    self.sigStatus:SetText("Signature added")
+    self.signBtn:SetText("Signed")
+    self.signBtn:SetEnabled(false)
+    self.useSavedBtn:SetEnabled(false)
+    self:UpdateResourceCounter()
 end
 
 function PANEL:SaveDocument()
@@ -237,8 +273,6 @@ function PANEL:SaveDocument()
         if self.signatureData then
             net.WriteString(util.TableToJSON(self.signatureData))
         end
-        net.WriteBool(false)  -- Not a rename operation
-        net.WriteString("")   -- No title
     net.SendToServer()
 
     self:Remove()

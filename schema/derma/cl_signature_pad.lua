@@ -107,7 +107,7 @@ function PANEL:Init()
     -- Clear button
     local clearBtn = vgui.Create("DButton", btnPanel)
     clearBtn:Dock(LEFT)
-    clearBtn:SetWide(100)
+    clearBtn:SetWide(70)
     clearBtn:DockMargin(10, 5, 5, 5)
     clearBtn:SetText("Clear")
     clearBtn.DoClick = function()
@@ -118,17 +118,40 @@ function PANEL:Init()
     -- Cancel button
     local cancelBtn = vgui.Create("DButton", btnPanel)
     cancelBtn:Dock(RIGHT)
-    cancelBtn:SetWide(100)
+    cancelBtn:SetWide(70)
     cancelBtn:DockMargin(5, 5, 10, 5)
     cancelBtn:SetText("Cancel")
     cancelBtn.DoClick = function()
         self:Remove()
     end
 
-    -- Confirm button
+    -- Save & Sign button
+    local saveSignBtn = vgui.Create("DButton", btnPanel)
+    saveSignBtn:Dock(RIGHT)
+    saveSignBtn:SetWide(90)
+    saveSignBtn:DockMargin(5, 5, 5, 5)
+    saveSignBtn:SetText("Save & Sign")
+    saveSignBtn.DoClick = function()
+        if #self.strokes > 0 then
+            -- Save signature to character
+            net.Start("ixSignatureSave")
+                net.WriteString(util.TableToJSON(self.strokes))
+            net.SendToServer()
+
+            -- Also apply to current document
+            if self.OnConfirm then
+                self.OnConfirm(self.strokes)
+            end
+        else
+            LocalPlayer():NotifyLocalized("signatureEmpty")
+        end
+        self:Remove()
+    end
+
+    -- Sign button (one-time use)
     local confirmBtn = vgui.Create("DButton", btnPanel)
     confirmBtn:Dock(RIGHT)
-    confirmBtn:SetWide(100)
+    confirmBtn:SetWide(70)
     confirmBtn:DockMargin(5, 5, 5, 5)
     confirmBtn:SetText("Sign")
     confirmBtn.DoClick = function()

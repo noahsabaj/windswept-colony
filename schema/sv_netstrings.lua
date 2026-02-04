@@ -163,6 +163,7 @@ util.AddNetworkString("ixDocumentErase")       -- Client->Server: erase pencil c
 util.AddNetworkString("ixDocumentDestroy")     -- Client->Server: destroy paper item
 util.AddNetworkString("ixContainerRename")     -- Client->Server: rename envelope/folder
 util.AddNetworkString("ixPenRefill")           -- Client->Server: refill pen with ink
+util.AddNetworkString("ixSignatureSave")       -- Client->Server: save signature to character
 util.AddNetworkString("ixTypewriterOpen")      -- Server->Client: open typewriter UI
 util.AddNetworkString("ixTypewriterWrite")     -- Client->Server: type content on paper
 util.AddNetworkString("ixTypewriterClose")     -- Client->Server: close typewriter UI

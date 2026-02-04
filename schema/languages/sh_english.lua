@@ -311,6 +311,9 @@ LANGUAGE = {
     paperOnly = "Only paper can be stored here.",
     containerRenamed = "Name written.",
     signatureEmpty = "Draw a signature first.",
+    signatureSaved = "Signature saved.",
+    noSavedSignature = "No saved signature.",
+    signatureTooComplex = "Signature too complex.",
     selectPaperFirst = "Select a paper first.",
 
     -- Pen
