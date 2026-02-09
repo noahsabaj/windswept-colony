@@ -116,24 +116,7 @@ function SWEP:UpdateCurrentKey()
 end
 
 function SWEP:GetTargetDoor()
-    local owner = self:GetOwner()
-    if not IsValid(owner) then return nil end
-
-    local tr = util.TraceLine({
-        start = owner:GetShootPos(),
-        endpos = owner:GetShootPos() + owner:GetAimVector() * self.MaxUseDistance,
-        filter = owner
-    })
-
-    local ent = tr.Entity
-    if not IsValid(ent) then return nil end
-
-    -- Check if it's our managed door
-    if ent.ixIsWindsweptDoor then
-        return ent
-    end
-
-    return nil
+    return ix.doors.GetTargetDoor(self:GetOwner(), self.MaxUseDistance)
 end
 
 function SWEP:CanKeyFitLock(door)
@@ -149,26 +132,9 @@ end
 -- ============================================================================
 
 if SERVER then
-    net.Receive("ixKeyringCycle", function(len, ply)
-        local weapon = ply:GetActiveWeapon()
-        if not IsValid(weapon) or weapon:GetClass() ~= "ix_keyring" then return end
-
-        weapon:DoCycle()
-    end)
-
-    net.Receive("ixKeyringLock", function(len, ply)
-        local weapon = ply:GetActiveWeapon()
-        if not IsValid(weapon) or weapon:GetClass() ~= "ix_keyring" then return end
-
-        weapon:DoLock()
-    end)
-
-    net.Receive("ixKeyringUnlock", function(len, ply)
-        local weapon = ply:GetActiveWeapon()
-        if not IsValid(weapon) or weapon:GetClass() ~= "ix_keyring" then return end
-
-        weapon:DoUnlock()
-    end)
+    ix.weapon.NetReceive("ixKeyringCycle", "ix_keyring", "DoCycle")
+    ix.weapon.NetReceive("ixKeyringLock", "ix_keyring", "DoLock")
+    ix.weapon.NetReceive("ixKeyringUnlock", "ix_keyring", "DoUnlock")
 end
 
 function SWEP:DoCycle()
@@ -264,49 +230,28 @@ function SWEP:Think()
     local owner = self:GetOwner()
     if not IsValid(owner) then return end
 
-    -- Client-side input detection (Helix doesn't call PrimaryAttack/SecondaryAttack on client)
     if CLIENT then
-        -- Don't process input if a UI panel is open
-        if vgui.CursorVisible() then
-            self.wasLMBDown = false
-            self.wasRMBDown = false
-            self.wasReloadDown = false
-            return
+        local lmb, rmb = ix.constants.ProcessSWEPInput(self)
+
+        if lmb and CurTime() >= (self.nextLockAttempt or 0) then
+            self.nextLockAttempt = CurTime() + 1
+            net.Start("ixKeyringLock")
+            net.SendToServer()
         end
 
-        local lmbDown = input.IsMouseDown(MOUSE_LEFT)
-        local rmbDown = input.IsMouseDown(MOUSE_RIGHT)
+        if rmb and CurTime() >= (self.nextUnlockAttempt or 0) then
+            self.nextUnlockAttempt = CurTime() + 1
+            net.Start("ixKeyringUnlock")
+            net.SendToServer()
+        end
+
+        -- R key: cycle keys
         local reloadDown = input.IsKeyDown(KEY_R)
-
-        -- LMB pressed - lock door
-        if lmbDown and not self.wasLMBDown then
-            if CurTime() >= (self.nextLockAttempt or 0) then
-                self.nextLockAttempt = CurTime() + 1
-                net.Start("ixKeyringLock")
-                net.SendToServer()
-            end
+        if reloadDown and self.wasReloadDown == false and CurTime() >= (self.nextCycleAttempt or 0) then
+            self.nextCycleAttempt = CurTime() + 0.3
+            net.Start("ixKeyringCycle")
+            net.SendToServer()
         end
-
-        -- RMB pressed - unlock door
-        if rmbDown and not self.wasRMBDown then
-            if CurTime() >= (self.nextUnlockAttempt or 0) then
-                self.nextUnlockAttempt = CurTime() + 1
-                net.Start("ixKeyringUnlock")
-                net.SendToServer()
-            end
-        end
-
-        -- R pressed - cycle keys
-        if reloadDown and not self.wasReloadDown then
-            if CurTime() >= (self.nextCycleAttempt or 0) then
-                self.nextCycleAttempt = CurTime() + 0.3
-                net.Start("ixKeyringCycle")
-                net.SendToServer()
-            end
-        end
-
-        self.wasLMBDown = lmbDown
-        self.wasRMBDown = rmbDown
         self.wasReloadDown = reloadDown
     end
 end
@@ -316,31 +261,7 @@ end
 -- ============================================================================
 
 function SWEP:DrawWorldModel()
-    local owner = self:GetOwner()
-    if not IsValid(owner) then
-        return self:DrawModel()
-    end
-
-    local boneIndex = owner:LookupBone("ValveBiped.Bip01_R_Hand")
-    if not boneIndex then
-        return self:DrawModel()
-    end
-
-    local boneMatrix = owner:GetBoneMatrix(boneIndex)
-    if not boneMatrix then
-        return self:DrawModel()
-    end
-
-    local pos = boneMatrix:GetTranslation()
-    local ang = boneMatrix:GetAngles()
-
-    pos = pos + ang:Forward() * 3 + ang:Right() * 1 + ang:Up() * -1
-    ang:RotateAroundAxis(ang:Forward(), 90)
-    ang:RotateAroundAxis(ang:Up(), 180)
-
-    self:SetRenderOrigin(pos)
-    self:SetRenderAngles(ang)
-    self:DrawModel()
+    ix.constants.DrawWorldModelBone(self, {3, 1, -1}, {{"Forward", 90}, {"Up", 180}})
 end
 
 -- ============================================================================

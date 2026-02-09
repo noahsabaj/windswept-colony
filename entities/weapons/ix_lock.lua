@@ -90,35 +90,15 @@ end
 -- ============================================================================
 
 function SWEP:GetTargetDoor()
-    local owner = self:GetOwner()
-    if not IsValid(owner) then return nil end
-
-    local tr = util.TraceLine({
-        start = owner:GetShootPos(),
-        endpos = owner:GetShootPos() + owner:GetAimVector() * self.MaxUseDistance,
-        filter = owner
-    })
-
-    local ent = tr.Entity
-    if not IsValid(ent) then return nil end
-
-    -- Check if it's our managed door
-    if ent.ixIsWindsweptDoor then
-        return ent
-    end
-
-    return nil
+    return ix.doors.GetTargetDoor(self:GetOwner(), self.MaxUseDistance)
 end
 
 function SWEP:HasToolkit()
     local owner = self:GetOwner()
     if not IsValid(owner) then return false, nil end
 
-    local character = owner:GetCharacter()
-    if not character then return false, nil end
-
-    local inventory = character:GetInventory()
-    if not inventory then return false, nil end
+    local character, inventory = ix.constants.GetCharacterInventory(owner)
+    if not character or not inventory then return false, nil end
 
     -- Find best toolkit in inventory
     local bestToolkit = nil
@@ -153,19 +133,8 @@ end
 -- ============================================================================
 
 if SERVER then
-    net.Receive("ixLockInstall", function(len, ply)
-        local weapon = ply:GetActiveWeapon()
-        if not IsValid(weapon) or weapon:GetClass() ~= "ix_lock" then return end
-
-        weapon:StartInstall()
-    end)
-
-    net.Receive("ixLockCancel", function(len, ply)
-        local weapon = ply:GetActiveWeapon()
-        if not IsValid(weapon) or weapon:GetClass() ~= "ix_lock" then return end
-
-        weapon:CancelInstall()
-    end)
+    ix.weapon.NetReceive("ixLockInstall", "ix_lock", "StartInstall")
+    ix.weapon.NetReceive("ixLockCancel", "ix_lock", "CancelInstall")
 end
 
 function SWEP:StartInstall()
@@ -205,16 +174,11 @@ function SWEP:StartInstall()
 end
 
 function SWEP:CancelInstall()
-    if not self:GetInstalling() then return end
-
-    self:SetInstalling(false)
-    self.targetDoor = nil
-    self.installingToolkit = nil
-
-    local owner = self:GetOwner()
-    if IsValid(owner) then
-        owner:EmitSound("buttons/button10.wav", 50)
-    end
+    ix.constants.CancelSWEPAction(self, function() return self:GetInstalling() end, function()
+        self:SetInstalling(false)
+        self.targetDoor = nil
+        self.installingToolkit = nil
+    end)
 end
 
 function SWEP:CompleteInstall()
@@ -274,37 +238,19 @@ function SWEP:Think()
     local owner = self:GetOwner()
     if not IsValid(owner) then return end
 
-    -- Client-side input detection (Helix doesn't call PrimaryAttack/SecondaryAttack on client)
     if CLIENT then
-        -- Don't process input if a UI panel is open
-        if vgui.CursorVisible() then
-            self.wasLMBDown = false
-            self.wasRMBDown = false
-            return
+        local lmb, rmb = ix.constants.ProcessSWEPInput(self)
+
+        if rmb and not self:GetInstalling() and CurTime() >= (self.nextInstallAttempt or 0) then
+            self.nextInstallAttempt = CurTime() + 0.5
+            net.Start("ixLockInstall")
+            net.SendToServer()
         end
 
-        local rmbDown = input.IsMouseDown(MOUSE_RIGHT)
-        local lmbDown = input.IsMouseDown(MOUSE_LEFT)
-
-        -- RMB pressed - start install
-        if rmbDown and not self.wasRMBDown then
-            if not self:GetInstalling() and CurTime() >= (self.nextInstallAttempt or 0) then
-                self.nextInstallAttempt = CurTime() + 0.5
-                net.Start("ixLockInstall")
-                net.SendToServer()
-            end
+        if lmb and self:GetInstalling() then
+            net.Start("ixLockCancel")
+            net.SendToServer()
         end
-
-        -- LMB pressed - cancel install
-        if lmbDown and not self.wasLMBDown then
-            if self:GetInstalling() then
-                net.Start("ixLockCancel")
-                net.SendToServer()
-            end
-        end
-
-        self.wasRMBDown = rmbDown
-        self.wasLMBDown = lmbDown
     end
 
     -- Installation progress checks (server only)
@@ -346,30 +292,7 @@ end
 -- ============================================================================
 
 function SWEP:DrawWorldModel()
-    local owner = self:GetOwner()
-    if not IsValid(owner) then
-        return self:DrawModel()
-    end
-
-    local boneIndex = owner:LookupBone("ValveBiped.Bip01_R_Hand")
-    if not boneIndex then
-        return self:DrawModel()
-    end
-
-    local boneMatrix = owner:GetBoneMatrix(boneIndex)
-    if not boneMatrix then
-        return self:DrawModel()
-    end
-
-    local pos = boneMatrix:GetTranslation()
-    local ang = boneMatrix:GetAngles()
-
-    pos = pos + ang:Forward() * 4 + ang:Right() * 1 + ang:Up() * -2
-    ang:RotateAroundAxis(ang:Forward(), 90)
-
-    self:SetRenderOrigin(pos)
-    self:SetRenderAngles(ang)
-    self:DrawModel()
+    ix.constants.DrawWorldModelBone(self, {4, 1, -2}, {{"Forward", 90}})
 end
 
 -- ============================================================================

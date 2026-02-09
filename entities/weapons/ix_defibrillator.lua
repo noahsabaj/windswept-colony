@@ -530,17 +530,6 @@ end
 -- HOOKS
 -- ============================================================================
 
--- Handle player death/knockout - exit all states
-hook.Add("PlayerDeath", "ixDefibDeath", function(client)
-    local weapon = client:GetWeapon("ix_defibrillator")
-    if IsValid(weapon) and weapon.ExitAllStates then
-        weapon:ExitAllStates()
-    end
-end)
-
-hook.Add("ixPlayerKnockedOut", "ixDefibKnockout", function(client)
-    local weapon = client:GetWeapon("ix_defibrillator")
-    if IsValid(weapon) and weapon.ExitAllStates then
-        weapon:ExitAllStates()
-    end
+ix.weapon.RegisterCleanupHooks("ix_defibrillator", "ixDefib", function(weapon)
+    if weapon.ExitAllStates then weapon:ExitAllStates() end
 end)

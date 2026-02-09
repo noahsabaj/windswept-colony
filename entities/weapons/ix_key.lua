@@ -98,24 +98,7 @@ function SWEP:GetKeying()
 end
 
 function SWEP:GetTargetDoor()
-    local owner = self:GetOwner()
-    if not IsValid(owner) then return nil end
-
-    local tr = util.TraceLine({
-        start = owner:GetShootPos(),
-        endpos = owner:GetShootPos() + owner:GetAimVector() * self.MaxUseDistance,
-        filter = owner
-    })
-
-    local ent = tr.Entity
-    if not IsValid(ent) then return nil end
-
-    -- Check if it's our managed door (prop_door_rotating with our marker)
-    if ent.ixIsWindsweptDoor then
-        return ent
-    end
-
-    return nil
+    return ix.doors.GetTargetDoor(self:GetOwner(), self.MaxUseDistance)
 end
 
 function SWEP:CanKeyFitLock(door)
@@ -132,16 +115,11 @@ function SWEP:IsPerformingAction()
 end
 
 function SWEP:CancelAction()
-    if not self:IsPerformingAction() then return end
-
-    self:SetLocking(false)
-    self:SetUnlocking(false)
-    self.targetDoor = nil
-
-    local owner = self:GetOwner()
-    if IsValid(owner) and SERVER then
-        owner:EmitSound("buttons/button10.wav", 50)
-    end
+    ix.constants.CancelSWEPAction(self, function() return self:IsPerformingAction() end, function()
+        self:SetLocking(false)
+        self:SetUnlocking(false)
+        self.targetDoor = nil
+    end)
 end
 
 -- ============================================================================
@@ -149,26 +127,9 @@ end
 -- ============================================================================
 
 if SERVER then
-    net.Receive("ixKeyStartLock", function(len, ply)
-        local weapon = ply:GetActiveWeapon()
-        if not IsValid(weapon) or weapon:GetClass() ~= "ix_key" then return end
-
-        weapon:StartLock()
-    end)
-
-    net.Receive("ixKeyStartUnlock", function(len, ply)
-        local weapon = ply:GetActiveWeapon()
-        if not IsValid(weapon) or weapon:GetClass() ~= "ix_key" then return end
-
-        weapon:StartUnlock()
-    end)
-
-    net.Receive("ixKeyCancel", function(len, ply)
-        local weapon = ply:GetActiveWeapon()
-        if not IsValid(weapon) or weapon:GetClass() ~= "ix_key" then return end
-
-        weapon:CancelAction()
-    end)
+    ix.weapon.NetReceive("ixKeyStartLock", "ix_key", "StartLock")
+    ix.weapon.NetReceive("ixKeyStartUnlock", "ix_key", "StartUnlock")
+    ix.weapon.NetReceive("ixKeyCancel", "ix_key", "CancelAction")
 end
 
 -- ============================================================================
@@ -314,33 +275,7 @@ end
 -- ============================================================================
 
 function SWEP:DrawWorldModel()
-    local owner = self:GetOwner()
-    if not IsValid(owner) then
-        return self:DrawModel()
-    end
-
-    -- Position key in right hand
-    local boneIndex = owner:LookupBone("ValveBiped.Bip01_R_Hand")
-    if not boneIndex then
-        return self:DrawModel()
-    end
-
-    local boneMatrix = owner:GetBoneMatrix(boneIndex)
-    if not boneMatrix then
-        return self:DrawModel()
-    end
-
-    local pos = boneMatrix:GetTranslation()
-    local ang = boneMatrix:GetAngles()
-
-    -- Offset to fit in hand
-    pos = pos + ang:Forward() * 3 + ang:Right() * 1 + ang:Up() * -1
-    ang:RotateAroundAxis(ang:Forward(), 90)
-    ang:RotateAroundAxis(ang:Up(), 180)
-
-    self:SetRenderOrigin(pos)
-    self:SetRenderAngles(ang)
-    self:DrawModel()
+    ix.constants.DrawWorldModelBone(self, {3, 1, -1}, {{"Forward", 90}, {"Up", 180}})
 end
 
 -- ============================================================================
@@ -351,38 +286,20 @@ function SWEP:Think()
     local owner = self:GetOwner()
     if not IsValid(owner) then return end
 
-    -- Client-side input detection
     if CLIENT then
-        -- Don't process input if a UI panel is open
-        if vgui.CursorVisible() then
-            self.wasLMBDown = false
-            self.wasRMBDown = false
-            return
+        local lmb, rmb = ix.constants.ProcessSWEPInput(self)
+
+        if lmb and not self:IsPerformingAction() and CurTime() >= (self.nextActionAttempt or 0) then
+            self.nextActionAttempt = CurTime() + 1
+            net.Start("ixKeyStartLock")
+            net.SendToServer()
         end
 
-        local lmbDown = input.IsMouseDown(MOUSE_LEFT)
-        local rmbDown = input.IsMouseDown(MOUSE_RIGHT)
-
-        -- LMB pressed - start lock
-        if lmbDown and not self.wasLMBDown then
-            if not self:IsPerformingAction() and CurTime() >= (self.nextActionAttempt or 0) then
-                self.nextActionAttempt = CurTime() + 1
-                net.Start("ixKeyStartLock")
-                net.SendToServer()
-            end
+        if rmb and not self:IsPerformingAction() and CurTime() >= (self.nextActionAttempt or 0) then
+            self.nextActionAttempt = CurTime() + 1
+            net.Start("ixKeyStartUnlock")
+            net.SendToServer()
         end
-
-        -- RMB pressed - start unlock
-        if rmbDown and not self.wasRMBDown then
-            if not self:IsPerformingAction() and CurTime() >= (self.nextActionAttempt or 0) then
-                self.nextActionAttempt = CurTime() + 1
-                net.Start("ixKeyStartUnlock")
-                net.SendToServer()
-            end
-        end
-
-        self.wasLMBDown = lmbDown
-        self.wasRMBDown = rmbDown
     end
 
     -- Action progress checks
@@ -433,27 +350,8 @@ if CLIENT then
     function SWEP:DrawHUD()
         if not self:IsPerformingAction() then return end
 
-        local elapsed = CurTime() - self:GetActionStartTime()
-        local progress = math.Clamp(elapsed / self.ActionTime, 0, 1)
-
-        local w, h = ScrW(), ScrH()
-        local barW, barH = 200, 20
-        local x, y = (w - barW) / 2, h * 0.6
-
-        -- Background
-        surface.SetDrawColor(30, 30, 30, 200)
-        surface.DrawRect(x, y, barW, barH)
-
-        -- Progress fill
-        surface.SetDrawColor(100, 150, 200, 255)
-        surface.DrawRect(x + 2, y + 2, (barW - 4) * progress, barH - 4)
-
-        -- Border
-        surface.SetDrawColor(200, 200, 200, 255)
-        surface.DrawOutlinedRect(x, y, barW, barH, 2)
-
-        -- Text
-        local actionText = self:GetLocking() and "Locking..." or "Unlocking..."
-        draw.SimpleText(actionText, "ixSmallFont", w / 2, y - 20, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
+        local progress = math.Clamp((CurTime() - self:GetActionStartTime()) / self.ActionTime, 0, 1)
+        local label = self:GetLocking() and "Locking..." or "Unlocking..."
+        ix.constants.DrawProgressBar(label, progress, Color(100, 150, 200))
     end
 end

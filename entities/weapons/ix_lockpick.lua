@@ -107,24 +107,7 @@ end
 -- ============================================================================
 
 function SWEP:GetTargetDoor()
-    local owner = self:GetOwner()
-    if not IsValid(owner) then return nil end
-
-    local tr = util.TraceLine({
-        start = owner:GetShootPos(),
-        endpos = owner:GetShootPos() + owner:GetAimVector() * self.MaxUseDistance,
-        filter = owner
-    })
-
-    local ent = tr.Entity
-    if not IsValid(ent) then return nil end
-
-    -- Check if it's our managed door
-    if ent.ixIsWindsweptDoor then
-        return ent
-    end
-
-    return nil
+    return ix.doors.GetTargetDoor(self:GetOwner(), self.MaxUseDistance)
 end
 
 function SWEP:GenerateSweetSpot()
@@ -143,11 +126,7 @@ end
 -- ============================================================================
 
 if SERVER then
-    net.Receive("ixLockpickStart", function(len, ply)
-        local weapon = ply:GetActiveWeapon()
-        if not IsValid(weapon) or weapon:GetClass() ~= "ix_lockpick" then return end
-        weapon:StartPicking()
-    end)
+    ix.weapon.NetReceive("ixLockpickStart", "ix_lockpick", "StartPicking")
 
     net.Receive("ixLockpickAttempt", function(len, ply)
         local weapon = ply:GetActiveWeapon()
@@ -179,11 +158,7 @@ if SERVER then
         end
     end)
 
-    net.Receive("ixLockpickCancel", function(len, ply)
-        local weapon = ply:GetActiveWeapon()
-        if not IsValid(weapon) or weapon:GetClass() ~= "ix_lockpick" then return end
-        weapon:CancelPicking()
-    end)
+    ix.weapon.NetReceive("ixLockpickCancel", "ix_lockpick", "CancelPicking")
 end
 
 function SWEP:StartPicking()
@@ -235,15 +210,10 @@ function SWEP:StartPicking()
 end
 
 function SWEP:CancelPicking()
-    if not self:IsPicking() then return end
-
-    self:SetPicking(false)
-    self.targetDoor = nil
-
-    local owner = self:GetOwner()
-    if IsValid(owner) and SERVER then
-        owner:EmitSound("buttons/button10.wav", 40)
-    end
+    ix.constants.CancelSWEPAction(self, function() return self:IsPicking() end, function()
+        self:SetPicking(false)
+        self.targetDoor = nil
+    end, 40)
 end
 
 function SWEP:DoAttempt()
@@ -365,50 +335,30 @@ function SWEP:Think()
     local owner = self:GetOwner()
     if not IsValid(owner) then return end
 
-    -- Client-side input detection (Helix doesn't call PrimaryAttack/SecondaryAttack on client)
     if CLIENT then
-        -- Don't process input if a UI panel is open
-        if vgui.CursorVisible() then
-            self.wasLMBDown = false
-            self.wasRMBDown = false
-            return
-        end
+        local lmb, rmb = ix.constants.ProcessSWEPInput(self)
 
-        local rmbDown = input.IsMouseDown(MOUSE_RIGHT)
-        local lmbDown = input.IsMouseDown(MOUSE_LEFT)
-
-        -- RMB pressed - start picking or cancel
-        if rmbDown and not self.wasRMBDown then
+        if rmb then
             if self:IsPicking() then
-                -- Cancel while picking
                 net.Start("ixLockpickCancel")
                 net.SendToServer()
             elseif CurTime() >= (self.nextPickAttempt or 0) then
-                -- Start picking
                 self.nextPickAttempt = CurTime() + 0.5
                 net.Start("ixLockpickStart")
                 net.SendToServer()
             end
         end
 
-        -- LMB pressed - attempt pick (when minigame active)
-        if lmbDown and not self.wasLMBDown then
-            if self:IsPicking() then
-                -- Calculate if ticker is in sweet spot
-                local tickerPos = self:GetTickerPosition()
-                local sweetStart = self:GetSweetSpotStart()
-                local sweetSize = self:GetSweetSpotSize()
+        if lmb and self:IsPicking() then
+            local tickerPos = self:GetTickerPosition()
+            local sweetStart = self:GetSweetSpotStart()
+            local sweetSize = self:GetSweetSpotSize()
+            local hit = tickerPos >= sweetStart and tickerPos <= (sweetStart + sweetSize)
 
-                local hit = tickerPos >= sweetStart and tickerPos <= (sweetStart + sweetSize)
-
-                net.Start("ixLockpickAttempt")
-                net.WriteBool(hit)
-                net.SendToServer()
-            end
+            net.Start("ixLockpickAttempt")
+            net.WriteBool(hit)
+            net.SendToServer()
         end
-
-        self.wasRMBDown = rmbDown
-        self.wasLMBDown = lmbDown
     end
 
     -- Picking progress checks (server only)
@@ -449,30 +399,7 @@ end
 -- ============================================================================
 
 function SWEP:DrawWorldModel()
-    local owner = self:GetOwner()
-    if not IsValid(owner) then
-        return self:DrawModel()
-    end
-
-    local boneIndex = owner:LookupBone("ValveBiped.Bip01_R_Hand")
-    if not boneIndex then
-        return self:DrawModel()
-    end
-
-    local boneMatrix = owner:GetBoneMatrix(boneIndex)
-    if not boneMatrix then
-        return self:DrawModel()
-    end
-
-    local pos = boneMatrix:GetTranslation()
-    local ang = boneMatrix:GetAngles()
-
-    pos = pos + ang:Forward() * 3 + ang:Right() * 0.5 + ang:Up() * -1
-    ang:RotateAroundAxis(ang:Forward(), 45)
-
-    self:SetRenderOrigin(pos)
-    self:SetRenderAngles(ang)
-    self:DrawModel()
+    ix.constants.DrawWorldModelBone(self, {3, 0.5, -1}, {{"Forward", 45}})
 end
 
 -- ============================================================================

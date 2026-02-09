@@ -76,44 +76,8 @@ function SWEP:Reload()
 end
 
 if CLIENT then
-    -- Manual world model rendering (prop model doesn't attach to hand automatically)
     function SWEP:DrawWorldModel()
-        local owner = self:GetOwner()
-
-        -- No owner, just draw normally
-        if not IsValid(owner) then
-            self:DrawModel()
-            return
-        end
-
-        -- Find the right hand bone
-        local bone = owner:LookupBone("ValveBiped.Bip01_R_Hand")
-        if not bone then
-            self:DrawModel()
-            return
-        end
-
-        -- Get the bone's position and angle
-        local matrix = owner:GetBoneMatrix(bone)
-        if not matrix then
-            self:DrawModel()
-            return
-        end
-
-        local pos = matrix:GetTranslation()
-        local ang = matrix:GetAngles()
-
-        -- Offset position to place gavel in hand (gripping handle, head on top)
-        pos = pos + ang:Forward() * 3 + ang:Right() * 3 + ang:Up() * -5
-
-        -- Rotate to orient the gavel correctly (handle pointing forward)
-        ang:RotateAroundAxis(ang:Forward(), -90)
-        ang:RotateAroundAxis(ang:Up(), 180)
-
-        self:SetRenderOrigin(pos)
-        self:SetRenderAngles(ang)
-        self:SetModelScale(1, 0)
-        self:DrawModel()
+        ix.constants.DrawWorldModelBone(self, {3, 3, -5}, {{"Forward", -90}, {"Up", 180}}, true)
     end
 
     -- Simple crosshair

@@ -156,11 +156,8 @@ function SWEP:HasRepairMaterial(materialType)
     local owner = self:GetOwner()
     if not IsValid(owner) then return false, nil end
 
-    local character = owner:GetCharacter()
-    if not character then return false, nil end
-
-    local inventory = character:GetInventory()
-    if not inventory then return false, nil end
+    local character, inventory = ix.constants.GetCharacterInventory(owner)
+    if not character or not inventory then return false, nil end
 
     local targetID = materialType == "wood" and "wood_planks" or "metal_sheets"
 
@@ -177,11 +174,8 @@ function SWEP:HasMatchingKey(door)
     local owner = self:GetOwner()
     if not IsValid(owner) then return false end
 
-    local character = owner:GetCharacter()
-    if not character then return false end
-
-    local inventory = character:GetInventory()
-    if not inventory then return false end
+    local character, inventory = ix.constants.GetCharacterInventory(owner)
+    if not character or not inventory then return false end
 
     local lockData = door.ixLockData
     if not lockData or not lockData.keyings then return false end
@@ -206,26 +200,9 @@ end
 -- ============================================================================
 
 if SERVER then
-    net.Receive("ixToolkitStartRemove", function(len, ply)
-        local weapon = ply:GetActiveWeapon()
-        if not IsValid(weapon) or weapon:GetClass() ~= "ix_toolkit" then return end
-
-        weapon:StartRemove()
-    end)
-
-    net.Receive("ixToolkitStartRepair", function(len, ply)
-        local weapon = ply:GetActiveWeapon()
-        if not IsValid(weapon) or weapon:GetClass() ~= "ix_toolkit" then return end
-
-        weapon:StartRepair()
-    end)
-
-    net.Receive("ixToolkitCancel", function(len, ply)
-        local weapon = ply:GetActiveWeapon()
-        if not IsValid(weapon) or weapon:GetClass() ~= "ix_toolkit" then return end
-
-        weapon:CancelWork()
-    end)
+    ix.weapon.NetReceive("ixToolkitStartRemove", "ix_toolkit", "StartRemove")
+    ix.weapon.NetReceive("ixToolkitStartRepair", "ix_toolkit", "StartRepair")
+    ix.weapon.NetReceive("ixToolkitCancel", "ix_toolkit", "CancelWork")
 end
 
 -- ============================================================================
@@ -388,16 +365,11 @@ end
 -- ============================================================================
 
 function SWEP:CancelWork()
-    if not self:IsWorking() then return end
-
-    self:SetWorking(false)
-    self.targetDoor = nil
-    self.repairMaterial = nil
-
-    local owner = self:GetOwner()
-    if IsValid(owner) and SERVER then
-        owner:EmitSound("buttons/button10.wav", 50)
-    end
+    ix.constants.CancelSWEPAction(self, function() return self:IsWorking() end, function()
+        self:SetWorking(false)
+        self.targetDoor = nil
+        self.repairMaterial = nil
+    end)
 end
 
 -- ============================================================================
@@ -624,20 +596,10 @@ function SWEP:Think()
     local owner = self:GetOwner()
     if not IsValid(owner) then return end
 
-    -- Client-side input detection
     if CLIENT then
-        -- Don't process input if a UI panel is open
-        if vgui.CursorVisible() then
-            self.wasLMBDown = false
-            self.wasRMBDown = false
-            return
-        end
+        local lmb, rmb = ix.constants.ProcessSWEPInput(self)
 
-        local lmbDown = input.IsMouseDown(MOUSE_LEFT)
-        local rmbDown = input.IsMouseDown(MOUSE_RIGHT)
-
-        -- LMB pressed - repair or cancel
-        if lmbDown and not self.wasLMBDown then
+        if lmb then
             if self:IsWorking() then
                 net.Start("ixToolkitCancel")
                 net.SendToServer()
@@ -647,16 +609,10 @@ function SWEP:Think()
             end
         end
 
-        -- RMB pressed - remove
-        if rmbDown and not self.wasRMBDown then
-            if not self:IsWorking() then
-                net.Start("ixToolkitStartRemove")
-                net.SendToServer()
-            end
+        if rmb and not self:IsWorking() then
+            net.Start("ixToolkitStartRemove")
+            net.SendToServer()
         end
-
-        self.wasLMBDown = lmbDown
-        self.wasRMBDown = rmbDown
     end
 
     -- Work progress checks
@@ -699,30 +655,7 @@ end
 -- ============================================================================
 
 function SWEP:DrawWorldModel()
-    local owner = self:GetOwner()
-    if not IsValid(owner) then
-        return self:DrawModel()
-    end
-
-    local boneIndex = owner:LookupBone("ValveBiped.Bip01_R_Hand")
-    if not boneIndex then
-        return self:DrawModel()
-    end
-
-    local boneMatrix = owner:GetBoneMatrix(boneIndex)
-    if not boneMatrix then
-        return self:DrawModel()
-    end
-
-    local pos = boneMatrix:GetTranslation()
-    local ang = boneMatrix:GetAngles()
-
-    pos = pos + ang:Forward() * 4 + ang:Right() * 1 + ang:Up() * -2
-    ang:RotateAroundAxis(ang:Forward(), 90)
-
-    self:SetRenderOrigin(pos)
-    self:SetRenderAngles(ang)
-    self:DrawModel()
+    ix.constants.DrawWorldModelBone(self, {4, 1, -2}, {{"Forward", 90}})
 end
 
 -- ============================================================================
@@ -740,33 +673,9 @@ if CLIENT then
     function SWEP:DrawHUD()
         if not self:IsWorking() then return end
 
-        local elapsed = CurTime() - self:GetWorkStartTime()
-        local duration = self:GetWorkDuration()
-        local progress = math.Clamp(elapsed / duration, 0, 1)
-
-        local w, h = ScrW(), ScrH()
-        local barW, barH = 200, 20
-        local x, y = (w - barW) / 2, h * 0.6
-
-        -- Background
-        surface.SetDrawColor(30, 30, 30, 200)
-        surface.DrawRect(x, y, barW, barH)
-
-        -- Progress fill
-        surface.SetDrawColor(100, 150, 100, 255)
-        surface.DrawRect(x + 2, y + 2, (barW - 4) * progress, barH - 4)
-
-        -- Border
-        surface.SetDrawColor(200, 200, 200, 255)
-        surface.DrawOutlinedRect(x, y, barW, barH, 2)
-
-        -- Text
-        local workType = ""
-        if self.GetWorkType then
-            workType = self:GetWorkType()
-        end
+        local progress = math.Clamp((CurTime() - self:GetWorkStartTime()) / self:GetWorkDuration(), 0, 1)
+        local workType = self.GetWorkType and self:GetWorkType() or ""
         local workName = workTypeNames[workType] or "Working"
-        draw.SimpleText(workName .. "...", "ixSmallFont", w / 2, y - 20, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
-        draw.SimpleText("LMB to cancel", "ixSmallFont", w / 2, y + barH + 10, Color(150, 150, 150), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+        ix.constants.DrawProgressBar(workName .. "...", progress, Color(100, 150, 100), "LMB to cancel")
     end
 end

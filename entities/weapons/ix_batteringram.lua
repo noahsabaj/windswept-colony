@@ -174,38 +174,8 @@ function SWEP:Holster()
 	return true
 end
 
--- World model rendering (placeholder - adjust offsets when proper model is added)
 if CLIENT then
 	function SWEP:DrawWorldModel()
-		local owner = self:GetOwner()
-
-		if not IsValid(owner) then
-			self:DrawModel()
-			return
-		end
-
-		local boneIndex = owner:LookupBone("ValveBiped.Bip01_R_Hand")
-		if not boneIndex then
-			self:DrawModel()
-			return
-		end
-
-		local boneMatrix = owner:GetBoneMatrix(boneIndex)
-		if not boneMatrix then
-			self:DrawModel()
-			return
-		end
-
-		local pos = boneMatrix:GetTranslation()
-		local ang = boneMatrix:GetAngles()
-
-		-- Offset adjustments for the model
-		pos = pos + ang:Forward() * 5 + ang:Right() * 3 + ang:Up() * -2
-		ang:RotateAroundAxis(ang:Forward(), 90)
-		ang:RotateAroundAxis(ang:Up(), 180)
-
-		self:SetRenderOrigin(pos)
-		self:SetRenderAngles(ang)
-		self:DrawModel()
+		ix.constants.DrawWorldModelBone(self, {5, 3, -2}, {{"Forward", 90}, {"Up", 180}})
 	end
 end

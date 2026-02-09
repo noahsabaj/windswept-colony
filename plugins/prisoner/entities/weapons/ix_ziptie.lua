@@ -64,39 +64,7 @@ end
 
 if CLIENT then
     function SWEP:DrawWorldModel()
-        local owner = self:GetOwner()
-
-        if not IsValid(owner) then
-            self:DrawModel()
-            return
-        end
-
-        local bone = owner:LookupBone("ValveBiped.Bip01_R_Hand")
-        if not bone then
-            self:DrawModel()
-            return
-        end
-
-        local matrix = owner:GetBoneMatrix(bone)
-        if not matrix then
-            self:DrawModel()
-            return
-        end
-
-        local pos = matrix:GetTranslation()
-        local ang = matrix:GetAngles()
-
-        -- Offset for zip tie (small item held in hand)
-        pos = pos + ang:Forward() * 3 + ang:Right() * 1 + ang:Up() * -1
-
-        -- Rotate to lay flat in hand
-        ang:RotateAroundAxis(ang:Forward(), 0)
-        ang:RotateAroundAxis(ang:Right(), 90)
-
-        self:SetRenderOrigin(pos)
-        self:SetRenderAngles(ang)
-        self:SetModelScale(1, 0)
-        self:DrawModel()
+        ix.constants.DrawWorldModelBone(self, {3, 1, -1}, {{"Right", 90}}, true)
     end
 end
 
@@ -172,7 +140,7 @@ if SERVER then
         end
 
         -- Check distance
-        if client:GetPos():DistToSqr(target:GetPos()) > (96 * 96) then
+        if not ix.constants.CanInteractClose(client, target) then
             client:Notify("You are too far away.")
             return
         end

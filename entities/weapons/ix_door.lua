@@ -134,11 +134,8 @@ function SWEP:HasToolkit()
     local owner = self:GetOwner()
     if not IsValid(owner) then return false, nil end
 
-    local character = owner:GetCharacter()
-    if not character then return false, nil end
-
-    local inventory = character:GetInventory()
-    if not inventory then return false, nil end
+    local character, inventory = ix.constants.GetCharacterInventory(owner)
+    if not character or not inventory then return false, nil end
 
     -- Find best toolkit in inventory
     local bestToolkit = nil
@@ -177,19 +174,8 @@ end
 -- ============================================================================
 
 if SERVER then
-    net.Receive("ixDoorInstall", function(len, ply)
-        local weapon = ply:GetActiveWeapon()
-        if not IsValid(weapon) or weapon:GetClass() ~= "ix_door" then return end
-
-        weapon:StartInstall()
-    end)
-
-    net.Receive("ixDoorCancel", function(len, ply)
-        local weapon = ply:GetActiveWeapon()
-        if not IsValid(weapon) or weapon:GetClass() ~= "ix_door" then return end
-
-        weapon:CancelInstall()
-    end)
+    ix.weapon.NetReceive("ixDoorInstall", "ix_door", "StartInstall")
+    ix.weapon.NetReceive("ixDoorCancel", "ix_door", "CancelInstall")
 end
 
 function SWEP:StartInstall()
@@ -224,16 +210,11 @@ function SWEP:StartInstall()
 end
 
 function SWEP:CancelInstall()
-    if not self:IsInstalling() then return end
-
-    self:SetInstalling(false)
-    self.targetFrame = nil
-    self.installingToolkit = nil
-
-    local owner = self:GetOwner()
-    if IsValid(owner) and SERVER then
-        owner:EmitSound("buttons/button10.wav", 50)
-    end
+    ix.constants.CancelSWEPAction(self, function() return self:IsInstalling() end, function()
+        self:SetInstalling(false)
+        self.targetFrame = nil
+        self.installingToolkit = nil
+    end)
 end
 
 function SWEP:CompleteInstall()
@@ -303,37 +284,19 @@ function SWEP:Think()
     local owner = self:GetOwner()
     if not IsValid(owner) then return end
 
-    -- Client-side input detection (Helix doesn't call PrimaryAttack/SecondaryAttack on client)
     if CLIENT then
-        -- Don't process input if a UI panel is open
-        if vgui.CursorVisible() then
-            self.wasLMBDown = false
-            self.wasRMBDown = false
-            return
+        local lmb, rmb = ix.constants.ProcessSWEPInput(self)
+
+        if rmb and not self:IsInstalling() and CurTime() >= (self.nextInstallAttempt or 0) then
+            self.nextInstallAttempt = CurTime() + 0.5
+            net.Start("ixDoorInstall")
+            net.SendToServer()
         end
 
-        local rmbDown = input.IsMouseDown(MOUSE_RIGHT)
-        local lmbDown = input.IsMouseDown(MOUSE_LEFT)
-
-        -- RMB pressed - start install
-        if rmbDown and not self.wasRMBDown then
-            if not self:IsInstalling() and CurTime() >= (self.nextInstallAttempt or 0) then
-                self.nextInstallAttempt = CurTime() + 0.5
-                net.Start("ixDoorInstall")
-                net.SendToServer()
-            end
+        if lmb and self:IsInstalling() then
+            net.Start("ixDoorCancel")
+            net.SendToServer()
         end
-
-        -- LMB pressed - cancel install
-        if lmbDown and not self.wasLMBDown then
-            if self:IsInstalling() then
-                net.Start("ixDoorCancel")
-                net.SendToServer()
-            end
-        end
-
-        self.wasRMBDown = rmbDown
-        self.wasLMBDown = lmbDown
     end
 
     -- Installation progress checks (server only)
@@ -383,28 +346,7 @@ if CLIENT then
     function SWEP:DrawHUD()
         if not self:IsInstalling() then return end
 
-        local elapsed = CurTime() - self:GetInstallStartTime()
-        local duration = self:GetInstallDuration()
-        local progress = math.Clamp(elapsed / duration, 0, 1)
-
-        local w, h = ScrW(), ScrH()
-        local barW, barH = 200, 20
-        local x, y = (w - barW) / 2, h * 0.6
-
-        -- Background
-        surface.SetDrawColor(30, 30, 30, 200)
-        surface.DrawRect(x, y, barW, barH)
-
-        -- Progress fill
-        surface.SetDrawColor(150, 100, 50, 255)
-        surface.DrawRect(x + 2, y + 2, (barW - 4) * progress, barH - 4)
-
-        -- Border
-        surface.SetDrawColor(200, 200, 200, 255)
-        surface.DrawOutlinedRect(x, y, barW, barH, 2)
-
-        -- Text
-        draw.SimpleText("Installing Door...", "ixSmallFont", w / 2, y - 20, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
-        draw.SimpleText("LMB to cancel", "ixSmallFont", w / 2, y + barH + 10, Color(150, 150, 150), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+        local progress = math.Clamp((CurTime() - self:GetInstallStartTime()) / self:GetInstallDuration(), 0, 1)
+        ix.constants.DrawProgressBar("Installing Door...", progress, Color(150, 100, 50), "LMB to cancel")
     end
 end

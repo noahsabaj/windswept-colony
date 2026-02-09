@@ -66,42 +66,7 @@ end
 
 if CLIENT then
     function SWEP:DrawWorldModel()
-        local owner = self:GetOwner()
-
-        -- No owner, just draw normally (e.g., dropped weapon)
-        if not IsValid(owner) then
-            self:DrawModel()
-            return
-        end
-
-        -- Find the right hand bone
-        local bone = owner:LookupBone("ValveBiped.Bip01_R_Hand")
-        if not bone then
-            self:DrawModel()
-            return
-        end
-
-        -- Get the bone's position and angle
-        local matrix = owner:GetBoneMatrix(bone)
-        if not matrix then
-            self:DrawModel()
-            return
-        end
-
-        local pos = matrix:GetTranslation()
-        local ang = matrix:GetAngles()
-
-        -- Offset position to place card in hand (tweak these values as needed)
-        pos = pos + ang:Forward() * 3 + ang:Right() * 1 + ang:Up() * -1
-
-        -- Rotate to orient the card correctly
-        ang:RotateAroundAxis(ang:Right(), 90)
-        ang:RotateAroundAxis(ang:Up(), 180)
-
-        self:SetRenderOrigin(pos)
-        self:SetRenderAngles(ang)
-        self:SetModelScale(1, 0)
-        self:DrawModel()
+        ix.constants.DrawWorldModelBone(self, {3, 1, -1}, {{"Right", 90}, {"Up", 180}}, true)
     end
 end
 
@@ -172,11 +137,8 @@ if CLIENT then
     -- (self.ixItem is only set server-side, not networked to client)
     function SWEP:GetEquippedItem()
         local client = LocalPlayer()
-        local character = client:GetCharacter()
-        if not character then return nil end
-
-        local inventory = character:GetInventory()
-        if not inventory then return nil end
+        local character, inventory = ix.constants.GetCharacterInventory(client)
+        if not character or not inventory then return nil end
 
         for _, item in pairs(inventory:GetItems()) do
             if item.uniqueID == "personal_id" and item:GetData("equipped") then

@@ -198,16 +198,6 @@ end
 -- HOOKS - Turn Off Light on Death/Knockout
 -- ============================================================================
 
-hook.Add("PlayerDeath", "ixFlashlightDeath", function(client)
-    local weapon = client:GetWeapon("ix_flashlight")
-    if IsValid(weapon) and weapon.SetLight then
-        weapon:SetLight(false)
-    end
-end)
-
-hook.Add("ixPlayerKnockedOut", "ixFlashlightKnockout", function(client)
-    local weapon = client:GetWeapon("ix_flashlight")
-    if IsValid(weapon) and weapon.SetLight then
-        weapon:SetLight(false)
-    end
+ix.weapon.RegisterCleanupHooks("ix_flashlight", "ixFlashlight", function(weapon)
+    if weapon.SetLight then weapon:SetLight(false) end
 end)

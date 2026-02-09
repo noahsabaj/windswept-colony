@@ -331,18 +331,16 @@ if CLIENT then
 
     function SWEP:DrawHUD()
         if not self:GetAiming() then return end
-        if self.hidingHUD then return end  -- Don't draw HUD during photo capture
 
         local scrW, scrH = ScrW(), ScrH()
         local item = self:GetCameraItem()
 
-        -- Calculate square viewfinder that matches EXACTLY what will be captured
-        -- This ensures WYSIWYG - what you see is what you get in the photo
+        -- Square viewfinder frame - purely cosmetic framing overlay.
+        -- CapturePhoto() uses render.RenderView() with the same FOV, so the
+        -- full visible scene inside this frame is what ends up in the photo.
         local borderSize = 80
         local maxViewfinderW = scrW - (borderSize * 2)
         local maxViewfinderH = scrH - (borderSize * 2)
-
-        -- Square size matches the capture logic in CapturePhoto()
         local squareSize = math.min(maxViewfinderW, maxViewfinderH)
         local squareX = (scrW - squareSize) / 2
         local squareY = (scrH - squareSize) / 2
@@ -441,83 +439,72 @@ if CLIENT then
         weapon:CapturePhoto()
     end)
 
+    -- Render target for photo capture (768x768, created once and reused)
+    local photoRT = GetRenderTarget("ixCameraPhoto", 768, 768)
+
     function SWEP:CapturePhoto()
         local owner = self:GetOwner()
         if not IsValid(owner) then return end
 
-        -- Hide HUD temporarily for clean capture
-        self.hidingHUD = true
-        self.captureNextFrame = true
+        -- Calculate the effective FOV of the viewfinder square BEFORE the PostRender
+        -- hook fires, so we capture exactly what the player sees framed.
+        --
+        -- The viewfinder is a square crop of the widescreen view. Source treats the
+        -- camera FOV as horizontal FOV. The viewfinder square is height-limited
+        -- (squareSize = scrH - 160 on widescreen), so it spans squareSize/scrW of
+        -- the horizontal FOV. We need the angular extent of that square so the 1:1
+        -- render target matches it exactly.
+        local scrW, scrH = ScrW(), ScrH()
+        local borderSize = 80
+        local squareSize = math.min(scrW - borderSize * 2, scrH - borderSize * 2)
+        local hFOV = self:GetCurrentFOV()
+        local viewfinderFOV = math.deg(2 * math.atan(
+            math.tan(math.rad(hFOV / 2)) * (squareSize / scrW)
+        ))
 
-        -- CRITICAL: We need to capture on the NEXT frame's PostRender
-        -- so that this frame's DrawHUD can check hidingHUD and not draw
-        -- Frame N: Set hidingHUD, DrawHUD still draws (too late), schedule hook
-        -- Frame N+1: DrawHUD skips due to hidingHUD, PostRender captures clean frame
         hook.Add("PostRender", "ixCameraCapture", function()
-            if not IsValid(self) then
-                hook.Remove("PostRender", "ixCameraCapture")
-                return
-            end
-
-            -- Skip first frame (where HUD was already drawn)
-            if self.captureNextFrame then
-                self.captureNextFrame = false
-                return
-            end
-
-            -- Remove the hook (one-shot)
             hook.Remove("PostRender", "ixCameraCapture")
 
-            -- Calculate capture area to match the viewfinder
-            -- The viewfinder has 80px border on all sides, so inner area is (scrW-160, scrH-160)
-            -- We capture a square using the smaller dimension (so it fits in viewfinder)
-            local scrW, scrH = ScrW(), ScrH()
-            local borderSize = 80  -- Must match DrawHUD border
-            local viewfinderW = scrW - (borderSize * 2)
-            local viewfinderH = scrH - (borderSize * 2)
+            if not IsValid(self) or not IsValid(owner) then return end
 
-            -- Use smaller dimension for square capture (fits entirely in viewfinder)
-            -- Cap at 512x512 - photo viewer displays at 512x512 max, larger is wasteful
-            -- and would exceed net message limits (~64KB)
-            local captureSize = math.min(viewfinderW, viewfinderH, 512)
+            render.PushRenderTarget(photoRT)
+                render.Clear(0, 0, 0, 255)
+                render.RenderView({
+                    origin = owner:EyePos(),
+                    angles = owner:EyeAngles(),
+                    x = 0, y = 0,
+                    w = 768, h = 768,
+                    fov = viewfinderFOV,
+                    drawviewmodel = false,
+                })
 
-            -- Center the capture on screen
-            local captureX = (scrW - captureSize) / 2
-            local captureY = (scrH - captureSize) / 2
-
-            -- Capture the screen (quality 60 keeps file small, ~15-25KB for 512x512)
-            local data = render.Capture({
-                format = "jpeg",
-                quality = 60,
-                x = captureX,
-                y = captureY,
-                w = captureSize,
-                h = captureSize
-            })
-
-            self.hidingHUD = false
-
-            if data then
-                -- Encode to base64 for transmission
-                local encoded = util.Base64Encode(data)
-
-                if encoded and #encoded > 0 then
-                    -- Size check
-                    if #encoded > 60000 then
-                        LocalPlayer():NotifyLocalized("cameraImageTooLarge")
-                        return
-                    end
-
-                    -- Send photo data to server
-                    -- Server will store in file and only keep ID in item (prevents inventory sync overflow)
-                    net.Start("ixCameraPhotoData")
-                        net.WriteUInt(#encoded, 32)
-                        net.WriteData(encoded, #encoded)
-                    net.SendToServer()
-
-                    -- Play shutter sound
-                    surface.PlaySound("buttons/lightswitch2.wav")
+                -- Adaptive quality: try high quality first, reduce if scene is too complex.
+                -- Raw binary (no base64) gives us ~60KB of actual JPEG budget.
+                local data
+                for _, quality in ipairs({70, 50, 35}) do
+                    data = render.Capture({
+                        format = "jpeg",
+                        quality = quality,
+                        x = 0, y = 0,
+                        w = 768, h = 768
+                    })
+                    if not data then break end
+                    if #data <= 60000 then break end
                 end
+            render.PopRenderTarget()
+
+            if data and #data > 0 then
+                if #data > 60000 then
+                    LocalPlayer():NotifyLocalized("cameraImageTooLarge")
+                    return
+                end
+
+                net.Start("ixCameraPhotoData")
+                    net.WriteUInt(#data, 32)
+                    net.WriteData(data, #data)
+                net.SendToServer()
+
+                surface.PlaySound("buttons/lightswitch2.wav")
             end
         end)
     end
@@ -641,7 +628,7 @@ if SERVER then
     end)
 
     -- Handle photo data from client
-    -- With 512x512 cap, data fits in single message (<64KB)
+    -- Raw JPEG binary with adaptive quality, fits in single message (<64KB)
     net.Receive("ixCameraPhotoData", function(len, client)
         local dataLen = net.ReadUInt(32)
         local imageData = net.ReadData(dataLen)
@@ -695,11 +682,8 @@ if SERVER then
         -- so the scene is illuminated in the photo
 
         -- Create photo item
-        local character = client:GetCharacter()
-        if not character then return end
-
-        local inventory = character:GetInventory()
-        if not inventory then return end
+        local character, inventory = ix.constants.GetCharacterInventory(client)
+        if not character or not inventory then return end
 
         -- Generate unique photo ID and save image to file
         -- This prevents inventory sync overflow (storing ~25KB per photo in item data would crash)
@@ -711,11 +695,8 @@ if SERVER then
             file.CreateDir(photoDir)
         end
 
-        -- Save image data to file
-        -- Note: Uses .txt extension for base64-encoded JPEG data. GMod's file.Write
-        -- works with any extension, and .txt ensures no issues with file system filters.
-        -- The actual content is base64 text, so .txt is technically accurate.
-        file.Write(photoDir .. "/" .. photoID .. ".txt", imageData)
+        -- Save raw JPEG binary to file
+        file.Write(photoDir .. "/" .. photoID .. ".dat", imageData)
 
         -- Item only stores the ID reference, not the actual image data
         local photoData = {
@@ -779,16 +760,6 @@ end
 -- HOOKS
 -- ============================================================================
 
-hook.Add("PlayerDeath", "ixCameraDeath", function(client)
-    local weapon = client:GetWeapon("ix_camera")
-    if IsValid(weapon) then
-        weapon:SetAiming(false)
-    end
-end)
-
-hook.Add("ixPlayerKnockedOut", "ixCameraKnockout", function(client)
-    local weapon = client:GetWeapon("ix_camera")
-    if IsValid(weapon) then
-        weapon:SetAiming(false)
-    end
+ix.weapon.RegisterCleanupHooks("ix_camera", "ixCamera", function(weapon)
+    weapon:SetAiming(false)
 end)

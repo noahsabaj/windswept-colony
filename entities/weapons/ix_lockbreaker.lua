@@ -98,24 +98,7 @@ end
 -- ============================================================================
 
 function SWEP:GetTargetDoor()
-    local owner = self:GetOwner()
-    if not IsValid(owner) then return nil end
-
-    local tr = util.TraceLine({
-        start = owner:GetShootPos(),
-        endpos = owner:GetShootPos() + owner:GetAimVector() * self.MaxUseDistance,
-        filter = owner
-    })
-
-    local ent = tr.Entity
-    if not IsValid(ent) then return nil end
-
-    -- Check if it's our managed door
-    if ent.ixIsWindsweptDoor then
-        return ent
-    end
-
-    return nil
+    return ix.doors.GetTargetDoor(self:GetOwner(), self.MaxUseDistance)
 end
 
 -- ============================================================================
@@ -123,17 +106,8 @@ end
 -- ============================================================================
 
 if SERVER then
-    net.Receive("ixLockbreakerStart", function(len, ply)
-        local weapon = ply:GetActiveWeapon()
-        if not IsValid(weapon) or weapon:GetClass() ~= "ix_lockbreaker" then return end
-        weapon:StartBreaking()
-    end)
-
-    net.Receive("ixLockbreakerCancel", function(len, ply)
-        local weapon = ply:GetActiveWeapon()
-        if not IsValid(weapon) or weapon:GetClass() ~= "ix_lockbreaker" then return end
-        weapon:CancelBreaking()
-    end)
+    ix.weapon.NetReceive("ixLockbreakerStart", "ix_lockbreaker", "StartBreaking")
+    ix.weapon.NetReceive("ixLockbreakerCancel", "ix_lockbreaker", "CancelBreaking")
 end
 
 function SWEP:StartBreaking()
@@ -166,22 +140,17 @@ function SWEP:StartBreaking()
 
     -- Broadcast to nearby players that someone is breaking a lock
     for _, ply in ipairs(player.GetAll()) do
-        if ply:GetPos():DistToSqr(owner:GetPos()) < 1000000 then  -- ~1000 units
+        if ix.constants.WithinRange(ply, owner, ix.constants.RANGE_SOUND_FAR) then
             ply:NotifyLocalized("lockbreakerHeard")
         end
     end
 end
 
 function SWEP:CancelBreaking()
-    if not self:IsBreaking() then return end
-
-    self:SetBreaking(false)
-    self.targetDoor = nil
-
-    local owner = self:GetOwner()
-    if IsValid(owner) and SERVER then
-        owner:EmitSound("buttons/button10.wav", 50)
-    end
+    ix.constants.CancelSWEPAction(self, function() return self:IsBreaking() end, function()
+        self:SetBreaking(false)
+        self.targetDoor = nil
+    end)
 end
 
 function SWEP:CompleteBreaking()
@@ -228,37 +197,19 @@ function SWEP:Think()
     local owner = self:GetOwner()
     if not IsValid(owner) then return end
 
-    -- Client-side input detection (Helix doesn't call PrimaryAttack/SecondaryAttack on client)
     if CLIENT then
-        -- Don't process input if a UI panel is open
-        if vgui.CursorVisible() then
-            self.wasLMBDown = false
-            self.wasRMBDown = false
-            return
+        local lmb, rmb = ix.constants.ProcessSWEPInput(self)
+
+        if rmb and not self:IsBreaking() and CurTime() >= (self.nextBreakAttempt or 0) then
+            self.nextBreakAttempt = CurTime() + 0.5
+            net.Start("ixLockbreakerStart")
+            net.SendToServer()
         end
 
-        local rmbDown = input.IsMouseDown(MOUSE_RIGHT)
-        local lmbDown = input.IsMouseDown(MOUSE_LEFT)
-
-        -- RMB pressed - start breaking
-        if rmbDown and not self.wasRMBDown then
-            if not self:IsBreaking() and CurTime() >= (self.nextBreakAttempt or 0) then
-                self.nextBreakAttempt = CurTime() + 0.5
-                net.Start("ixLockbreakerStart")
-                net.SendToServer()
-            end
+        if lmb and self:IsBreaking() then
+            net.Start("ixLockbreakerCancel")
+            net.SendToServer()
         end
-
-        -- LMB pressed - cancel breaking
-        if lmbDown and not self.wasLMBDown then
-            if self:IsBreaking() then
-                net.Start("ixLockbreakerCancel")
-                net.SendToServer()
-            end
-        end
-
-        self.wasRMBDown = rmbDown
-        self.wasLMBDown = lmbDown
     end
 
     -- Breaking progress checks
@@ -320,31 +271,7 @@ end
 -- ============================================================================
 
 function SWEP:DrawWorldModel()
-    local owner = self:GetOwner()
-    if not IsValid(owner) then
-        return self:DrawModel()
-    end
-
-    local boneIndex = owner:LookupBone("ValveBiped.Bip01_R_Hand")
-    if not boneIndex then
-        return self:DrawModel()
-    end
-
-    local boneMatrix = owner:GetBoneMatrix(boneIndex)
-    if not boneMatrix then
-        return self:DrawModel()
-    end
-
-    local pos = boneMatrix:GetTranslation()
-    local ang = boneMatrix:GetAngles()
-
-    pos = pos + ang:Forward() * 5 + ang:Right() * 2 + ang:Up() * -3
-    ang:RotateAroundAxis(ang:Right(), -90)
-    ang:RotateAroundAxis(ang:Forward(), 180)
-
-    self:SetRenderOrigin(pos)
-    self:SetRenderAngles(ang)
-    self:DrawModel()
+    ix.constants.DrawWorldModelBone(self, {5, 2, -3}, {{"Right", -90}, {"Forward", 180}})
 end
 
 -- ============================================================================
@@ -355,27 +282,7 @@ if CLIENT then
     function SWEP:DrawHUD()
         if not self:IsBreaking() then return end
 
-        local elapsed = CurTime() - self:GetBreakStartTime()
-        local progress = math.Clamp(elapsed / self.BreakTime, 0, 1)
-
-        local w, h = ScrW(), ScrH()
-        local barW, barH = 200, 20
-        local x, y = (w - barW) / 2, h * 0.6
-
-        -- Background
-        surface.SetDrawColor(30, 30, 30, 200)
-        surface.DrawRect(x, y, barW, barH)
-
-        -- Progress fill (red/orange for destructive action)
-        surface.SetDrawColor(200, 100, 50, 255)
-        surface.DrawRect(x + 2, y + 2, (barW - 4) * progress, barH - 4)
-
-        -- Border
-        surface.SetDrawColor(200, 200, 200, 255)
-        surface.DrawOutlinedRect(x, y, barW, barH, 2)
-
-        -- Text
-        draw.SimpleText("Breaking Lock...", "ixSmallFont", w / 2, y - 20, Color(255, 150, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
-        draw.SimpleText("LMB to cancel", "ixSmallFont", w / 2, y + barH + 30, Color(150, 150, 150), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+        local progress = math.Clamp((CurTime() - self:GetBreakStartTime()) / self.BreakTime, 0, 1)
+        ix.constants.DrawProgressBar("Breaking Lock...", progress, Color(200, 100, 50), "LMB to cancel", Color(255, 150, 100))
     end
 end
