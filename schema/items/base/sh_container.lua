@@ -1,0 +1,308 @@
+--[[
+    Base Container Item
+
+    Common bag infrastructure for all container items.
+    Child items configure via properties and optionally override hook methods.
+
+    Required child properties:
+        ITEM.invWidth           -- Internal inventory width
+        ITEM.invHeight          -- Internal inventory height
+        ITEM.inventoryFlag      -- Inventory variable name (e.g., "isDocumentContainer")
+
+    Optional child properties:
+        ITEM.allowedItemType    -- Restrict to this uniqueID (e.g., "paper", "photo", "key")
+        ITEM.allowedItemNotify  -- Notification key for wrong item type in combine
+        ITEM.viewSuffix         -- Suffix for View panel title (e.g., " - Keys")
+
+    Optional child overrides:
+        ITEM:OnRemoveContents(inv)              -- Called before DB cleanup in OnRemoved
+        ITEM:OnDropExtra()                      -- Called after standard drop handling
+        ITEM:CanTransferExtra(old, new)         -- Return false to block transfer
+        ITEM:OnTransferExtra(curInv, inventory) -- Called after standard transfer handling
+        ITEM:PaintOverExtra(item, w, h)         -- Called after standard PaintOver
+]]--
+
+ITEM.name = "Container"
+ITEM.description = "A container for items."
+ITEM.category = "Storage"
+ITEM.model = "models/props_c17/paper01.mdl"
+ITEM.width = 1
+ITEM.height = 1
+
+ITEM.isBag = true
+ITEM.noBusiness = true
+
+-- Override in child items
+ITEM.invWidth = 5
+ITEM.invHeight = 1
+ITEM.inventoryFlag = "isContainer"
+ITEM.allowedItemType = nil
+ITEM.allowedItemNotify = nil
+ITEM.viewSuffix = nil
+
+-- ============================================================================
+-- BAG SYSTEM
+-- ============================================================================
+
+function ITEM:OnInstanced(invID, x, y)
+    local inventory = ix.item.inventories[invID]
+
+    ix.inventory.New(inventory and inventory.owner or 0, self.uniqueID, function(inv)
+        local client = inv:GetOwner()
+
+        inv.vars.isBag = self.uniqueID
+        inv.vars[self.inventoryFlag] = true
+        self:SetData("id", inv:GetID())
+
+        if IsValid(client) then
+            inv:AddReceiver(client)
+        end
+    end)
+end
+
+function ITEM:GetInventory()
+    local index = self:GetData("id")
+    if index then
+        return ix.item.inventories[index]
+    end
+end
+
+ITEM.GetInv = ITEM.GetInventory
+
+function ITEM:OnSendData()
+    local index = self:GetData("id")
+
+    if index then
+        local inventory = ix.item.inventories[index]
+
+        if inventory then
+            inventory.vars.isBag = self.uniqueID
+            inventory.vars[self.inventoryFlag] = true
+            inventory:Sync(self.player)
+            inventory:AddReceiver(self.player)
+        else
+            local owner = self.player:GetCharacter():GetID()
+
+            ix.inventory.Restore(self:GetData("id"), self.invWidth, self.invHeight, function(inv)
+                inv.vars.isBag = self.uniqueID
+                inv.vars[self.inventoryFlag] = true
+                inv:SetOwner(owner, true)
+
+                if not inv.owner then
+                    return
+                end
+
+                for client, character in ix.util.GetCharacters() do
+                    if character:GetID() == inv.owner then
+                        inv:AddReceiver(client)
+                        break
+                    end
+                end
+            end)
+        end
+    else
+        ix.inventory.New(self.player:GetCharacter():GetID(), self.uniqueID, function(inv)
+            inv.vars[self.inventoryFlag] = true
+            self:SetData("id", inv:GetID())
+        end)
+    end
+end
+
+function ITEM.postHooks.drop(item, result)
+    local index = item:GetData("id")
+
+    local query = mysql:Update("ix_inventories")
+        query:Update("character_id", 0)
+        query:Where("inventory_id", index)
+    query:Execute()
+
+    if SERVER then
+        net.Start("ixBagDrop")
+            net.WriteUInt(index, 32)
+        net.Send(item.player)
+    end
+
+    if item.OnDropExtra then
+        item:OnDropExtra()
+    end
+end
+
+function ITEM:OnRemoved()
+    local index = self:GetData("id")
+
+    if index then
+        if self.OnRemoveContents then
+            local inv = ix.item.inventories[index]
+            if inv then
+                self:OnRemoveContents(inv)
+            end
+        end
+
+        local query = mysql:Delete("ix_items")
+            query:Where("inventory_id", index)
+        query:Execute()
+
+        query = mysql:Delete("ix_inventories")
+            query:Where("inventory_id", index)
+        query:Execute()
+    end
+end
+
+function ITEM:CanTransfer(oldInventory, newInventory)
+    if self.CanTransferExtra and self:CanTransferExtra(oldInventory, newInventory) == false then
+        return false
+    end
+
+    local index = self:GetData("id")
+
+    if newInventory then
+        if newInventory.vars and newInventory.vars.isBag then
+            return false
+        end
+
+        local index2 = newInventory:GetID()
+
+        if index == index2 then
+            return false
+        end
+
+        local bagInv = self:GetInventory()
+        if bagInv then
+            for k, _ in bagInv:Iter() do
+                if k:GetData("id") == index2 then
+                    return false
+                end
+            end
+        end
+    end
+
+    return not newInventory or newInventory:GetID() ~= oldInventory:GetID() or newInventory.vars.isBag
+end
+
+function ITEM:OnTransferred(curInv, inventory)
+    local bagInventory = self:GetInventory()
+    if not bagInventory then return end
+
+    if isfunction(curInv.GetOwner) then
+        local owner = curInv:GetOwner()
+        if IsValid(owner) then
+            bagInventory:RemoveReceiver(owner)
+        end
+    end
+
+    if isfunction(inventory.GetOwner) then
+        local owner = inventory:GetOwner()
+        if IsValid(owner) then
+            bagInventory:AddReceiver(owner)
+            bagInventory:SetOwner(owner)
+        end
+    else
+        bagInventory:SetOwner(nil)
+    end
+
+    if self.OnTransferExtra then
+        self:OnTransferExtra(curInv, inventory)
+    end
+end
+
+function ITEM:OnRegistered()
+    ix.inventory.Register(self.uniqueID, self.invWidth, self.invHeight, true)
+
+    -- Auto-register container item type restriction
+    if self.inventoryFlag and self.allowedItemType then
+        ix.containerRestrictions[self.inventoryFlag] = self.allowedItemType
+    end
+end
+
+-- ============================================================================
+-- VIEW FUNCTION (Helix auto-bag-open)
+-- ============================================================================
+
+ITEM.functions.View = {
+    name = "Open",
+    tip = "View the contents.",
+    icon = "icon16/folder.png",
+    OnClick = ix.constants.OpenContainerPanel,
+    OnCanRun = ix.constants.CanOpenContainerPanel
+}
+
+-- ============================================================================
+-- COMBINE (drag items into bag)
+-- ============================================================================
+
+ITEM.functions.combine = {
+    OnRun = function(item, data)
+        if not item.allowedItemType then return false end
+
+        local targetItem = ix.item.instances[data[1]]
+        if not targetItem then return false end
+
+        if targetItem.uniqueID ~= item.allowedItemType then
+            if item.player and item.allowedItemNotify then
+                item.player:NotifyLocalized(item.allowedItemNotify)
+            end
+            return false
+        end
+
+        targetItem:Transfer(item:GetData("id"), nil, nil, item.player)
+        return false
+    end,
+    OnCanRun = function(item, data)
+        if not item.allowedItemType then return false end
+
+        local index = item:GetData("id", "")
+        if index then
+            local inventory = ix.item.inventories[index]
+            if inventory then return true end
+        end
+        return false
+    end
+}
+
+-- ============================================================================
+-- CLIENT VISUALS
+-- ============================================================================
+
+if CLIENT then
+    function ITEM:PaintOver(item, w, h)
+        local panel = ix.gui["inv" .. item:GetData("id", "")]
+
+        if IsValid(panel) and vgui.GetHoveredPanel() == self then
+            panel:SetHighlighted(true)
+        elseif IsValid(panel) then
+            panel:SetHighlighted(false)
+        end
+
+        if item.PaintOverExtra then
+            item:PaintOverExtra(w, h)
+        end
+    end
+
+    net.Receive("ixBagDrop", function()
+        local index = net.ReadUInt(32)
+        local panel = ix.gui["inv"..index]
+
+        if panel and panel:IsVisible() then
+            panel:Close()
+        end
+    end)
+end
+
+-- ============================================================================
+-- CONTAINER RESTRICTION SYSTEM
+-- ============================================================================
+
+-- Centralized container item type restrictions (replaces per-item hooks)
+ix.containerRestrictions = ix.containerRestrictions or {}
+
+hook.Add("CanTransferItem", "ixContainerRestriction", function(item, curInv, inventory)
+    if not inventory or not inventory.vars then return end
+
+    for flag, allowedType in pairs(ix.containerRestrictions) do
+        if inventory.vars[flag] then
+            if item.uniqueID ~= allowedType then
+                return false
+            end
+        end
+    end
+end)
