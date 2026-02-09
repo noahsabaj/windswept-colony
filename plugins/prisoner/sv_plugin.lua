@@ -85,7 +85,7 @@ function PLUGIN:KeyPress(client, key)
     if not target:IsRestricted() then return end
 
     -- Must be within interaction range
-    if client:GetPos():DistToSqr(target:GetPos()) > (96 * 96) then return end
+    if not ix.constants.CanInteractClose(client, target) then return end
 
     -- Toggle gag state
     local gagged = target:GetNetVar("gagged", false)
@@ -166,7 +166,7 @@ function PLUGIN:StartDrag(dragger, target)
     if target:GetNetVar("ixDraggedBy") then return false end
 
     -- Check distance
-    if dragger:GetPos():DistToSqr(target:GetPos()) > (96 * 96) then return false end
+    if not ix.constants.CanInteractClose(dragger, target) then return false end
 
     -- Set drag state
     dragger:SetNetVar("ixDragging", target:EntIndex())
@@ -364,7 +364,7 @@ net.Receive("ixLeashStart", function(len, client)
     if not IsValid(target) or not target:IsPlayer() then return end
 
     -- Range check
-    if client:GetPos():DistToSqr(target:GetPos()) > (96 * 96) then return end
+    if not ix.constants.CanInteractClose(client, target) then return end
 
     -- Trace from client to find surface
     local tr = util.TraceLine({
@@ -392,7 +392,7 @@ net.Receive("ixLeashStop", function(len, client)
     if not IsValid(target) or not target:IsPlayer() then return end
 
     -- Range check
-    if client:GetPos():DistToSqr(target:GetPos()) > (96 * 96) then return end
+    if not ix.constants.CanInteractClose(client, target) then return end
 
     if restraintPlugin:UnleashPlayer(target) then
         client:Notify("You have unleashed " .. target:Name() .. ".")

@@ -101,6 +101,25 @@ function ix.doors.IsDoorOpen(door)
     return not ix.doors.IsDoorClosed(door)
 end
 
+-- Trace from a player's eyes to find a Windswept-managed door within maxDist
+-- Used by key, keyring, lock, lockpick, lockbreaker SWEPs
+function ix.doors.GetTargetDoor(owner, maxDist)
+    if not IsValid(owner) then return nil end
+
+    local tr = util.TraceLine({
+        start = owner:GetShootPos(),
+        endpos = owner:GetShootPos() + owner:GetAimVector() * maxDist,
+        filter = owner
+    })
+
+    local ent = tr.Entity
+    if IsValid(ent) and ent.ixIsWindsweptDoor then
+        return ent
+    end
+
+    return nil
+end
+
 -- ============================================================================
 -- SERVER: Frame Detection & Management
 -- ============================================================================
@@ -1063,8 +1082,6 @@ if SERVER then
                 linkedByProximity = linkedByProximity + 1
                 break  -- Move to next door1
             end
-        end
-
         end
     end
 

@@ -88,16 +88,14 @@ function ENT:OpenUI(client)
     local inv = char:GetInventory()
     if not inv then return end
 
-    -- Find blank papers
+    -- Find papers
     local papers = {}
-    for _, item in pairs(inv:GetItems()) do
-        if item.uniqueID == "paper" then
-            table.insert(papers, {
-                id = item:GetID(),
-                name = item:GetName(),
-                hasContent = item:HasContent()
-            })
-        end
+    for _, item in ipairs(inv:GetItemsByUniqueID("paper", false)) do
+        table.insert(papers, {
+            id = item:GetID(),
+            name = item:GetName(),
+            hasContent = item:HasContent()
+        })
     end
 
     -- Send UI open message

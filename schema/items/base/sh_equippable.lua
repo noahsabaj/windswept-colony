@@ -53,8 +53,7 @@ ITEM.unequipTip = "Put this item away."
 if CLIENT then
     function ITEM:PaintOver(item, w, h)
         if item:GetData("equipped") then
-            surface.SetDrawColor(110, 255, 110, 200)
-            surface.DrawRect(w - 14, h - 14, 8, 8)
+            ix.constants.DrawEquippedIndicator(w, h)
         end
     end
 end

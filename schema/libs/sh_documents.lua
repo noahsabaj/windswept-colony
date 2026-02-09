@@ -17,10 +17,14 @@
             },
             ...
         },
-        signatureData = {
-            strokes = {{x=0.1, y=0.2}, ...},
-            authorName = "Signer Name",
-            timestamp = 1234567890
+        signatures = {
+            {
+                strokes = {{x=0.1, y=0.2}, ...},
+                authorName = "Signer Name",
+                color = {200, 200, 200},
+                timestamp = 1234567890
+            },
+            ...
         }
     }
 ]]--
@@ -128,6 +132,29 @@ end
 -- ============================================================================
 -- SHARED UTILITY FUNCTIONS
 -- ============================================================================
+
+-- Check if a player has a writing tool (pen with ink or pencil with lead) in inventory
+-- @param client Player The player to check
+-- @return boolean Has a usable writing tool
+function ix.documents.HasWritingTool(client)
+    local char = client:GetCharacter()
+    if not char then return false end
+
+    local inv = char:GetInventory()
+    if not inv then return false end
+
+    local penTypes = {pen = true, pen_black = true, pen_red = true, pen_green = true}
+
+    for _, invItem in pairs(inv:GetItems()) do
+        if penTypes[invItem.uniqueID] and invItem:GetInk() > 0 then
+            return true
+        elseif (invItem.uniqueID == "pencil" or invItem.uniqueID == "pencil_eraser") and invItem:GetLead() > 0 then
+            return true
+        end
+    end
+
+    return false
+end
 
 -- Count words in text
 -- @param text string The text to count words in

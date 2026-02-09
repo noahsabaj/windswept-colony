@@ -56,18 +56,20 @@ end
 local radioTransmitting = false
 local wasHKeyDown = false
 
+local function StopRadioTransmission()
+    if not radioTransmitting then return end
+    net.Start("ixRadioVoiceStop")
+    net.SendToServer()
+    radioTransmitting = false
+end
+
 hook.Add("Think", "ixRadioVoiceTransmit", function()
     local client = LocalPlayer()
     if not IsValid(client) then return end
 
     -- Don't process input when UI is open
     if vgui.CursorVisible() then
-        if radioTransmitting then
-            -- Stop transmission if UI opens
-            net.Start("ixRadioVoiceStop")
-            net.SendToServer()
-            radioTransmitting = false
-        end
+        StopRadioTransmission()
         wasHKeyDown = false
         return
     end
@@ -93,11 +95,7 @@ hook.Add("Think", "ixRadioVoiceTransmit", function()
         end
     -- Edge detection: key just released
     elseif not hKeyDown and wasHKeyDown then
-        if radioTransmitting then
-            net.Start("ixRadioVoiceStop")
-            net.SendToServer()
-            radioTransmitting = false
-        end
+        StopRadioTransmission()
     end
 
     wasHKeyDown = hKeyDown
@@ -107,10 +105,8 @@ end)
 hook.Add("EntityNetworkedVarChanged", "ixRadioStopOnIncapacitate", function(ent, name, old, new)
     if ent ~= LocalPlayer() then return end
 
-    if (name == "ixKnocked" or name == "gagged" or name == "ixRestricted") and new and radioTransmitting then
-        net.Start("ixRadioVoiceStop")
-        net.SendToServer()
-        radioTransmitting = false
+    if (name == "ixKnocked" or name == "gagged" or name == "ixRestricted") and new then
+        StopRadioTransmission()
     end
 end)
 

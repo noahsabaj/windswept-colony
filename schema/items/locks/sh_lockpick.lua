@@ -119,10 +119,9 @@ end
 
 if CLIENT then
     function ITEM:PaintOver(item, w, h)
-        -- Draw equipped indicator (green dot) - same as base
+        -- Draw equipped indicator (green dot)
         if item:GetData("equipped") then
-            surface.SetDrawColor(110, 255, 110, 200)
-            surface.DrawRect(w - 14, h - 14, 8, 8)
+            ix.constants.DrawEquippedIndicator(w, h)
         end
 
         -- Draw quality indicator color
@@ -142,22 +141,14 @@ if CLIENT then
     function ITEM:PopulateTooltip(tooltip)
         local config = self:GetQualityConfig()
 
-        local qualityRow = tooltip:AddRow("quality")
-        qualityRow:SetText("Quality: " .. config.name)
-
         local quality = self:GetQuality()
-        local colors = {
+        local qualityColors = {
             crude = Color(150, 80, 60),
             regular = Color(100, 100, 100),
             quality = Color(60, 100, 150),
             master = Color(150, 130, 60)
         }
-        qualityRow:SetBackgroundColor(colors[quality] or colors.regular)
-        qualityRow:SizeToContents()
-
-        local attemptsRow = tooltip:AddRow("attempts")
-        attemptsRow:SetText("Attempts: " .. config.maxAttempts)
-        attemptsRow:SetBackgroundColor(Color(60, 60, 80))
-        attemptsRow:SizeToContents()
+        ix.constants.AddTooltipRow(tooltip, "quality", "Quality: " .. config.name, qualityColors[quality] or qualityColors.regular)
+        ix.constants.AddTooltipRow(tooltip, "attempts", "Attempts: " .. config.maxAttempts, Color(60, 60, 80))
     end
 end

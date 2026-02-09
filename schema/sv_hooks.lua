@@ -422,11 +422,8 @@ net.Receive("ixRadioVolumeSet", function(len, client)
     if not item or item.uniqueID ~= "handheld_radio" then return end
 
     -- Verify ownership
-    local character = client:GetCharacter()
-    if not character then return end
-
-    local inventory = character:GetInventory()
-    if not inventory then return end
+    local character, inventory = ix.constants.GetCharacterInventory(client)
+    if not character or not inventory then return end
 
     if item.invID ~= inventory:GetID() then return end
 

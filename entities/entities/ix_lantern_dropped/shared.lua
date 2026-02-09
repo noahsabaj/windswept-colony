@@ -141,11 +141,8 @@ if SERVER then
     end
 
     function ENT:PickUp(activator)
-        local character = activator:GetCharacter()
-        if not character then return end
-
-        local inventory = character:GetInventory()
-        if not inventory then return end
+        local character, inventory = ix.constants.GetCharacterInventory(activator)
+        if not character or not inventory then return end
 
         -- Check if inventory has room
         local canFit = inventory:FindEmptySlot(1, 2)

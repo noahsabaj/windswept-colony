@@ -560,12 +560,8 @@ function PLUGIN:FindPersonalID(character)
     local inventory = character:GetInventory()
     if not inventory then return nil end
 
-    for _, item in pairs(inventory:GetItems()) do
-        if item.uniqueID == "personal_id" then
-            return item
-        end
-    end
-    return nil
+    local items = inventory:GetItemsByUniqueID("personal_id", false)
+    return items[1] or nil
 end
 
 function PLUGIN:ApplyPermadeath(client, character, reason)

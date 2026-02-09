@@ -83,9 +83,6 @@ end
 function ITEM:PopulateTooltip(tooltip)
     local customName = self:GetData("customName")
     if customName then
-        local note = tooltip:AddRow("note")
-        note:SetText("Labeled: " .. customName)
-        note:SetBackgroundColor(Color(50, 50, 50))
-        note:SizeToContents()
+        ix.constants.AddTooltipRow(tooltip, "note", "Labeled: " .. customName, Color(50, 50, 50))
     end
 end

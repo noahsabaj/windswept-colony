@@ -130,11 +130,8 @@ ix.command.Add("DoorGiveItems", {
     description = "Give yourself door system test items.",
     adminOnly = true,
     OnRun = function(self, client)
-        local character = client:GetCharacter()
-        if not character then return end
-
-        local inventory = character:GetInventory()
-        if not inventory then return end
+        local character, inventory = ix.constants.GetCharacterInventory(client)
+        if not character or not inventory then return end
 
         -- Give test items
         inventory:Add("key_blank", 1, {quantity = 5})

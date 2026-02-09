@@ -66,7 +66,7 @@ function ITEM:GetStrokeColor()
     return self.strokeColor
 end
 
--- Aliases for compatibility with existing code
+-- Semantic aliases: pens use "ink", pencils use "lead"
 function ITEM:GetInk()
     return self:GetResource()
 end

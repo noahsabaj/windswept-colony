@@ -85,11 +85,8 @@ end
 function ENT:PickupByPlayer(client)
     if not IsValid(client) then return end
 
-    local character = client:GetCharacter()
-    if not character then return end
-
-    local inventory = character:GetInventory()
-    if not inventory then return end
+    local character, inventory = ix.constants.GetCharacterInventory(client)
+    if not character or not inventory then return end
 
     -- Check if there's room in inventory (locksmith_station is 2x1)
     if not inventory:FindEmptySlot(2, 1) then
@@ -142,11 +139,8 @@ net.Receive("ixLocksmithProgramLock", function(len, ply)
     end
 
     -- Verify ownership
-    local character = ply:GetCharacter()
-    if not character then return end
-
-    local inventory = character:GetInventory()
-    if not inventory then return end
+    local character, inventory = ix.constants.GetCharacterInventory(ply)
+    if not character or not inventory then return end
 
     local found = false
     for _, item in pairs(inventory:GetItems()) do
@@ -212,11 +206,8 @@ net.Receive("ixLocksmithProgramKey", function(len, ply)
         return
     end
 
-    local character = ply:GetCharacter()
-    if not character then return end
-
-    local inventory = character:GetInventory()
-    if not inventory then return end
+    local character, inventory = ix.constants.GetCharacterInventory(ply)
+    if not character or not inventory then return end
 
     -- Verify ownership of both items
     local foundBlank, foundSource = false, false
@@ -296,11 +287,8 @@ net.Receive("ixLocksmithAddKeying", function(len, ply)
         return
     end
 
-    local character = ply:GetCharacter()
-    if not character then return end
-
-    local inventory = character:GetInventory()
-    if not inventory then return end
+    local character, inventory = ix.constants.GetCharacterInventory(ply)
+    if not character or not inventory then return end
 
     -- Verify ownership
     local foundLock, foundKey = false, false
@@ -375,11 +363,8 @@ net.Receive("ixLocksmithRename", function(len, ply)
         return
     end
 
-    local character = ply:GetCharacter()
-    if not character then return end
-
-    local inventory = character:GetInventory()
-    if not inventory then return end
+    local character, inventory = ix.constants.GetCharacterInventory(ply)
+    if not character or not inventory then return end
 
     -- Verify ownership
     local found = false
@@ -448,11 +433,8 @@ net.Receive("ixLocksmithViewKeyings", function(len, ply)
         return
     end
 
-    local character = ply:GetCharacter()
-    if not character then return end
-
-    local inventory = character:GetInventory()
-    if not inventory then return end
+    local character, inventory = ix.constants.GetCharacterInventory(ply)
+    if not character or not inventory then return end
 
     -- Verify ownership
     local found = false

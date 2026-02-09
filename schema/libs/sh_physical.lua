@@ -192,9 +192,7 @@ function ix.physical.GetAgeDescriptor(age)
 end
 
 -- Get model path from model index
--- factionIndex parameter is kept for backwards compatibility but ignored
-function ix.physical.GetModelPath(factionIndex, modelIndex)
-    -- All characters use factionless models since factions are removed
+function ix.physical.GetModelPath(modelIndex)
     local models = ix.config.Get("factionlessModels") or {}
     local model = models[modelIndex]
 
@@ -383,7 +381,7 @@ ix.char.RegisterVar("physSkinTone", {
         panel:Dock(TOP)
 
         -- Get initial options based on current model
-        local modelPath = ix.physical.GetModelPath(payload.faction, payload.model or 1)
+        local modelPath = ix.physical.GetModelPath(payload.model or 1)
         local options = ix.physical.GetSkinTonesForModel(modelPath)
         panel:SetOptions(options)
 
@@ -394,7 +392,7 @@ ix.char.RegisterVar("physSkinTone", {
         -- Update options when model changes
         payload:AddHook("model", function(modelIndex)
             if not IsValid(panel) then return end
-            local newModelPath = ix.physical.GetModelPath(payload.faction, modelIndex)
+            local newModelPath = ix.physical.GetModelPath(modelIndex)
             local newOptions = ix.physical.GetSkinTonesForModel(newModelPath)
             panel:SetOptions(newOptions)
             payload:Set("physSkinTone", panel:GetValue())
@@ -446,7 +444,7 @@ ix.char.RegisterVar("physHairColor", {
     OnPostSetup = function(self, panel, payload)
         if not IsValid(panel) then return end
         -- Check if model is bald-locked
-        local modelPath = ix.physical.GetModelPath(payload.faction, payload.model or 1)
+        local modelPath = ix.physical.GetModelPath(payload.model or 1)
         if ix.physical.IsBaldModel(modelPath) then
             panel:SetVisible(false)
         end
@@ -492,7 +490,7 @@ ix.char.RegisterVar("physHairType", {
     OnPostSetup = function(self, panel, payload)
         if not IsValid(panel) then return end
         -- Check if model is bald-locked
-        local modelPath = ix.physical.GetModelPath(payload.faction, payload.model or 1)
+        local modelPath = ix.physical.GetModelPath(payload.model or 1)
         if ix.physical.IsBaldModel(modelPath) then
             panel:SetVisible(false)
         end
@@ -526,7 +524,7 @@ ix.char.RegisterVar("physHairLength", {
         -- Lock to bald for bald models
         payload:AddHook("model", function(modelIndex)
             if not IsValid(panel) then return end
-            local modelPath = ix.physical.GetModelPath(payload.faction, modelIndex)
+            local modelPath = ix.physical.GetModelPath(modelIndex)
             if ix.physical.IsBaldModel(modelPath) then
                 panel:SetOptions({"Bald"})
                 panel:SetEnabled(false)
@@ -549,7 +547,7 @@ ix.char.RegisterVar("physHairLength", {
     OnPostSetup = function(self, panel, payload)
         if not IsValid(panel) then return end
         -- Check if model is bald-locked
-        local modelPath = ix.physical.GetModelPath(payload.faction, payload.model or 1)
+        local modelPath = ix.physical.GetModelPath(payload.model or 1)
         if ix.physical.IsBaldModel(modelPath) then
             panel:SetOptions({"Bald"})
             panel:SetEnabled(false)

@@ -95,8 +95,7 @@ if CLIENT then
     function ITEM:PaintOver(item, w, h)
         -- Draw equipped indicator (green dot)
         if item:GetData("equipped") then
-            surface.SetDrawColor(110, 255, 110, 200)
-            surface.DrawRect(w - 14, h - 14, 8, 8)
+            ix.constants.DrawEquippedIndicator(w, h)
         end
 
         -- Draw color indicator strip at bottom
@@ -110,18 +109,12 @@ if CLIENT then
     function ITEM:PopulateTooltip(tooltip)
         local keying = self:GetKeying()
         if keying and keying ~= "" then
-            local keyingRow = tooltip:AddRow("keying")
-            keyingRow:SetText("Keying: " .. keying)
-            keyingRow:SetBackgroundColor(Color(80, 80, 120))
-            keyingRow:SizeToContents()
+            ix.constants.AddTooltipRow(tooltip, "keying", "Keying: " .. keying, Color(80, 80, 120))
         end
 
         local keyName = self:GetKeyName()
         if keyName and keyName ~= "" then
-            local nameRow = tooltip:AddRow("keyName")
-            nameRow:SetText("Label: " .. keyName)
-            nameRow:SetBackgroundColor(Color(60, 100, 60))
-            nameRow:SizeToContents()
+            ix.constants.AddTooltipRow(tooltip, "keyName", "Label: " .. keyName, Color(60, 100, 60))
         end
     end
 end

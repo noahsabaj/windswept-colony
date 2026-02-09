@@ -53,10 +53,9 @@ if CLIENT then
         local batteries = item:GetData("batteries", {})
         local isEnabled = item:GetData("enabled")
 
-        -- Draw enabled indicator (green dot) instead of equipped
+        -- Draw enabled indicator (green dot)
         if isEnabled then
-            surface.SetDrawColor(110, 255, 110, 200)
-            surface.DrawRect(w - 14, h - 14, 8, 8)
+            ix.constants.DrawEquippedIndicator(w, h)
         end
 
         -- Draw battery bar (single battery)
@@ -69,21 +68,7 @@ if CLIENT then
 
             -- Charge fill
             local chargeWidth = ((w - 8) / 100) * charge
-            local color
-
-            if charge >= 50 then
-                color = Color(50, 200, 50)
-            elseif charge >= 25 then
-                color = Color(200, 200, 50)
-            elseif charge >= 10 then
-                color = Color(255, 150, 50)
-            elseif charge >= 1 then
-                color = Color(200, 50, 50)
-            else
-                color = Color(30, 30, 30)
-            end
-
-            surface.SetDrawColor(color)
+            surface.SetDrawColor(ix.constants.GetChargeColor(charge))
             surface.DrawRect(4, h - 12, chargeWidth, 8)
         end
     end
@@ -106,10 +91,7 @@ if CLIENT then
         statusRow:SizeToContents()
 
         -- Volume row
-        local volRow = tooltip:AddRow("volume")
-        volRow:SetText(string.format("Volume: %d%%", volume))
-        volRow:SetBackgroundColor(Color(75, 75, 100))
-        volRow:SizeToContents()
+        ix.constants.AddTooltipRow(tooltip, "volume", string.format("Volume: %d%%", volume), Color(75, 75, 100))
 
         -- Battery row
         local batteryRow = tooltip:AddRow("battery")
@@ -120,25 +102,12 @@ if CLIENT then
             local charge = batteries[1]
             batteryRow:SetText(string.format("Battery: %dup / 100up", charge))
 
-            if charge >= 50 then
-                batteryRow:SetBackgroundColor(Color(50, 100, 50))
-            elseif charge >= 25 then
-                batteryRow:SetBackgroundColor(Color(100, 100, 50))
-            elseif charge >= 10 then
-                batteryRow:SetBackgroundColor(Color(150, 100, 50))
-            elseif charge >= 1 then
-                batteryRow:SetBackgroundColor(Color(150, 50, 50))
-            else
-                batteryRow:SetBackgroundColor(Color(60, 60, 60))
-            end
+            batteryRow:SetBackgroundColor(ix.constants.GetChargeColorDark(charge))
         end
         batteryRow:SizeToContents()
 
         -- Usage hint
-        local hintRow = tooltip:AddRow("hint")
-        hintRow:SetText("Hold H to transmit voice")
-        hintRow:SetBackgroundColor(Color(60, 60, 80))
-        hintRow:SizeToContents()
+        ix.constants.AddTooltipRow(tooltip, "hint", "Hold H to transmit voice", Color(60, 60, 80))
     end
 end
 

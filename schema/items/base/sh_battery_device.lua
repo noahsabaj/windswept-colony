@@ -119,11 +119,8 @@ function ITEM:AutoEjectDepleted(client)
     end
 
     local batteries = self:GetBatteries()
-    local character = client:GetCharacter()
-    if not character then return false end
-
-    local inventory = character:GetInventory()
-    if not inventory then return false end
+    local character, inventory = ix.constants.GetCharacterInventory(client)
+    if not character or not inventory then return false end
 
     local ejected = false
 
@@ -160,11 +157,8 @@ function ITEM:AutoLoadFromInventory(client)
         return false
     end
 
-    local character = client:GetCharacter()
-    if not character then return false end
-
-    local inventory = character:GetInventory()
-    if not inventory then return false end
+    local character, inventory = ix.constants.GetCharacterInventory(client)
+    if not character or not inventory then return false end
 
     local bestBattery, bestCharge = self:FindBestBatteryInInventory(inventory)
     if not bestBattery then return false end
@@ -194,8 +188,7 @@ if CLIENT then
 
         -- Draw equipped indicator (green dot)
         if isEquipped then
-            surface.SetDrawColor(110, 255, 110, 200)
-            surface.DrawRect(w - 14, h - 14, 8, 8)
+            ix.constants.DrawEquippedIndicator(w, h)
         end
 
         -- Draw battery bar(s)
@@ -210,21 +203,7 @@ if CLIENT then
 
                 -- Charge fill with granular colors
                 local chargeWidth = ((w - 8) / 100) * charge
-                local color
-
-                if charge >= 50 then
-                    color = Color(50, 200, 50)
-                elseif charge >= 25 then
-                    color = Color(200, 200, 50)
-                elseif charge >= 10 then
-                    color = Color(255, 150, 50)
-                elseif charge >= 1 then
-                    color = Color(200, 50, 50)
-                else
-                    color = Color(30, 30, 30)
-                end
-
-                surface.SetDrawColor(color)
+                surface.SetDrawColor(ix.constants.GetChargeColor(charge))
                 surface.DrawRect(4, h - 12, chargeWidth, 8)
             end
         else
@@ -269,17 +248,7 @@ if CLIENT then
             local charge = batteries[1]
             batteryRow:SetText(string.format("Battery: %dup / 100up", charge))
 
-            if charge >= 50 then
-                batteryRow:SetBackgroundColor(Color(50, 100, 50))
-            elseif charge >= 25 then
-                batteryRow:SetBackgroundColor(Color(100, 100, 50))
-            elseif charge >= 10 then
-                batteryRow:SetBackgroundColor(Color(150, 100, 50))
-            elseif charge >= 1 then
-                batteryRow:SetBackgroundColor(Color(150, 50, 50))
-            else
-                batteryRow:SetBackgroundColor(Color(60, 60, 60))
-            end
+            batteryRow:SetBackgroundColor(ix.constants.GetChargeColorDark(charge))
         else
             -- Multiple battery display (defibrillator style)
             local fullCount, partialCount, depletedCount = 0, 0, 0
@@ -305,10 +274,7 @@ if CLIENT then
 
         -- Add requirement note for full-battery devices
         if self.requireFullBattery then
-            local reqRow = tooltip:AddRow("requirement")
-            reqRow:SetText("Requires fully charged batteries (100up)")
-            reqRow:SetBackgroundColor(Color(75, 75, 100))
-            reqRow:SizeToContents()
+            ix.constants.AddTooltipRow(tooltip, "requirement", "Requires fully charged batteries (100up)", Color(75, 75, 100))
         end
     end
 end
@@ -324,11 +290,8 @@ ITEM.functions.LoadBattery = {
     isMulti = true,
     multiOptions = function(item, client)
         local options = {}
-        local character = client:GetCharacter()
-        if not character then return options end
-
-        local inventory = character:GetInventory()
-        if not inventory then return options end
+        local character, inventory = ix.constants.GetCharacterInventory(client)
+        if not character or not inventory then return options end
 
         local filterEmpty = ix.option.Get(client, "batteryFilterEmpty", true)
 
@@ -405,11 +368,8 @@ ITEM.functions.LoadBattery = {
         local client = item.player
         if not IsValid(client) then return false end
 
-        local character = client:GetCharacter()
-        if not character then return false end
-
-        local inventory = character:GetInventory()
-        if not inventory then return false end
+        local character, inventory = ix.constants.GetCharacterInventory(client)
+        if not character or not inventory then return false end
 
         for _, invItem in pairs(inventory:GetItems()) do
             if invItem.uniqueID == "battery" then

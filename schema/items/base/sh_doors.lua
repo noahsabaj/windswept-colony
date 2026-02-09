@@ -59,15 +59,13 @@ end
 
 function ITEM:GetConditionText()
     local percent = self:GetHealthPercent()
-    if percent >= 76 then
-        return "Intact", Color(50, 200, 50)
-    elseif percent >= 51 then
-        return "Minor Damage", Color(200, 200, 50)
-    elseif percent >= 26 then
-        return "Moderate Damage", Color(255, 150, 50)
-    else
-        return "Severe Damage", Color(200, 50, 50)
-    end
+    local text
+    if percent >= 76 then text = "Intact"
+    elseif percent >= 51 then text = "Minor Damage"
+    elseif percent >= 26 then text = "Moderate Damage"
+    else text = "Severe Damage" end
+
+    return text, ix.constants.GetChargeColor(percent, 76, 51, 26)
 end
 
 -- Override description to show health
@@ -98,8 +96,7 @@ if CLIENT then
 
         -- Draw equipped indicator (green dot)
         if isEquipped then
-            surface.SetDrawColor(110, 255, 110, 200)
-            surface.DrawRect(w - 14, h - 14, 8, 8)
+            ix.constants.DrawEquippedIndicator(w, h)
         end
 
         -- Draw health bar at bottom
@@ -107,18 +104,7 @@ if CLIENT then
         surface.DrawRect(4, h - 12, w - 8, 8)
 
         local healthWidth = ((w - 8) / 100) * healthPercent
-        local color
-        if healthPercent >= 76 then
-            color = Color(50, 200, 50)
-        elseif healthPercent >= 51 then
-            color = Color(200, 200, 50)
-        elseif healthPercent >= 26 then
-            color = Color(255, 150, 50)
-        else
-            color = Color(200, 50, 50)
-        end
-
-        surface.SetDrawColor(color)
+        surface.SetDrawColor(ix.constants.GetChargeColor(healthPercent, 76, 51, 26))
         surface.DrawRect(4, h - 12, healthWidth, 8)
 
         -- Draw lock indicator if has lock
@@ -133,25 +119,16 @@ if CLIENT then
         local condition, condColor = self:GetConditionText()
 
         -- Health row
-        local healthRow = tooltip:AddRow("health")
-        healthRow:SetText("Health: " .. health .. "/" .. self.maxHealth)
-        healthRow:SetBackgroundColor(condColor)
-        healthRow:SizeToContents()
+        ix.constants.AddTooltipRow(tooltip, "health", "Health: " .. health .. "/" .. self.maxHealth, condColor)
 
         -- Condition row
-        local condRow = tooltip:AddRow("condition")
-        condRow:SetText("Condition: " .. condition)
-        condRow:SetBackgroundColor(Color(60, 60, 60))
-        condRow:SizeToContents()
+        ix.constants.AddTooltipRow(tooltip, "condition", "Condition: " .. condition, Color(60, 60, 60))
 
         -- Lock info
         if self:HasLock() then
             local lockData = self:GetLockData()
-            local lockRow = tooltip:AddRow("lock")
             local lockName = lockData.name ~= "" and lockData.name or "Unnamed Lock"
-            lockRow:SetText("Lock: " .. lockName .. " (" .. math.floor(lockData.durability or 100) .. "% dur.)")
-            lockRow:SetBackgroundColor(Color(80, 80, 120))
-            lockRow:SizeToContents()
+            ix.constants.AddTooltipRow(tooltip, "lock", "Lock: " .. lockName .. " (" .. math.floor(lockData.durability or 100) .. "% dur.)", Color(80, 80, 120))
         end
     end
 end

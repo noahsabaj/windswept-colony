@@ -184,10 +184,9 @@ if CLIENT then
         local maxDurability = item:GetMaxDurability()
         local durPercent = (durability / maxDurability) * 100
 
-        -- Draw equipped indicator (green dot) - same as base
+        -- Draw equipped indicator (green dot)
         if item:GetData("equipped") then
-            surface.SetDrawColor(110, 255, 110, 200)
-            surface.DrawRect(w - 14, h - 14, 8, 8)
+            ix.constants.DrawEquippedIndicator(w, h)
         end
 
         -- Draw durability bar
@@ -195,18 +194,7 @@ if CLIENT then
         surface.DrawRect(4, h - 12, w - 8, 8)
 
         local durWidth = ((w - 8) / 100) * durPercent
-        local color
-        if durPercent >= 75 then
-            color = Color(50, 200, 50)
-        elseif durPercent >= 50 then
-            color = Color(200, 200, 50)
-        elseif durPercent >= 25 then
-            color = Color(255, 150, 50)
-        else
-            color = Color(200, 50, 50)
-        end
-
-        surface.SetDrawColor(color)
+        surface.SetDrawColor(ix.constants.GetChargeColor(durPercent, 75, 50, 25))
         surface.DrawRect(4, h - 12, durWidth, 8)
     end
 
@@ -223,27 +211,11 @@ if CLIENT then
             speedDesc = "Fast"
         end
 
-        local sizeRow = tooltip:AddRow("size")
-        sizeRow:SetText("Size: " .. sizeConfig.name .. " (" .. speedDesc .. ")")
-        sizeRow:SetBackgroundColor(Color(80, 80, 100))
-        sizeRow:SizeToContents()
+        ix.constants.AddTooltipRow(tooltip, "size", "Size: " .. sizeConfig.name .. " (" .. speedDesc .. ")", Color(80, 80, 100))
 
         -- Quality/Durability
-        local durRow = tooltip:AddRow("durability")
-        durRow:SetText("Durability: " .. math.floor(durability) .. "/" .. maxDurability)
-
         local durPercent = (durability / maxDurability) * 100
-        if durPercent >= 75 then
-            durRow:SetBackgroundColor(Color(50, 100, 50))
-        elseif durPercent >= 50 then
-            durRow:SetBackgroundColor(Color(100, 100, 50))
-        elseif durPercent >= 25 then
-            durRow:SetBackgroundColor(Color(150, 100, 50))
-        else
-            durRow:SetBackgroundColor(Color(150, 50, 50))
-        end
-
-        durRow:SizeToContents()
+        ix.constants.AddTooltipRow(tooltip, "durability", "Durability: " .. math.floor(durability) .. "/" .. maxDurability, ix.constants.GetChargeColorDark(durPercent, 75, 50, 25))
     end
 end
 

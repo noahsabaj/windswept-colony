@@ -20,14 +20,57 @@ resource.AddWorkshop("635535045")   -- Handheld Radio Model (c_model + w_model)
 -- which violates our scarcity principle (nothing appears from nowhere)
 RunConsoleCommand("sv_tfa_cmenu", "0")
 
--- Database migrations
-ix.util.Include("sv_migration.lua")
-
 -- Centralized network string registry (schema + entities)
 ix.util.Include("sv_netstrings.lua")
 
 -- Document system server handlers
 ix.util.Include("sv_documents.lua")
+
+-- Check if a currency item belongs to the player (main inventory or owned bag)
+local function IsOwnedItem(item, character, inventory)
+    local itemInvID = item.invID
+    if itemInvID == inventory:GetID() then return true end
+
+    local itemInv = ix.item.inventories[itemInvID]
+    return itemInv and itemInv:GetOwner() == character:GetID()
+end
+
+-- Validate a give target (valid player, in range, alive, not incapacitated)
+-- Returns targetChar on success, nil on failure (notifications sent to client)
+local function ValidateGiveTarget(client, target)
+    if not IsValid(target) or not target:IsPlayer() then
+        client:NotifyLocalized("targetNotValid")
+        return nil
+    end
+
+    if not ix.constants.CanInteract(client, target) then
+        client:NotifyLocalized("targetTooFar")
+        return nil
+    end
+
+    if not target:Alive() then
+        client:NotifyLocalized("targetNotAlive")
+        return nil
+    end
+
+    local targetChar = target:GetCharacter()
+    if not targetChar then
+        client:NotifyLocalized("targetNotValid")
+        return nil
+    end
+
+    if target:GetNetVar("ixKnocked", false) then
+        client:NotifyLocalized("targetKnocked")
+        return nil
+    end
+
+    if target:GetNetVar("ixRestricted", false) then
+        client:NotifyLocalized("targetRestrained")
+        return nil
+    end
+
+    return targetChar
+end
 
 -- Money destroy handler
 net.Receive("ixMoneyDestroy", function(len, client)
@@ -38,20 +81,11 @@ net.Receive("ixMoneyDestroy", function(len, client)
     if not item then return end
 
     -- Validate ownership
-    local character = client:GetCharacter()
-    if not character then return end
-
-    local inventory = character:GetInventory()
-    if not inventory then return end
+    local character, inventory = ix.constants.GetCharacterInventory(client)
+    if not character or not inventory then return end
 
     -- Check item is in player's inventory
-    if item:GetInventory() ~= inventory:GetID() then
-        -- Check if it's in a bag owned by player
-        local itemInv = ix.item.inventories[item:GetInventory()]
-        if not itemInv or itemInv:GetOwner() ~= character:GetID() then
-            return
-        end
-    end
+    if not IsOwnedItem(item, character, inventory) then return end
 
     -- Validate it's a currency item
     if not item.isCurrency then return end
@@ -93,56 +127,15 @@ net.Receive("ixMoneyGive", function(len, client)
     if not item or not item.isCurrency then return end
 
     -- Validate giver
-    local character = client:GetCharacter()
-    if not character then return end
-
-    local inventory = character:GetInventory()
-    if not inventory then return end
+    local character, inventory = ix.constants.GetCharacterInventory(client)
+    if not character or not inventory then return end
 
     -- Check item ownership (in main inventory or owned bag)
-    local itemInvID = item.invID
-    if itemInvID ~= inventory:GetID() then
-        local itemInv = ix.item.inventories[itemInvID]
-        if not itemInv or itemInv:GetOwner() ~= character:GetID() then
-            return
-        end
-    end
+    if not IsOwnedItem(item, character, inventory) then return end
 
     -- Validate target
-    if not IsValid(target) or not target:IsPlayer() then
-        client:NotifyLocalized("targetNotValid")
-        return
-    end
-
-    -- Check range
-    if client:GetPos():DistToSqr(target:GetPos()) > ix.constants.RANGE_INTERACTION then
-        client:NotifyLocalized("targetTooFar")
-        return
-    end
-
-    -- Check target is alive
-    if not target:Alive() then
-        client:NotifyLocalized("targetNotAlive")
-        return
-    end
-
-    -- Check target is not knocked
-    local targetChar = target:GetCharacter()
-    if not targetChar then
-        client:NotifyLocalized("targetNotValid")
-        return
-    end
-
-    if target:GetNetVar("ixKnocked", false) then
-        client:NotifyLocalized("targetKnocked")
-        return
-    end
-
-    -- Check target is not zip tied
-    if target:GetNetVar("ixRestricted", false) then
-        client:NotifyLocalized("targetRestrained")
-        return
-    end
+    local targetChar = ValidateGiveTarget(client, target)
+    if not targetChar then return end
 
     -- Validate amount
     local currentQty = item:GetData("quantity", 1)
@@ -196,11 +189,8 @@ net.Receive("ixWalletGive", function(len, client)
     if not walletItem or walletItem.uniqueID ~= "wallet" then return end
 
     -- Validate ownership
-    local character = client:GetCharacter()
-    if not character then return end
-
-    local inventory = character:GetInventory()
-    if not inventory then return end
+    local character, inventory = ix.constants.GetCharacterInventory(client)
+    if not character or not inventory then return end
 
     -- Check wallet is in player's main inventory
     if walletItem.invID ~= inventory:GetID() then return end
@@ -213,36 +203,8 @@ net.Receive("ixWalletGive", function(len, client)
     if not walletInv then return end
 
     -- Validate target
-    if not IsValid(target) or not target:IsPlayer() then
-        client:NotifyLocalized("targetNotValid")
-        return
-    end
-
-    if client:GetPos():DistToSqr(target:GetPos()) > ix.constants.RANGE_INTERACTION then
-        client:NotifyLocalized("targetTooFar")
-        return
-    end
-
-    if not target:Alive() then
-        client:NotifyLocalized("targetNotAlive")
-        return
-    end
-
-    local targetChar = target:GetCharacter()
-    if not targetChar then
-        client:NotifyLocalized("targetNotValid")
-        return
-    end
-
-    if target:GetNetVar("ixKnocked", false) then
-        client:NotifyLocalized("targetKnocked")
-        return
-    end
-
-    if target:GetNetVar("ixRestricted", false) then
-        client:NotifyLocalized("targetRestrained")
-        return
-    end
+    local targetChar = ValidateGiveTarget(client, target)
+    if not targetChar then return end
 
     -- Calculate available money in wallet
     local available = ix.wallet and ix.wallet.GetWalletMoney and ix.wallet.GetWalletMoney(walletInv) or 0
@@ -294,20 +256,11 @@ net.Receive("ixCurrencySplitConfirm", function(len, client)
     if not item or not item.isCurrency then return end
 
     -- Validate ownership
-    local character = client:GetCharacter()
-    if not character then return end
-
-    local inventory = character:GetInventory()
-    if not inventory then return end
+    local character, inventory = ix.constants.GetCharacterInventory(client)
+    if not character or not inventory then return end
 
     -- Check item ownership (in main inventory or owned bag)
-    local itemInvID = item.invID
-    if itemInvID ~= inventory:GetID() then
-        local itemInv = ix.item.inventories[itemInvID]
-        if not itemInv or itemInv:GetOwner() ~= character:GetID() then
-            return
-        end
-    end
+    if not IsOwnedItem(item, character, inventory) then return end
 
     -- Validate split amount
     local currentQty = item:GetData("quantity", 1)

@@ -13,6 +13,13 @@
 
 local PANEL = {}
 
+local function getInventoryItems(cachedItems)
+    if cachedItems then return cachedItems end
+    local _, inventory = ix.constants.GetCharacterInventory(LocalPlayer())
+    if not inventory then return nil end
+    return inventory:GetItems()
+end
+
 function PANEL:Init()
     self:SetSize(450, 400)
     self:SetTitle("Locksmith")
@@ -42,11 +49,8 @@ end
 
 function PANEL:RefreshInventory()
     -- Cache inventory items ONCE instead of 6+ GetItems() calls
-    local character = LocalPlayer():GetCharacter()
-    if not character then return end
-
-    local inventory = character:GetInventory()
-    if not inventory then return end
+    local character, inventory = ix.constants.GetCharacterInventory(LocalPlayer())
+    if not character or not inventory then return end
 
     local cachedItems = inventory:GetItems()
 
@@ -111,15 +115,8 @@ end
 function PANEL:PopulateBlankLocks(listView, cachedItems)
     listView:Clear()
 
-    -- Use cached items if provided, otherwise fetch (fallback for direct calls)
-    local items = cachedItems
-    if not items then
-        local character = LocalPlayer():GetCharacter()
-        if not character then return end
-        local inventory = character:GetInventory()
-        if not inventory then return end
-        items = inventory:GetItems()
-    end
+    local items = getInventoryItems(cachedItems)
+    if not items then return end
 
     for _, item in pairs(items) do
         if item.uniqueID == "lock_blank" then
@@ -194,14 +191,8 @@ end
 function PANEL:PopulateBlankKeys(listView, cachedItems)
     listView:Clear()
 
-    local items = cachedItems
-    if not items then
-        local character = LocalPlayer():GetCharacter()
-        if not character then return end
-        local inventory = character:GetInventory()
-        if not inventory then return end
-        items = inventory:GetItems()
-    end
+    local items = getInventoryItems(cachedItems)
+    if not items then return end
 
     for _, item in pairs(items) do
         if item.uniqueID == "key_blank" then
@@ -215,14 +206,8 @@ end
 function PANEL:PopulateSources(listView, cachedItems)
     listView:Clear()
 
-    local items = cachedItems
-    if not items then
-        local character = LocalPlayer():GetCharacter()
-        if not character then return end
-        local inventory = character:GetInventory()
-        if not inventory then return end
-        items = inventory:GetItems()
-    end
+    local items = getInventoryItems(cachedItems)
+    if not items then return end
 
     for _, item in pairs(items) do
         if item.uniqueID == "lock" then
@@ -309,14 +294,8 @@ end
 function PANEL:PopulateLocks(listView, cachedItems)
     listView:Clear()
 
-    local items = cachedItems
-    if not items then
-        local character = LocalPlayer():GetCharacter()
-        if not character then return end
-        local inventory = character:GetInventory()
-        if not inventory then return end
-        items = inventory:GetItems()
-    end
+    local items = getInventoryItems(cachedItems)
+    if not items then return end
 
     for _, item in pairs(items) do
         if item.uniqueID == "lock" then
@@ -332,14 +311,8 @@ end
 function PANEL:PopulateKeys(listView, cachedItems)
     listView:Clear()
 
-    local items = cachedItems
-    if not items then
-        local character = LocalPlayer():GetCharacter()
-        if not character then return end
-        local inventory = character:GetInventory()
-        if not inventory then return end
-        items = inventory:GetItems()
-    end
+    local items = getInventoryItems(cachedItems)
+    if not items then return end
 
     for _, item in pairs(items) do
         if item.uniqueID == "key" then
@@ -418,14 +391,8 @@ end
 function PANEL:PopulateRenamable(listView, cachedItems)
     listView:Clear()
 
-    local items = cachedItems
-    if not items then
-        local character = LocalPlayer():GetCharacter()
-        if not character then return end
-        local inventory = character:GetInventory()
-        if not inventory then return end
-        items = inventory:GetItems()
-    end
+    local items = getInventoryItems(cachedItems)
+    if not items then return end
 
     for _, item in pairs(items) do
         if item.uniqueID == "lock" then

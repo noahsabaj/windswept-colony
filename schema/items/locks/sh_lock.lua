@@ -109,8 +109,7 @@ if CLIENT then
 
         -- Draw equipped indicator (green dot)
         if item:GetData("equipped") then
-            surface.SetDrawColor(110, 255, 110, 200)
-            surface.DrawRect(w - 14, h - 14, 8, 8)
+            ix.constants.DrawEquippedIndicator(w, h)
         end
 
         -- Draw durability bar
@@ -118,18 +117,7 @@ if CLIENT then
         surface.DrawRect(4, h - 12, w - 8, 8)
 
         local durWidth = ((w - 8) / 100) * durability
-        local color
-        if durability >= 75 then
-            color = Color(50, 200, 50)
-        elseif durability >= 50 then
-            color = Color(200, 200, 50)
-        elseif durability >= 25 then
-            color = Color(255, 150, 50)
-        else
-            color = Color(200, 50, 50)
-        end
-
-        surface.SetDrawColor(color)
+        surface.SetDrawColor(ix.constants.GetChargeColor(durability, 75, 50, 25))
         surface.DrawRect(4, h - 12, durWidth, 8)
     end
 
@@ -138,34 +126,15 @@ if CLIENT then
         local durability = self:GetDurability()
 
         -- Keying count
-        local keyingRow = tooltip:AddRow("keyings")
-        keyingRow:SetText("Keyings: " .. #keyings .. "/" .. self.maxKeyings)
-        keyingRow:SetBackgroundColor(Color(80, 80, 120))
-        keyingRow:SizeToContents()
+        ix.constants.AddTooltipRow(tooltip, "keyings", "Keyings: " .. #keyings .. "/" .. self.maxKeyings, Color(80, 80, 120))
 
         -- Durability
-        local durRow = tooltip:AddRow("durability")
-        durRow:SetText("Durability: " .. math.floor(durability) .. "%")
-
-        if durability >= 75 then
-            durRow:SetBackgroundColor(Color(50, 100, 50))
-        elseif durability >= 50 then
-            durRow:SetBackgroundColor(Color(100, 100, 50))
-        elseif durability >= 25 then
-            durRow:SetBackgroundColor(Color(150, 100, 50))
-        else
-            durRow:SetBackgroundColor(Color(150, 50, 50))
-        end
-
-        durRow:SizeToContents()
+        ix.constants.AddTooltipRow(tooltip, "durability", "Durability: " .. math.floor(durability) .. "%", ix.constants.GetChargeColorDark(durability, 75, 50, 25))
 
         -- Lock name
         local lockName = self:GetLockName()
         if lockName and lockName ~= "" then
-            local nameRow = tooltip:AddRow("lockName")
-            nameRow:SetText("Label: " .. lockName)
-            nameRow:SetBackgroundColor(Color(60, 100, 60))
-            nameRow:SizeToContents()
+            ix.constants.AddTooltipRow(tooltip, "lockName", "Label: " .. lockName, Color(60, 100, 60))
         end
     end
 end

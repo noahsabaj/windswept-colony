@@ -93,8 +93,7 @@ if CLIENT then
 
         -- Draw equipped indicator (green dot)
         if isEquipped then
-            surface.SetDrawColor(110, 255, 110, 200)
-            surface.DrawRect(w - 14, h - 14, 8, 8)
+            ix.constants.DrawEquippedIndicator(w, h)
         end
 
         local barY = h - 12
@@ -108,19 +107,7 @@ if CLIENT then
             surface.DrawRect(4, barY - barHeight - 2, w - 8, barHeight)
 
             local chargeWidth = ((w - 8) / 100) * charge
-            local color
-            if charge >= 50 then
-                color = Color(50, 200, 50)
-            elseif charge >= 25 then
-                color = Color(200, 200, 50)
-            elseif charge >= 10 then
-                color = Color(255, 150, 50)
-            elseif charge >= 1 then
-                color = Color(200, 50, 50)
-            else
-                color = Color(30, 30, 30)
-            end
-            surface.SetDrawColor(color)
+            surface.SetDrawColor(ix.constants.GetChargeColor(charge))
             surface.DrawRect(4, barY - barHeight - 2, chargeWidth, barHeight)
         end
 
@@ -147,17 +134,7 @@ if CLIENT then
         else
             local charge = batteries[1]
             batteryRow:SetText(string.format("Battery: %dup / 100up", charge))
-            if charge >= 50 then
-                batteryRow:SetBackgroundColor(Color(50, 100, 50))
-            elseif charge >= 25 then
-                batteryRow:SetBackgroundColor(Color(100, 100, 50))
-            elseif charge >= 10 then
-                batteryRow:SetBackgroundColor(Color(150, 100, 50))
-            elseif charge >= 1 then
-                batteryRow:SetBackgroundColor(Color(150, 50, 50))
-            else
-                batteryRow:SetBackgroundColor(Color(60, 60, 60))
-            end
+            batteryRow:SetBackgroundColor(ix.constants.GetChargeColorDark(charge))
         end
         batteryRow:SizeToContents()
 
@@ -191,11 +168,8 @@ ITEM.functions.LoadFilm = {
     isMulti = true,
     multiOptions = function(item, client)
         local options = {}
-        local character = client:GetCharacter()
-        if not character then return options end
-
-        local inventory = character:GetInventory()
-        if not inventory then return options end
+        local character, inventory = ix.constants.GetCharacterInventory(client)
+        if not character or not inventory then return options end
 
         for _, invItem in pairs(inventory:GetItems()) do
             if invItem.uniqueID == "film" then
@@ -247,11 +221,8 @@ ITEM.functions.LoadFilm = {
         local client = item.player
         if not IsValid(client) then return false end
 
-        local character = client:GetCharacter()
-        if not character then return false end
-
-        local inventory = character:GetInventory()
-        if not inventory then return false end
+        local character, inventory = ix.constants.GetCharacterInventory(client)
+        if not character or not inventory then return false end
 
         for _, invItem in pairs(inventory:GetItems()) do
             if invItem.uniqueID == "film" then

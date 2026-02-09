@@ -11,11 +11,10 @@ A Garry's Mod SeriousRP gamemode set in 2200 on Zephyrus, a hostile mining plane
 ```
 windswept/
 ├── schema/                  # Core gamemode code
-│   ├── sh_schema.lua        # Main shared entry point (includes libs here!)
+│   ├── sh_schema.lua        # Main shared entry point
 │   ├── cl_schema.lua        # Client entry point
 │   ├── sv_schema.lua        # Server entry point
 │   ├── sv_netstrings.lua    # Centralized network string registry
-│   ├── sh_constants.lua     # Centralized constants (ix.constants)
 │   ├── cl_hooks.lua         # Client hooks
 │   ├── sv_hooks.lua         # Server hooks
 │   ├── items/               # Item definitions (domain-organized)
@@ -31,7 +30,8 @@ windswept/
 │   │   └── weapons/         # Ammo, melee weapons, battering ram
 │   ├── attributes/          # Character attributes
 │   ├── derma/               # Custom UI panels
-│   ├── libs/                # Custom libraries (MUST be included in sh_schema.lua)
+│   ├── libs/                # Custom libraries (auto-included by Helix before derma)
+│   │   ├── sh_constants.lua # Centralized constants (ix.constants) - loads first alphabetically
 │   │   ├── sh_birthdata.lua # Birth date/age system
 │   │   ├── sh_physical.lua  # Physical appearance system
 │   │   ├── sh_doors.lua     # Door system library
@@ -318,7 +318,7 @@ The Workshop ID is the number in the URL: `steamcommunity.com/sharedfiles/filede
 
 ### Helix Framework
 
-- **Missing library include**: Helix does NOT auto-include files in `schema/libs/`. Add `ix.util.Include("libs/your_file.lua")` to sh_schema.lua for every lib file. Missing includes cause silent nil returns.
+- **Schema load order**: Helix loads schema folders in this order: `libs/` → `derma/` → `sh_schema.lua` (see `sh_plugin.lua:41-55`). Files in `libs/` are auto-included alphabetically. This means libs are available to derma files, but `sh_schema.lua` code is NOT. The manual `ix.util.Include()` calls in `sh_schema.lua` for libs are redundant (harmless but unnecessary). If a derma file needs something at file scope, it must come from `libs/`, not `sh_schema.lua`.
 
 - **Hook data flow in character creation**: In hooks like `AdjustCreationPayload`, Helix's OnAdjust functions run BEFORE your hook and populate `newPayload` with processed values. Use `newPayload.model` (the path) not `payload.model` (the index).
 

@@ -99,10 +99,8 @@ ITEM.functions.MergeAll = {
     name = "Merge All",
     icon = "icon16/arrow_join.png",
     OnRun = function(item)
-        local character = item.player:GetCharacter()
-        if not character then return false end
-        local inventory = character:GetInventory()
-        if not inventory then return false end
+        local character, inventory = ix.constants.GetCharacterInventory(item.player)
+        if not character or not inventory then return false end
         local currentQuantity = item:GetQuantity()
         local maxStack = ix.currency.MAX_STACK
         local canAdd = maxStack - currentQuantity
@@ -115,9 +113,10 @@ ITEM.functions.MergeAll = {
         -- Find other stacks of the same currency type
         local mergedTotal = 0
         local itemsToRemove = {}
+        local sameType = inventory:GetItemsByUniqueID(item.uniqueID, false)
 
-        for _, otherItem in pairs(inventory:GetItems()) do
-            if otherItem.uniqueID == item.uniqueID and otherItem:GetID() ~= item:GetID() then
+        for _, otherItem in ipairs(sameType) do
+            if otherItem:GetID() ~= item:GetID() then
                 local otherQuantity = otherItem:GetData("quantity", 1)
 
                 if canAdd >= otherQuantity then
@@ -159,16 +158,9 @@ ITEM.functions.MergeAll = {
             return false
         end
 
-        local character = item.player:GetCharacter()
-        if not character then return false end
-        local inventory = character:GetInventory()
-        if not inventory then return false end
-        for _, otherItem in pairs(inventory:GetItems()) do
-            if otherItem.uniqueID == item.uniqueID and otherItem:GetID() ~= item:GetID() then
-                return true
-            end
-        end
-        return false
+        local character, inventory = ix.constants.GetCharacterInventory(item.player)
+        if not character or not inventory then return false end
+        return #inventory:GetItemsByUniqueID(item.uniqueID, false) > 1
     end
 }
 
@@ -189,16 +181,9 @@ ITEM.functions.MergeWith = {
             return false
         end
 
-        local character = item.player:GetCharacter()
-        if not character then return false end
-        local inventory = character:GetInventory()
-        if not inventory then return false end
-        for _, otherItem in pairs(inventory:GetItems()) do
-            if otherItem.uniqueID == item.uniqueID and otherItem:GetID() ~= item:GetID() then
-                return true
-            end
-        end
-        return false
+        local character, inventory = ix.constants.GetCharacterInventory(item.player)
+        if not character or not inventory then return false end
+        return #inventory:GetItemsByUniqueID(item.uniqueID, false) > 1
     end
 }
 

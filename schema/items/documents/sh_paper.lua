@@ -373,20 +373,12 @@ hook.Add("PlayerUse", "ixPaperGroundView", function(client, entity)
     local docData = ix.documents.Load(paperID)
     if not docData then return end
 
-    -- Build response (support both old signatureData and new signatures array)
-    local signatures = docData.signatures or {}
-
-    -- Backwards compatibility: convert old single signature to array
-    if docData.signatureData and #signatures == 0 then
-        table.insert(signatures, docData.signatureData)
-    end
-
     local response = {
         content = docData.content or "",
         author = item:GetAuthor(),
         documentType = item:GetDocumentType(),
         wordCount = item:GetWordCount(),
-        signatures = signatures,
+        signatures = docData.signatures or {},
         entries = docData.entries or {},
         fromGround = true
     }

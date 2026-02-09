@@ -114,11 +114,8 @@ end
 function ENT:PickupByPlayer(client)
     if not IsValid(client) then return end
 
-    local character = client:GetCharacter()
-    if not character then return end
-
-    local inventory = character:GetInventory()
-    if not inventory then return end
+    local character, inventory = ix.constants.GetCharacterInventory(client)
+    if not character or not inventory then return end
 
     -- Check if there's room in inventory
     if not inventory:FindEmptySlot(2, 1) then -- stationary_radio is 2x1

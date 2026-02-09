@@ -25,22 +25,6 @@ ITEM.requireFullBattery = true
 ITEM.hasLightToggle = false
 
 -- ============================================================================
--- MIGRATION (convert old charge system to new battery system)
--- ============================================================================
-
-function ITEM:OnSendData()
-    local oldCharges = self:GetData("charges")
-    if oldCharges ~= nil and self:GetData("batteries") == nil then
-        local batteries = {}
-        for i = 1, oldCharges do
-            table.insert(batteries, 100)
-        end
-        self:SetData("batteries", batteries)
-        self:SetData("charges", nil)
-    end
-end
-
--- ============================================================================
 -- DEFIBRILLATOR-SPECIFIC FUNCTIONS
 -- ============================================================================
 

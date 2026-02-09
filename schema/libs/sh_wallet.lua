@@ -16,11 +16,8 @@ ix.wallet = ix.wallet or {}
 if SERVER then
     -- Find all wallets in a player's main inventory
     function ix.wallet.GetWallets(client)
-        local character = client:GetCharacter()
-        if not character then return {} end
-
-        local inventory = character:GetInventory()
-        if not inventory then return {} end
+        local character, inventory = ix.constants.GetCharacterInventory(client)
+        if not character or not inventory then return {} end
 
         local wallets = {}
         for _, item in pairs(inventory:GetItems()) do
@@ -122,11 +119,8 @@ if SERVER then
     function ix.currency.AddToInventoryWithWallet(client, cents)
         if cents <= 0 then return true end
 
-        local character = client:GetCharacter()
-        if not character then return false end
-
-        local mainInv = character:GetInventory()
-        if not mainInv then return false end
+        local character, mainInv = ix.constants.GetCharacterInventory(client)
+        if not character or not mainInv then return false end
 
         -- Split into dollars and coins
         local dollars = math.floor(cents / 100)

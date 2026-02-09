@@ -97,13 +97,7 @@ function PANEL:SetDocument(data)
     self.contentLabel:SetText(content)
     self.contentLabel:SizeToContentsY()
 
-    -- Signatures (supports multiple)
     local signatures = data.signatures or {}
-
-    -- Backwards compatibility: convert old single signature to array
-    if data.signatureData and #signatures == 0 then
-        table.insert(signatures, data.signatureData)
-    end
 
     if #signatures > 0 then
         self.signaturesContainer:SetVisible(true)
@@ -122,7 +116,7 @@ function PANEL:CreateSignaturePanels(signatures)
         sigPanel:DockMargin(0, i > 1 and spacing or 0, 0, 0)
         sigPanel:SetTall(sigHeight)
 
-        -- Get stroke color (default to gray for backwards compatibility)
+        -- Get stroke color (default gray if missing)
         local strokeColor = sigData.color or {200, 200, 200}
 
         sigPanel.Paint = function(pnl, w, h)

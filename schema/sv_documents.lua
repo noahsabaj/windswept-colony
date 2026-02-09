@@ -5,6 +5,16 @@
     Handles writing, reading, erasing, and signatures.
 ]]--
 
+-- Check if a specific item (by ID) exists in an inventory
+local function InvHasItem(inv, itemID)
+    for _, invItem in pairs(inv:GetItems()) do
+        if invItem:GetID() == itemID then
+            return true
+        end
+    end
+    return false
+end
+
 -- ============================================================================
 -- DOCUMENT WRITE HANDLER
 -- ============================================================================
@@ -29,15 +39,7 @@ net.Receive("ixDocumentWrite", function(len, client)
     local inv = char:GetInventory()
     if not inv then return end
 
-    local foundPaper = false
-    for _, invItem in pairs(inv:GetItems()) do
-        if invItem:GetID() == itemID then
-            foundPaper = true
-            break
-        end
-    end
-
-    if not foundPaper then return end
+    if not InvHasItem(inv, itemID) then return end
 
     -- Check if there's content to write
     if content == "" and not hasSignature then
@@ -52,15 +54,7 @@ net.Receive("ixDocumentWrite", function(len, client)
     end
 
     -- Verify tool is in player's inventory
-    local foundTool = false
-    for _, invItem in pairs(inv:GetItems()) do
-        if invItem:GetID() == toolItemID then
-            foundTool = true
-            break
-        end
-    end
-
-    if not foundTool then
+    if not InvHasItem(inv, toolItemID) then
         client:NotifyLocalized("needWritingTool")
         return
     end
@@ -218,20 +212,14 @@ net.Receive("ixDocumentRead", function(len, client)
     local docData = ix.documents.Load(paperID)
     if not docData then return end
 
-    -- Build response (support both old signatureData and new signatures array)
     local response = {
         content = docData.content or "",
         author = item:GetAuthor(),
         documentType = item:GetDocumentType(),
         wordCount = item:GetWordCount(),
         signatures = docData.signatures or {},
-        entries = docData.entries or {}  -- Include entries for color info
+        entries = docData.entries or {}
     }
-
-    -- Backwards compatibility: convert old single signature to array
-    if docData.signatureData and #response.signatures == 0 then
-        table.insert(response.signatures, docData.signatureData)
-    end
 
     net.Start("ixDocumentData")
         net.WriteBool(forEditor)
@@ -259,15 +247,7 @@ net.Receive("ixDocumentErase", function(len, client)
     local inv = char:GetInventory()
     if not inv then return end
 
-    local foundPaper = false
-    for _, invItem in pairs(inv:GetItems()) do
-        if invItem:GetID() == itemID then
-            foundPaper = true
-            break
-        end
-    end
-
-    if not foundPaper then return end
+    if not InvHasItem(inv, itemID) then return end
 
     -- Check if document is erasable (pencil only)
     if item:GetDocumentType() ~= "pencil" then
@@ -354,15 +334,7 @@ net.Receive("ixDocumentDestroy", function(len, client)
     local inv = char:GetInventory()
     if not inv then return end
 
-    local foundPaper = false
-    for _, invItem in pairs(inv:GetItems()) do
-        if invItem:GetID() == itemID then
-            foundPaper = true
-            break
-        end
-    end
-
-    if not foundPaper then return end
+    if not InvHasItem(inv, itemID) then return end
 
     -- Delete document file if exists
     local paperID = item:GetPaperID()
@@ -405,31 +377,10 @@ net.Receive("ixContainerRename", function(len, client)
     local inv = char:GetInventory()
     if not inv then return end
 
-    local foundItem = false
-    for _, invItem in pairs(inv:GetItems()) do
-        if invItem:GetID() == itemID then
-            foundItem = true
-            break
-        end
-    end
-
-    if not foundItem then return end
+    if not InvHasItem(inv, itemID) then return end
 
     -- Check for writing tool in inventory
-    local penTypes = {pen = true, pen_black = true, pen_red = true, pen_green = true}
-    local hasWritingTool = false
-
-    for _, invItem in pairs(inv:GetItems()) do
-        if penTypes[invItem.uniqueID] and invItem:GetInk() > 0 then
-            hasWritingTool = true
-            break
-        elseif (invItem.uniqueID == "pencil" or invItem.uniqueID == "pencil_eraser") and invItem:GetLead() > 0 then
-            hasWritingTool = true
-            break
-        end
-    end
-
-    if not hasWritingTool then
+    if not ix.documents.HasWritingTool(client) then
         client:NotifyLocalized("needWritingTool")
         return
     end
@@ -518,15 +469,7 @@ net.Receive("ixPenRefill", function(len, client)
     local inv = char:GetInventory()
     if not inv then return end
 
-    local foundPen = false
-    local foundCartridge = false
-
-    for _, invItem in pairs(inv:GetItems()) do
-        if invItem:GetID() == penItemID then foundPen = true end
-        if invItem:GetID() == cartridgeItemID then foundCartridge = true end
-    end
-
-    if not foundPen or not foundCartridge then return end
+    if not InvHasItem(inv, penItemID) or not InvHasItem(inv, cartridgeItemID) then return end
 
     -- Check if pen needs refill
     if penItem:GetInk() >= penItem.maxInk then
