@@ -25,7 +25,7 @@ function PANEL:Init()
     instructions:Dock(TOP)
     instructions:DockMargin(10, 5, 10, 5)
     instructions:SetText("Draw your signature below. Click and drag to draw.")
-    instructions:SetTextColor(Color(200, 200, 200))
+    instructions:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
 
     -- Canvas panel
     self.canvas = vgui.Create("DPanel", self)

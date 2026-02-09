@@ -10,8 +10,6 @@
     - Gavel tool for making noise (RP prop)
 ]]--
 
-print("[Restraint] sh_plugin.lua is loading...")
-
 PLUGIN.name = "Restraint System"
 PLUGIN.author = "Windswept"
 PLUGIN.description = "Physical restraint mechanics: zipties, gagging, dragging, leashing."

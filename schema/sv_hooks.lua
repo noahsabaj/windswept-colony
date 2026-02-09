@@ -32,6 +32,9 @@ function Schema:CanPlayerUseDoor(client, door)
 	-- m_eDoorState: 0=closed, 1=opening, 2=open, 3=closing
 	local doorState = door:GetInternalVariable("m_eDoorState")
 
+	-- If we can't determine door state, let native handling work
+	if doorState == nil then return end
+
 	if doorState == 0 then
 		-- Both doors closed - open both away from player
 		local tempTarget = ents.Create("info_target")
@@ -215,9 +218,6 @@ end
 -- ============================================================================
 
 -- Override money entity pickup to use wallet routing
--- Store original function and override
-local originalHandlePickup = ix.currency.HandlePickup
-
 ix.currency.HandlePickup = function(client, entity)
     if not IsValid(client) or not IsValid(entity) then return end
 
@@ -242,9 +242,7 @@ end
 -- Track who is currently transmitting on radio
 Schema.radioTransmitters = Schema.radioTransmitters or {}
 
--- Constants for voice distance scaling
-local BASE_VOICE_RANGE = 600  -- Helix default voiceDistance
-local BASE_EAVESDROP_RANGE = 400
+-- Voice distance scaling uses ix.constants.RANGE_EAVESDROP_BASE
 
 -- ============================================================================
 -- ENTITY CACHING FOR VOICE SYSTEM PERFORMANCE
@@ -669,7 +667,7 @@ function Schema:PlayerCanHearPlayersVoice(listener, speaker)
         end
 
         -- Calculate eavesdrop range: base * receiver_volume * transmitter_amplitude
-        local eavesdropRange = BASE_EAVESDROP_RANGE * closestReceiverVolume * speakerAmplitude
+        local eavesdropRange = ix.constants.RANGE_EAVESDROP_BASE * closestReceiverVolume * speakerAmplitude
 
         if closestReceiverDist < eavesdropRange then
             return true, false  -- Can hear via eavesdrop

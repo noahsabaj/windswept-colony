@@ -24,7 +24,7 @@ function PANEL:Init()
     self.paperLabel:Dock(TOP)
     self.paperLabel:DockMargin(10, 5, 10, 0)
     self.paperLabel:SetText("Select Paper:")
-    self.paperLabel:SetTextColor(Color(200, 200, 200))
+    self.paperLabel:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
 
     self.paperSelect = vgui.Create("DComboBox", self)
     self.paperSelect:Dock(TOP)
@@ -40,7 +40,7 @@ function PANEL:Init()
     self.contentLabel:Dock(TOP)
     self.contentLabel:DockMargin(10, 5, 10, 0)
     self.contentLabel:SetText("Type your document:")
-    self.contentLabel:SetTextColor(Color(200, 200, 200))
+    self.contentLabel:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
 
     self.content = vgui.Create("DTextEntry", self)
     self.content:Dock(FILL)
@@ -71,7 +71,7 @@ function PANEL:Init()
     self.charCounter:Dock(TOP)
     self.charCounter:DockMargin(10, 5, 10, 5)
     self.charCounter:SetText("Characters: 0")
-    self.charCounter:SetTextColor(Color(200, 200, 200))
+    self.charCounter:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
 
     -- Button panel
     local btnPanel = vgui.Create("DPanel", bottomPanel)
@@ -141,7 +141,7 @@ function PANEL:UpdateCharCounter()
     if charCount > ix.documents.MAX_CONTENT_LENGTH then
         self.charCounter:SetTextColor(Color(255, 100, 100))
     else
-        self.charCounter:SetTextColor(Color(200, 200, 200))
+        self.charCounter:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
     end
 end
 
@@ -168,13 +168,6 @@ function PANEL:TypeDocument()
 end
 
 function PANEL:Close()
-    -- Notify server we're closing
-    if IsValid(self.typewriter) then
-        net.Start("ixTypewriterClose")
-            net.WriteEntity(self.typewriter)
-        net.SendToServer()
-    end
-
     self:Remove()
 end
 

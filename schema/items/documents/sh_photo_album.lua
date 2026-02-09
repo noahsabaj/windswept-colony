@@ -560,7 +560,7 @@ if CLIENT then
         surface.DrawRect(0, 0, w, h)
 
         -- Album title at top
-        draw.SimpleText(self.albumTitle, "ixMediumFont", w / 2, 30, Color(200, 200, 200), TEXT_ALIGN_CENTER)
+        draw.SimpleText(self.albumTitle, "ixMediumFont", w / 2, 30, ix.constants.COLOR_UI_NEUTRAL, TEXT_ALIGN_CENTER)
 
         -- Image size (same as individual photo viewer: 512x512)
         local imgSize = 512

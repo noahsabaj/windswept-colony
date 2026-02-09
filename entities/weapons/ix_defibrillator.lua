@@ -184,6 +184,8 @@ end
 -- ============================================================================
 
 function SWEP:Think()
+    if not self.GetCharging then return end
+
     -- Charging -> Ready transition
     if self:GetCharging() then
         if CurTime() >= self:GetChargeStartTime() + self.ChargeDuration then
@@ -501,10 +503,11 @@ if CLIENT then
         local scrW, scrH = ScrW(), ScrH()
 
         -- Bar dimensions (similar to looting progress bar)
-        local barWidth = 200
-        local barHeight = 12
+        local barWidth = ScreenScale(100)
+        local barHeight = ScreenScale(6)
         local barX = (scrW - barWidth) / 2
         local barY = scrH * 0.6  -- Below center of screen
+        local pad = ScreenScale(1)
 
         -- Background
         surface.SetDrawColor(0, 0, 0, 200)
@@ -512,14 +515,14 @@ if CLIENT then
 
         -- Progress fill (blue for defibrillator)
         surface.SetDrawColor(60, 150, 255, 255)
-        surface.DrawRect(barX + 1, barY + 1, (barWidth - 2) * progress, barHeight - 2)
+        surface.DrawRect(barX + pad, barY + pad, (barWidth - pad * 2) * progress, barHeight - pad * 2)
 
         -- Border
         surface.SetDrawColor(255, 255, 255, 100)
         surface.DrawOutlinedRect(barX, barY, barWidth, barHeight)
 
         -- Label
-        draw.SimpleText("CHARGING", "DermaDefault", scrW / 2, barY - 5, Color(255, 255, 255, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
+        draw.SimpleText("CHARGING", "DermaDefault", scrW / 2, barY - ScreenScale(3), Color(255, 255, 255, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
     end
 end
 

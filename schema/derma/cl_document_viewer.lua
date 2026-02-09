@@ -54,7 +54,7 @@ function PANEL:Init()
     self.contentLabel:SetWrap(true)
     self.contentLabel:SetAutoStretchVertical(true)
     self.contentLabel:SetText("Loading...")
-    self.contentLabel:SetTextColor(Color(200, 200, 200))
+    self.contentLabel:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
 
     -- Update content background height when content changes
     self.contentLabel.PerformLayout = function(lbl)

@@ -49,7 +49,7 @@ function PANEL:Init()
     self.newLabel:Dock(TOP)
     self.newLabel:DockMargin(10, 5, 10, 0)
     self.newLabel:SetText("Write new content:")
-    self.newLabel:SetTextColor(Color(200, 200, 200))
+    self.newLabel:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
 
     -- New content text entry
     self.content = vgui.Create("DTextEntry", self)
@@ -72,7 +72,7 @@ function PANEL:Init()
     self.resourceCounter:Dock(TOP)
     self.resourceCounter:DockMargin(10, 5, 10, 0)
     self.resourceCounter:SetText("Ink: 1000 remaining")
-    self.resourceCounter:SetTextColor(Color(200, 200, 200))
+    self.resourceCounter:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
 
     -- Signature status
     self.sigStatus = vgui.Create("DLabel", bottomPanel)
@@ -207,7 +207,7 @@ function PANEL:UpdateResourceCounter()
     elseif remaining < self.maxResource * 0.1 then
         self.resourceCounter:SetTextColor(Color(255, 200, 100))
     else
-        self.resourceCounter:SetTextColor(Color(200, 200, 200))
+        self.resourceCounter:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
     end
 end
 

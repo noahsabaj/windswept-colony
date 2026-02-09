@@ -154,12 +154,8 @@ end
 
 if SERVER then
     net.Receive("ixLockInstall", function(len, ply)
-        print("[ix_lock] Received ixLockInstall from " .. ply:Nick())
         local weapon = ply:GetActiveWeapon()
-        if not IsValid(weapon) or weapon:GetClass() ~= "ix_lock" then
-            print("[ix_lock] ERROR: Player's active weapon is not ix_lock!")
-            return
-        end
+        if not IsValid(weapon) or weapon:GetClass() ~= "ix_lock" then return end
 
         weapon:StartInstall()
     end)
@@ -176,13 +172,10 @@ function SWEP:StartInstall()
     if CLIENT then return end
 
     local owner = self:GetOwner()
-    print("[ix_lock] StartInstall called for " .. owner:Nick())
 
     local door = self:GetTargetDoor()
-    print("[ix_lock] GetTargetDoor returned: " .. tostring(door))
 
     if not IsValid(door) then
-        print("[ix_lock] No valid door found - notifying lockNoDoor")
         owner:NotifyLocalized("lockNoDoor")
         return
     end
@@ -195,9 +188,7 @@ function SWEP:StartInstall()
 
     -- Check for toolkit
     local hasToolkit, toolkit = self:HasToolkit()
-    print("[ix_lock] HasToolkit: " .. tostring(hasToolkit))
     if not hasToolkit then
-        print("[ix_lock] No toolkit - notifying lockNeedToolkit")
         owner:NotifyLocalized("lockNeedToolkit")
         return
     end
@@ -394,7 +385,8 @@ if CLIENT then
         local progress = math.Clamp(elapsed / duration, 0, 1)
 
         local w, h = ScrW(), ScrH()
-        local barW, barH = 200, 20
+        local barW, barH = ScreenScale(100), ScreenScale(10)
+        local pad = ScreenScale(2)
         local x, y = (w - barW) / 2, h * 0.6
 
         -- Background
@@ -403,14 +395,14 @@ if CLIENT then
 
         -- Progress fill
         surface.SetDrawColor(100, 150, 200, 255)
-        surface.DrawRect(x + 2, y + 2, (barW - 4) * progress, barH - 4)
+        surface.DrawRect(x + pad, y + pad, (barW - pad * 2) * progress, barH - pad * 2)
 
         -- Border
         surface.SetDrawColor(200, 200, 200, 255)
         surface.DrawOutlinedRect(x, y, barW, barH, 2)
 
         -- Text
-        draw.SimpleText("Installing Lock...", "ixSmallFont", w / 2, y - 20, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
-        draw.SimpleText("LMB to cancel", "ixSmallFont", w / 2, y + barH + 10, Color(150, 150, 150), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+        draw.SimpleText("Installing Lock...", "ixSmallFont", w / 2, y - ScreenScale(10), Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
+        draw.SimpleText("LMB to cancel", "ixSmallFont", w / 2, y + barH + ScreenScale(5), Color(150, 150, 150), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
     end
 end

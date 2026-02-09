@@ -5,8 +5,6 @@
     communication blocking, and audio effects.
 ]]--
 
-print("[Permadeath] cl_plugin.lua is loading...")
-
 -- Knockout state
 local isKnockedOut = false
 local knockoutStartTime = 0
@@ -232,7 +230,7 @@ function PANEL:ShowGiveUpConfirmation()
     local label = vgui.Create("DLabel", self.confirmDialog)
     label:SetText(confirmText)
     label:SetFont("ixMediumFont")
-    label:SetTextColor(Color(200, 200, 200))
+    label:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
     label:SizeToContents()
     label:SetPos(dialogWidth / 2 - label:GetWide() / 2, 20)
 
@@ -250,7 +248,6 @@ function PANEL:ShowGiveUpConfirmation()
         surface.DrawOutlinedRect(0, 0, w, h)
     end
     yesBtn.DoClick = function()
-        print("[Permadeath] Client sending ixKnockoutGiveUp")
         -- Send give up request to server
         net.Start("ixKnockoutGiveUp")
         net.SendToServer()
@@ -531,12 +528,8 @@ vgui.Register("ixDeathMemorial", MEMORIAL, "EditablePanel")
 local knockoutPanel = nil
 
 net.Receive("ixKnockoutStart", function()
-    print("[Permadeath] Client received ixKnockoutStart!")
-
     local duration = net.ReadFloat()
     local count = net.ReadUInt(8)
-
-    print("[Permadeath] Duration: " .. duration .. ", Count: " .. count)
 
     isKnockedOut = true
     knockoutStartTime = RealTime()
@@ -552,9 +545,7 @@ net.Receive("ixKnockoutStart", function()
     knockoutPanel = vgui.Create("ixKnockoutScreen")
     if IsValid(knockoutPanel) then
         knockoutPanel:SetKnockoutData(duration, count)
-        print("[Permadeath] Knockout panel created successfully")
     else
-        print("[Permadeath] ERROR: Failed to create knockout panel!")
     end
 end)
 
@@ -578,7 +569,6 @@ local function CleanupKnockoutUI()
     knockoutCount = 0
 
     if IsValid(knockoutPanel) then
-        print("[Permadeath] Cleaning up knockout panel")
         knockoutPanel:Remove()
         knockoutPanel = nil
     end
@@ -588,12 +578,8 @@ local function CleanupKnockoutUI()
 end
 
 net.Receive("ixKnockoutEnd", function()
-    print("[Permadeath] Client received ixKnockoutEnd")
-
     local revived = net.ReadBool()
     local health = net.ReadUInt(8)
-
-    print("[Permadeath] Revived: " .. tostring(revived) .. ", Health: " .. health)
 
     -- Force cleanup all knockout state
     CleanupKnockoutUI()
@@ -603,7 +589,6 @@ net.Receive("ixKnockoutEnd", function()
         ix.util.Notify(L("revivalSuccess"))
         ix.util.Notify(string.format("You regained consciousness with %d HP.", health))
     else
-        print("[Permadeath] Character permadead, showing notification")
         ix.util.Notify(L("characterPermadead"))
     end
 end)
@@ -617,8 +602,6 @@ net.Receive("ixPermadeathScreen", function()
     local birthMonth = net.ReadUInt(4)
     local birthDay = net.ReadUInt(5)
     local age = net.ReadUInt(8)
-
-    print("[Permadeath] Received memorial screen data for: " .. charName)
 
     -- Clean up any existing knockout panel
     if IsValid(knockoutPanel) then
@@ -754,4 +737,3 @@ function PLUGIN:IsLocalPlayerKnockedOut()
     return isKnockedOut
 end
 
-print("[Permadeath] cl_plugin.lua finished loading")

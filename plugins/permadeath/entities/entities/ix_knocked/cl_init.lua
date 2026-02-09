@@ -149,7 +149,7 @@ hook.Add("HUDDrawTargetID", "ixKnockedTargetID", function()
     else
         -- Draw action hints (only when not burning - can't search a burning body)
         local yOffset = 30
-        draw.SimpleTextOutlined("E: Search body", "ixSmallFont", pos.x, pos.y + yOffset, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+        draw.SimpleTextOutlined("E: Search body", "ixSmallFont", pos.x, pos.y + yOffset, ix.constants.COLOR_UI_NEUTRAL, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
 
         -- Show CPR hint only if not dead and holding hands lowered
         if not knockedEnt:GetPermadead() then

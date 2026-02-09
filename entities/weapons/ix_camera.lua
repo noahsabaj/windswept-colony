@@ -410,7 +410,7 @@ if CLIENT then
         local flashText = self:GetFlashEnabled() and "FLASH: ON" or "FLASH: OFF"
         local zoomPercent = math.Round(100 - ((self:GetCurrentFOV() - self.MinFOV) / (self.MaxFOV - self.MinFOV)) * 100)
         local centerText = string.format("[%s | Zoom: %d%%]", flashText, zoomPercent)
-        local flashColor = self:GetFlashEnabled() and Color(255, 255, 100) or Color(200, 200, 200)
+        local flashColor = self:GetFlashEnabled() and Color(255, 255, 100) or ix.constants.COLOR_UI_NEUTRAL
         draw.SimpleText(centerText, "ixMediumFont", cx, infoY, flashColor, TEXT_ALIGN_CENTER)
 
         -- Film indicator (right)

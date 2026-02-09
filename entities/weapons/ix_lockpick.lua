@@ -484,12 +484,16 @@ if CLIENT then
         if not self:IsPicking() then return end
 
         local w, h = ScrW(), ScrH()
-        local barW, barH = 300, 30
+        local barW, barH = ScreenScale(150), ScreenScale(15)
+        local pad = ScreenScale(5)
+        local tickerW = ScreenScale(2)
+        local tickerOverhang = ScreenScale(3)
+        local textGap = ScreenScale(15)
         local x, y = (w - barW) / 2, h * 0.6
 
         -- Background
         surface.SetDrawColor(30, 30, 30, 230)
-        surface.DrawRect(x - 10, y - 60, barW + 20, barH + 100)
+        surface.DrawRect(x - pad * 2, y - textGap * 2, barW + pad * 4, barH + textGap * 2 + pad * 2 + textGap * 3)
 
         -- Sweet spot
         local sweetStart = self:GetSweetSpotStart()
@@ -514,21 +518,21 @@ if CLIENT then
 
         -- Ticker
         local tickerPos = self:GetTickerPosition()
-        local tickerX = x + (barW * tickerPos) - 2
+        local tickerX = x + (barW * tickerPos) - tickerW / 2
         surface.SetDrawColor(255, 255, 255, 255)
-        surface.DrawRect(tickerX, y - 5, 4, barH + 10)
+        surface.DrawRect(tickerX, y - tickerOverhang, tickerW, barH + tickerOverhang * 2)
 
         -- Progress (hits)
         local currentHits = self:GetCurrentHits()
         local requiredHits = self:GetRequiredHits()
 
-        draw.SimpleText("Progress: " .. currentHits .. "/" .. requiredHits, "ixSmallFont", w / 2, y - 30, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
+        draw.SimpleText("Progress: " .. currentHits .. "/" .. requiredHits, "ixSmallFont", w / 2, y - textGap, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
 
         -- Attempts remaining
         local attemptsLeft = self:GetAttemptsLeft()
-        draw.SimpleText("Attempts: " .. attemptsLeft, "ixSmallFont", w / 2, y + barH + 15, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+        draw.SimpleText("Attempts: " .. attemptsLeft, "ixSmallFont", w / 2, y + barH + pad * 2, ix.constants.COLOR_UI_NEUTRAL, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
 
         -- Instructions
-        draw.SimpleText("LMB when ticker is in green zone | RMB to cancel", "ixSmallFont", w / 2, y + barH + 35, Color(150, 150, 150), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+        draw.SimpleText("LMB when ticker is in green zone | RMB to cancel", "ixSmallFont", w / 2, y + barH + pad * 2 + textGap, Color(150, 150, 150), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
     end
 end

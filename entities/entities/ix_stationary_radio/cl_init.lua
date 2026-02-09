@@ -174,7 +174,7 @@ local function CreateChannelRow(parent, channelNum, ent)
             if txOn then
                 btnTX:SetTextColor(Color(255, 100, 100))
             else
-                btnTX:SetTextColor(Color(200, 200, 200))
+                btnTX:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
             end
         end
 
@@ -186,7 +186,7 @@ local function CreateChannelRow(parent, channelNum, ent)
             if rxOn then
                 btnRX:SetTextColor(Color(100, 255, 100))
             else
-                btnRX:SetTextColor(Color(200, 200, 200))
+                btnRX:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
             end
         end
 
@@ -307,7 +307,7 @@ local function OpenStationaryRadioUI(ent)
         if micOn then
             self:SetTextColor(Color(255, 100, 100))
         else
-            self:SetTextColor(Color(200, 200, 200))
+            self:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
         end
     end
 

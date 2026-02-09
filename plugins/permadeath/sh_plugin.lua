@@ -107,7 +107,5 @@ function PLUGIN:FormatTime(seconds)
 end
 
 -- Include server and client files
-print("[Permadeath] sh_plugin.lua including server/client files...")
 ix.util.Include("sv_plugin.lua")
 ix.util.Include("cl_plugin.lua")
-print("[Permadeath] sh_plugin.lua finished loading")

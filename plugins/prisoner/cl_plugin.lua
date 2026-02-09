@@ -9,8 +9,6 @@
     - Leash visual indicator
 ]]--
 
-print("[Restraint] cl_plugin.lua is loading...")
-
 -- Blindness effect when gagged (like a bag over the head)
 -- Knockout screen takes priority - gag persists but blindness yields to knockout UI
 function PLUGIN:RenderScreenspaceEffects()
@@ -104,19 +102,19 @@ hook.Add("HUDDrawTargetID", "ixRestrainedTargetID", function()
     local isDragging = client:GetNetVar("ixDragging") == target:EntIndex()
 
     if isDragging then
-        draw.SimpleTextOutlined("Release LMB: Stop dragging", "ixSmallFont", pos.x, pos.y + yOffset, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+        draw.SimpleTextOutlined("Release LMB: Stop dragging", "ixSmallFont", pos.x, pos.y + yOffset, ix.constants.COLOR_UI_NEUTRAL, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
     elseif isLeashed then
         -- Leashed player - show unleash hint
-        draw.SimpleTextOutlined("E: Unleash | R: " .. gagText, "ixSmallFont", pos.x, pos.y + yOffset, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+        draw.SimpleTextOutlined("E: Unleash | R: " .. gagText, "ixSmallFont", pos.x, pos.y + yOffset, ix.constants.COLOR_UI_NEUTRAL, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
     else
         -- Not leashed - show untie/drag/leash hints
-        draw.SimpleTextOutlined("E: Untie | R: " .. gagText, "ixSmallFont", pos.x, pos.y + yOffset, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+        draw.SimpleTextOutlined("E: Untie | R: " .. gagText, "ixSmallFont", pos.x, pos.y + yOffset, ix.constants.COLOR_UI_NEUTRAL, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
         yOffset = yOffset + 25
 
         -- Show drag/leash hint only if holding hands and lowered
         local weapon = client:GetActiveWeapon()
         if IsValid(weapon) and weapon:GetClass() == "ix_hands" and not client:IsWepRaised() then
-            draw.SimpleTextOutlined("Hold LMB: Drag | Hold RMB: Leash", "ixSmallFont", pos.x, pos.y + yOffset, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+            draw.SimpleTextOutlined("Hold LMB: Drag | Hold RMB: Leash", "ixSmallFont", pos.x, pos.y + yOffset, ix.constants.COLOR_UI_NEUTRAL, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
         end
     end
 end)
@@ -303,5 +301,5 @@ hook.Add("HUDPaint", "ixLeashProgress", function()
     surface.DrawRect(x, y, barW * progress, barH)
 
     -- Text
-    draw.SimpleText("Leashing...", "ixSmallFont", ScrW() / 2, y - 15, Color(200, 200, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
+    draw.SimpleText("Leashing...", "ixSmallFont", ScrW() / 2, y - 15, ix.constants.COLOR_UI_NEUTRAL, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
 end)

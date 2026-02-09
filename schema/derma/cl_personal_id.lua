@@ -160,7 +160,7 @@ function PANEL:AddHeader(text)
     closeBtn:DockMargin(0, 6, 6, 6)
     closeBtn:SetText("×")
     closeBtn:SetFont("ixMediumFont")
-    closeBtn:SetTextColor(Color(200, 200, 200))
+    closeBtn:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
     closeBtn.Paint = function(btn, w, h)
         if btn:IsHovered() then
             surface.SetDrawColor(255, 255, 255, 30)

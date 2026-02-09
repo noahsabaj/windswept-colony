@@ -9,8 +9,6 @@
     - Leash mechanics (tie to surfaces)
 ]]--
 
-print("[Restraint] sv_plugin.lua is loading...")
-
 util.AddNetworkString("ixDragStart")
 util.AddNetworkString("ixDragStop")
 util.AddNetworkString("ixLeashStart")

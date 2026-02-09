@@ -303,7 +303,6 @@ if SERVER then
             end
         end
 
-        print("[ix.doors] Detected " .. table.Count(ix.doors.frames) .. " door frames (skipped " .. skippedBrush .. " brush-based doors)")
     end
 
     -- Hide all map doors (make them invisible and non-solid)
@@ -319,7 +318,6 @@ if SERVER then
             end
         end
 
-        print("[ix.doors] Hidden map doors")
     end
 
     -- Sync frame data to a client
@@ -701,7 +699,7 @@ if SERVER then
                 if IsValid(gib) then
                     local alpha = 255
                     local color = gib:GetColor()
-                    timer.Create("gibFade" .. gib:EntIndex(), 0.05, 50, function()
+                    timer.Create("gibFade" .. gib:EntIndex() .. "_" .. CurTime(), 0.05, 50, function()
                         if IsValid(gib) then
                             alpha = alpha - 5
                             gib:SetColor(ColorAlpha(color, math.max(0, alpha)))
@@ -923,7 +921,6 @@ if SERVER then
         local json = util.TableToJSON(data, true)
         file.Write(ix.doors.GetSavePath(), json)
 
-        print("[ix.doors] Saved door data")
     end
 
     function ix.doors.Load()
@@ -931,7 +928,6 @@ if SERVER then
 
         if not file.Exists(path, "DATA") then
             -- First run: bootstrap all frames with default doors
-            print("[ix.doors] No saved door data found - bootstrapping default doors")
             ix.doors.BootstrapDefaultDoors()
             return
         end
@@ -962,7 +958,6 @@ if SERVER then
             end
         end
 
-        print("[ix.doors] Loaded door data")
     end
 
     -- Bootstrap: spawn default doors for all frames on first run
@@ -976,8 +971,6 @@ if SERVER then
                 end
             end
         end
-
-        print("[ix.doors] Bootstrapped " .. count .. " default doors")
 
         -- Save the initial state so next load uses persistence
         ix.doors.Save()
@@ -1072,8 +1065,6 @@ if SERVER then
             end
         end
 
-        if linkedCount > 0 then
-            print("[ix.doors] Linked " .. linkedCount .. " double door pairs (" .. linkedByKeyvalue .. " by keyvalue, " .. linkedByProximity .. " by proximity)")
         end
     end
 
@@ -1101,6 +1092,7 @@ if SERVER then
     -- Save on map cleanup
     hook.Add("ShutDown", "ixDoorsSave", function()
         ix.doors.Save()
+        timer.Remove("ixDoorsAutosave")
     end)
 
     -- Periodic autosave

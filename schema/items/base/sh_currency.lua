@@ -99,7 +99,10 @@ ITEM.functions.MergeAll = {
     name = "Merge All",
     icon = "icon16/arrow_join.png",
     OnRun = function(item)
-        local inventory = item.player:GetCharacter():GetInventory()
+        local character = item.player:GetCharacter()
+        if not character then return false end
+        local inventory = character:GetInventory()
+        if not inventory then return false end
         local currentQuantity = item:GetQuantity()
         local maxStack = ix.currency.MAX_STACK
         local canAdd = maxStack - currentQuantity
@@ -156,7 +159,10 @@ ITEM.functions.MergeAll = {
             return false
         end
 
-        local inventory = item.player:GetCharacter():GetInventory()
+        local character = item.player:GetCharacter()
+        if not character then return false end
+        local inventory = character:GetInventory()
+        if not inventory then return false end
         for _, otherItem in pairs(inventory:GetItems()) do
             if otherItem.uniqueID == item.uniqueID and otherItem:GetID() ~= item:GetID() then
                 return true
@@ -183,7 +189,10 @@ ITEM.functions.MergeWith = {
             return false
         end
 
-        local inventory = item.player:GetCharacter():GetInventory()
+        local character = item.player:GetCharacter()
+        if not character then return false end
+        local inventory = character:GetInventory()
+        if not inventory then return false end
         for _, otherItem in pairs(inventory:GetItems()) do
             if otherItem.uniqueID == item.uniqueID and otherItem:GetID() ~= item:GetID() then
                 return true

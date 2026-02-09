@@ -16,7 +16,6 @@ windswept/
 │   ├── sv_schema.lua        # Server entry point
 │   ├── sv_netstrings.lua    # Centralized network string registry
 │   ├── sh_constants.lua     # Centralized constants (ix.constants)
-│   ├── sh_hooks.lua         # Shared hooks
 │   ├── cl_hooks.lua         # Client hooks
 │   ├── sv_hooks.lua         # Server hooks
 │   ├── items/               # Item definitions (domain-organized)

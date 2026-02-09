@@ -5,8 +5,6 @@
     revival mechanics, and permadeath application.
 ]]--
 
-print("[Permadeath] sv_plugin.lua is loading...")
-
 -- Store reference to active knockout entities by SteamID64
 PLUGIN.knockedEntities = PLUGIN.knockedEntities or {}
 
@@ -89,7 +87,6 @@ function PLUGIN:EntityTakeDamage(entity, dmgInfo)
     end
 
     -- This would be lethal - intercept it
-    print("[Permadeath] Lethal damage intercepted for " .. client:Name())
 
     -- Set flag to prevent race conditions with multiple damage events
     client.ixProcessingLethalDamage = true
@@ -503,8 +500,6 @@ function PLUGIN:DeleteCharacter(client, character)
     local id = character:GetID()
     local steamID = client:SteamID64()
 
-    print("[Permadeath] Deleting character ID: " .. id)
-
     -- Remove from player's character list
     for k, v in ipairs(client.ixCharList or {}) do
         if v == id then
@@ -537,13 +532,10 @@ function PLUGIN:DeleteCharacter(client, character)
     -- Run post-delete hook
     hook.Run("CharacterDeleted", client, id, true)
 
-    print("[Permadeath] Character deleted successfully")
 end
 
 -- Delete a character when the player is offline (database only)
 function PLUGIN:DeleteCharacterOffline(charID)
-    print("[Permadeath] Deleting offline character ID: " .. charID)
-
     -- Remove from loaded characters if still there
     ix.char.loaded[charID] = nil
 
@@ -561,7 +553,6 @@ function PLUGIN:DeleteCharacterOffline(charID)
     -- The dead body (ix_knocked entity) needs the inventory for looting.
     -- The inventory will be cleaned up when the body is removed.
 
-    print("[Permadeath] Offline character deleted successfully")
 end
 
 -- Find a character's Personal ID item from their inventory
@@ -578,8 +569,6 @@ function PLUGIN:FindPersonalID(character)
 end
 
 function PLUGIN:ApplyPermadeath(client, character, reason)
-    print("[Permadeath] ApplyPermadeath called for " .. (IsValid(client) and client:Name() or "invalid") .. ", reason: " .. reason)
-
     -- Mark character as permanently dead
     character:SetData("permadead", true)
     character:SetData("permaDeathReason", reason)
@@ -661,7 +650,6 @@ function PLUGIN:ApplyPermadeath(client, character, reason)
         local steamID = client:SteamID64()
         timer.Create("ixPermadeathTimeout_" .. steamID, 60, 1, function()
             if IsValid(client) then
-                print("[Permadeath] Memorial timeout, force kicking")
                 client:Freeze(false)
                 client:KillSilent()
 
@@ -680,8 +668,6 @@ end
 
 -- Called when knockout timer expires
 function PLUGIN:OnKnockoutExpired(knockedEntity)
-    print("[Permadeath] OnKnockoutExpired called")
-
     -- Cancel any active revival attempt (CPR in progress)
     local reviver = knockedEntity:GetCurrentReviver()
     if IsValid(reviver) then
@@ -696,27 +682,21 @@ function PLUGIN:OnKnockoutExpired(knockedEntity)
     local charID = knockedEntity:GetCharacterID()
     local character = ix.char.loaded[charID]
 
-    print("[Permadeath] CharID: " .. tostring(charID) .. ", Character: " .. tostring(character))
-
     -- Clean up tracking table
     if knockedEntity.ixSteamID64 then
         self.knockedEntities[knockedEntity.ixSteamID64] = nil
     end
 
     if not character then
-        print("[Permadeath] No character found, entity already set permadead")
         return
     end
 
     local owner = knockedEntity.ixOwner
-    print("[Permadeath] Owner: " .. tostring(owner) .. ", IsValid: " .. tostring(IsValid(owner)))
 
     if IsValid(owner) then
-        print("[Permadeath] Calling ApplyPermadeath for online player")
         self:ApplyPermadeath(owner, character, "timer_expired")
     else
         -- Player offline - apply permadeath and delete character
-        print("[Permadeath] Player offline, deleting character")
         knockedEntity.ixOwner = nil
 
         -- Delete the character from database
@@ -968,28 +948,16 @@ end
 -- ============================================================================
 
 net.Receive("ixKnockoutGiveUp", function(len, client)
-    print("[Permadeath] Received ixKnockoutGiveUp from " .. (IsValid(client) and client:Name() or "invalid"))
-
     -- Validate player is actually knocked out
-    if not IsValid(client) then
-        print("[Permadeath] Give up failed: invalid client")
-        return
-    end
+    if not IsValid(client) then return end
 
-    if not IsValid(client.ixKnockedEntity) then
-        print("[Permadeath] Give up failed: no ixKnockedEntity")
-        return
-    end
+    if not IsValid(client.ixKnockedEntity) then return end
 
     local entity = client.ixKnockedEntity
-    if entity:GetPermadead() then
-        print("[Permadeath] Give up failed: already permadead")
-        return
-    end
+    if entity:GetPermadead() then return end
 
     -- Get current remaining time
     local remaining = entity:GetRemainingTime()
-    print("[Permadeath] Give up: remaining time = " .. remaining)
 
     -- Only reduce if timer is above 10 seconds (don't extend if already lower)
     if remaining > 10 then
@@ -1001,12 +969,8 @@ net.Receive("ixKnockoutGiveUp", function(len, client)
             net.WriteFloat(10)
         net.Send(client)
 
-        print("[Permadeath] Give up: timer reduced to 10 seconds")
-
         -- Log the give up
         ix.log.Add(client, "knockout_giveup")
-    else
-        print("[Permadeath] Give up: timer already <= 10, not extending")
     end
 end)
 
@@ -1019,6 +983,8 @@ net.Receive("ixKnockoutLoot", function(len, client)
     if not IsValid(client) then return end
 
     local plugin = ix.plugin.Get("permadeath")
+    if not plugin then return end
+
     local entity = plugin:ValidateKnockedInteraction(client, net.ReadEntity())
     if not entity then return end
 
@@ -1036,6 +1002,8 @@ net.Receive("ixKnockoutRevive", function(len, client)
     if not IsValid(client) then return end
 
     local plugin = ix.plugin.Get("permadeath")
+    if not plugin then return end
+
     local entity = plugin:ValidateKnockedInteraction(client, net.ReadEntity())
     if not entity then return end
 
@@ -1059,8 +1027,6 @@ net.Receive("ixPermadeathReady", function(len, client)
 
     -- Cancel the timeout timer
     timer.Remove("ixPermadeathTimeout_" .. steamID)
-
-    print("[Permadeath] Client acknowledged memorial, kicking to character menu")
 
     -- Properly kick to character menu (replicating Helix's character:Kick() logic)
     client:Freeze(false)

@@ -17,9 +17,7 @@ hook.Add("InitPostEntity", "ixFactionlessMigration", function()
                 -- Mark migration as complete
                 file.CreateDir("helix/migrations")
                 file.Write("helix/migrations/factionless_v1.txt", os.date())
-                print("[Windswept] Factionless migration complete - converted civilians to factionless")
             else
-                print("[Windswept] Factionless migration failed - will retry on next restart")
             end
         end)
         query:Execute()

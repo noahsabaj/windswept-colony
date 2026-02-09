@@ -89,9 +89,10 @@ function ENT:Think()
 
                     -- Start distance check timer
                     local entRef = self
-                    timer.Create("ixStationaryRadio_" .. ply:SteamID64(), 0.5, 0, function()
+                    local timerName = "ixStationaryRadio_" .. ply:SteamID64()
+                    timer.Create(timerName, 0.5, 0, function()
                         if not IsValid(ply) or not IsValid(entRef) then
-                            timer.Remove("ixStationaryRadio_" .. (IsValid(ply) and ply:SteamID64() or "unknown"))
+                            timer.Remove(timerName)
                             return
                         end
 

@@ -33,6 +33,7 @@ C.RANGE_INTERACTION = 100 * 100      -- 10000 - Standard player-to-player (givin
 C.RANGE_INTERACTION_CLOSE = 96 * 96  -- 9216 - Close range (prisoner drag, ziptie)
 C.RANGE_DOCUMENT_VIEW = 256 * 256    -- 65536 - Viewing documents (prison card)
 C.RANGE_SOUND_FAR = 1000 * 1000      -- 1000000 - Far sound audibility
+C.RANGE_EAVESDROP_BASE = 400         -- Base eavesdrop range (scaled by volume * amplitude)
 
 -- Linear distances (for reference/documentation)
 C.DISTANCE_INTERACTION = 100         -- units
