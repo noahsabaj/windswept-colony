@@ -182,40 +182,16 @@ ITEM.functions.Destroy = {
 }
 
 -- ============================================================================
--- CLIENT: Photo Viewer Panel
+-- CLIENT: Photo Viewer Panel (inherits ixPhotoViewerBase)
 -- ============================================================================
 
 if CLIENT then
     local PANEL = {}
 
-    function PANEL:Init()
-        self:SetSize(ScrW(), ScrH())
-        self:SetPos(0, 0)
-        self:MakePopup()
-        self:SetKeyboardInputEnabled(true)
-
-        self.closeKeys = {KEY_W, KEY_A, KEY_S, KEY_D}
-        self.title = "Untitled Photograph"
-        self.material = nil
-        self.loading = true
-    end
-
     function PANEL:SetPhotoData(imageData, title)
         self.title = title or "Untitled Photograph"
         self.loading = false
-
-        if imageData and imageData ~= "" then
-            -- Decode base64 and create material
-            local decoded = util.Base64Decode(imageData)
-
-            if decoded and #decoded > 0 then
-                -- Write to temp file
-                local tempPath = "ixphoto_viewer_temp.jpg"
-                file.Write(tempPath, decoded)
-
-                self.material = Material("../data/" .. tempPath, "smooth")
-            end
-        end
+        self.material, self.tempPath = ix.photo.LoadMaterial(imageData, "view_" .. SysTime())
     end
 
     function PANEL:SetLoading(title)
@@ -224,74 +200,26 @@ if CLIENT then
         self.material = nil
     end
 
-    function PANEL:Paint(w, h)
-        -- Dark background
-        surface.SetDrawColor(0, 0, 0, 240)
-        surface.DrawRect(0, 0, w, h)
+    function PANEL:GetPhotoMat() return self.material end
+    function PANEL:GetPhotoTitle() return self.title or "Untitled Photograph" end
+    function PANEL:IsPhotoLoading() return self.loading end
 
-        -- Image size (display at 2x for clarity)
-        local imgSize = 512
-        local x = (w - imgSize) / 2
-        local y = (h - imgSize) / 2 - 40
-
-        -- White border
-        surface.SetDrawColor(255, 255, 255)
-        surface.DrawOutlinedRect(x - 4, y - 4, imgSize + 8, imgSize + 8, 2)
-
-        if self.loading then
-            -- Loading indicator
-            surface.SetDrawColor(40, 40, 40)
-            surface.DrawRect(x, y, imgSize, imgSize)
-            draw.SimpleText("Loading...", "ixMediumFont", w / 2, h / 2 - 40, Color(150, 150, 150), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-        elseif self.material and not self.material:IsError() then
-            -- Draw image
-            surface.SetMaterial(self.material)
-            surface.SetDrawColor(255, 255, 255)
-            surface.DrawTexturedRect(x, y, imgSize, imgSize)
-        else
-            -- Placeholder if no image
-            surface.SetDrawColor(40, 40, 40)
-            surface.DrawRect(x, y, imgSize, imgSize)
-            draw.SimpleText("No Image", "ixMediumFont", w / 2, h / 2 - 40, Color(100, 100, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-        end
-
-        -- Title below image
-        draw.SimpleText(self.title, "ixMediumFont", w / 2, y + imgSize + 30, Color(255, 255, 255), TEXT_ALIGN_CENTER)
-
-        -- Instructions at bottom
-        draw.SimpleText("Press LMB or WASD to close", "ixSmallFont", w / 2, h - 40, Color(100, 100, 100), TEXT_ALIGN_CENTER)
-    end
-
-    function PANEL:OnKeyCodePressed(key)
-        for _, closeKey in ipairs(self.closeKeys) do
-            if key == closeKey then
-                self:Remove()
-                return
-            end
-        end
-    end
-
-    function PANEL:OnMousePressed(mouseCode)
-        if mouseCode == MOUSE_LEFT then
-            self:Remove()
-        end
-    end
-
-    function PANEL:OnRemove()
-        -- Cleanup
+    function PANEL:OnCleanup()
+        ix.photo.CleanupTempFile(self.tempPath)
         ix.gui.photoViewer = nil
     end
 
-    vgui.Register("ixPhotoViewer", PANEL, "DPanel")
+    vgui.Register("ixPhotoViewer", PANEL, "ixPhotoViewerBase")
 
     -- ========================================================================
     -- CLIENT NETWORKING
     -- ========================================================================
 
-    -- Receive photo data from server
+    -- Receive photo data from server (raw JPEG binary)
     net.Receive("ixPhotoData", function()
         local photoID = net.ReadString()
-        local imageData = net.ReadString()
+        local dataLen = net.ReadUInt(32)
+        local imageData = net.ReadData(dataLen)
 
         -- Fire hook for album viewer cache (and any other listeners)
         hook.Run("ixPhotoDataReceived", photoID, imageData)
@@ -308,16 +236,16 @@ if CLIENT then
             if IsValid(ix.gui.photoViewer) then
                 ix.gui.photoViewer:SetPhotoData(imageData, title)
             else
-                -- Create viewer if it doesn't exist
                 ix.gui.photoViewer = vgui.Create("ixPhotoViewer")
                 ix.gui.photoViewer:SetPhotoData(imageData, title)
             end
         end
     end)
 
-    -- Receive photo from ground viewing
+    -- Receive photo from ground viewing (raw JPEG binary)
     net.Receive("ixPhotoViewFromGround", function()
-        local imageData = net.ReadString()
+        local dataLen = net.ReadUInt(32)
+        local imageData = net.ReadData(dataLen)
         local title = net.ReadString()
 
         if IsValid(ix.gui.photoViewer) then
@@ -334,23 +262,16 @@ end
 -- ============================================================================
 
 if SERVER then
-    -- Client requests photo data by ID
+    -- Client requests photo data by ID (sends raw JPEG binary)
     net.Receive("ixPhotoRequest", function(len, client)
         local photoID = net.ReadString()
-
-        -- Validate photoID format (prevent path traversal)
-        if not photoID:match("^%d+_%d+$") then
-            return
-        end
-
-        -- Read photo from file
-        local filePath = "ix_photos/" .. photoID .. ".txt"
-        local imageData = file.Read(filePath, "DATA")
+        local imageData = ix.photo.ReadPhotoFile(photoID)
 
         if imageData then
             net.Start("ixPhotoData")
                 net.WriteString(photoID)
-                net.WriteString(imageData)
+                net.WriteUInt(#imageData, 32)
+                net.WriteData(imageData, #imageData)
             net.Send(client)
         end
     end)
@@ -359,26 +280,8 @@ if SERVER then
         local itemID = net.ReadUInt(32)
         local title = net.ReadString()
 
-        local item = ix.item.instances[itemID]
+        local item = ix.photo.VerifyOwnership(client, itemID, "photo")
         if not item then return end
-        if item.uniqueID ~= "photo" then return end
-
-        -- Verify ownership
-        local character = client:GetCharacter()
-        if not character then return end
-
-        local inventory = character:GetInventory()
-        if not inventory then return end
-
-        local found = false
-        for _, invItem in pairs(inventory:GetItems()) do
-            if invItem:GetID() == itemID then
-                found = true
-                break
-            end
-        end
-
-        if not found then return end
 
         -- Check if already named
         if item:GetData("titleSet", false) then
@@ -397,34 +300,13 @@ if SERVER then
     net.Receive("ixPhotoDestroy", function(len, client)
         local itemID = net.ReadUInt(32)
 
-        local item = ix.item.instances[itemID]
+        local item = ix.photo.VerifyOwnership(client, itemID, "photo")
         if not item then return end
-        if item.uniqueID ~= "photo" then return end
-
-        -- Verify ownership
-        local character = client:GetCharacter()
-        if not character then return end
-
-        local inventory = character:GetInventory()
-        if not inventory then return end
-
-        local found = false
-        for _, invItem in pairs(inventory:GetItems()) do
-            if invItem:GetID() == itemID then
-                found = true
-                break
-            end
-        end
-
-        if not found then return end
 
         -- Delete the photo file
         local photoID = item:GetData("photoID", "")
-        if photoID ~= "" and photoID:match("^%d+_%d+$") then
-            local filePath = "ix_photos/" .. photoID .. ".txt"
-            if file.Exists(filePath, "DATA") then
-                file.Delete(filePath)
-            end
+        if photoID ~= "" then
+            ix.photo.DeletePhotoFile(photoID)
         end
 
         -- Destroy the item
@@ -439,35 +321,27 @@ end
 
 function ITEM:OnEntityCreated(entity)
     if SERVER then
-        -- Allow players to use E to view the photo
         entity:SetUseType(SIMPLE_USE)
     end
 end
 
--- This hook allows viewing photos on the ground
 hook.Add("PlayerUse", "ixPhotoGroundView", function(client, entity)
     if not IsValid(entity) then return end
 
-    -- Check if this is an item entity
     local item = entity.ixItem
     if not item then return end
     if item.uniqueID ~= "photo" then return end
 
-    -- Open viewer for this client
     if SERVER then
         local photoID = item:GetData("photoID", "")
         local title = item:GetData("title", "")
         if title == "" then title = "Untitled Photograph" end
 
-        -- Read photo from file
-        local imageData = ""
-        if photoID ~= "" and photoID:match("^%d+_%d+$") then
-            local filePath = "ix_photos/" .. photoID .. ".txt"
-            imageData = file.Read(filePath, "DATA") or ""
-        end
+        local imageData = ix.photo.ReadPhotoFile(photoID) or ""
 
         net.Start("ixPhotoViewFromGround")
-            net.WriteString(imageData)
+            net.WriteUInt(#imageData, 32)
+            net.WriteData(imageData, #imageData)
             net.WriteString(title)
         net.Send(client)
     end
