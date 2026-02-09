@@ -139,37 +139,9 @@ function PANEL:Init()
 end
 
 function PANEL:AddHeader(text)
-    local header = self.container:Add("DPanel")
-    header:SetTall(36)
-    header:Dock(TOP)
-    header.text = text
-    header.Paint = function(pnl, w, h)
-        draw.RoundedBoxEx(4, 0, 0, w, h, COLOR_HEADER, true, true, false, false)
-
-        surface.SetFont("ixMediumFont")
-        local tw, th = surface.GetTextSize(pnl.text)
-        surface.SetTextColor(255, 255, 255, 255)
-        surface.SetTextPos(12, (h - th) / 2)
-        surface.DrawText(pnl.text)
-    end
-
-    -- Close button
-    local closeBtn = header:Add("DButton")
-    closeBtn:SetSize(24, 24)
-    closeBtn:Dock(RIGHT)
-    closeBtn:DockMargin(0, 6, 6, 6)
-    closeBtn:SetText("×")
-    closeBtn:SetFont("ixMediumFont")
-    closeBtn:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
-    closeBtn.Paint = function(btn, w, h)
-        if btn:IsHovered() then
-            surface.SetDrawColor(255, 255, 255, 30)
-            surface.DrawRect(0, 0, w, h)
-        end
-    end
-    closeBtn.DoClick = function()
+    local header, closeBtn = ix.constants.CreateHeaderBar(self.container, text, 36, function()
         self:Remove()
-    end
+    end)
 
     self.closeButton = closeBtn
     return header

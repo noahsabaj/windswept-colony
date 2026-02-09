@@ -10,31 +10,15 @@
 
 AddCSLuaFile()
 
+SWEP.Base = "base_windswept_swep"
 SWEP.PrintName = "Personal ID"
-SWEP.Author = "Windswept"
 SWEP.Purpose = "Display your identification."
 SWEP.Instructions = "Raise (R) then: RMB to view, LMB to show to others"
-
-SWEP.Spawnable = false
-SWEP.Drop = false
 
 SWEP.ViewModelFOV = 50
 SWEP.ViewModel = Model("models/weapons/helios/id_cards/c_idcard.mdl")
 SWEP.WorldModel = Model("models/weapons/helios/id_cards/w_idcard.mdl")
-SWEP.UseHands = true
 SWEP.HoldType = "slam"
-
-SWEP.Primary.ClipSize = -1
-SWEP.Primary.DefaultClip = -1
-SWEP.Primary.Automatic = false
-SWEP.Primary.Ammo = ""
-
-SWEP.Secondary.ClipSize = -1
-SWEP.Secondary.DefaultClip = -1
-SWEP.Secondary.Automatic = false
-SWEP.Secondary.Ammo = ""
-
-SWEP.DrawAmmo = false
 SWEP.DrawCrosshair = false
 
 -- ============================================================================
@@ -46,15 +30,6 @@ SWEP.DrawCrosshair = false
 -- ============================================================================
 -- INITIALIZATION
 -- ============================================================================
-
-function SWEP:Initialize()
-    self:SetHoldType(self.HoldType)
-end
-
-function SWEP:Deploy()
-    self:SetHoldType(self.HoldType)
-    return true
-end
 
 function SWEP:Holster()
     return true
@@ -78,54 +53,27 @@ function SWEP:Think()
     local owner = self:GetOwner()
     if not IsValid(owner) then return end
 
-    -- Only handle input on CLIENT (server has no input context)
     if CLIENT then
-        local isRaised = owner:IsWepRaised()
-
-        -- Handle View Self (RMB) - only when raised
-        if isRaised then
-            local rmbDown = input.IsMouseDown(MOUSE_RIGHT)
-
-            if rmbDown and not self.wasRMBDown then
-                -- RMB just pressed while raised - view own ID
-                if not self.nextViewTime or self.nextViewTime <= CurTime() then
-                    self.nextViewTime = CurTime() + 0.5
-                    self:ViewSelfID()
-                end
-            end
-
-            self.wasRMBDown = rmbDown
-        else
+        -- Must be raised to use - reset edge detection when lowered
+        if not owner:IsWepRaised() then
+            self.wasLMBDown = false
             self.wasRMBDown = false
+            return
         end
 
-        -- Handle Show Forward (LMB) - only when raised
-        if isRaised then
-            local lmbDown = input.IsMouseDown(MOUSE_LEFT)
+        local lmb, rmb = ix.constants.ProcessSWEPInput(self)
 
-            if lmbDown and not self.wasLMBDown then
-                -- LMB just pressed while raised - show to player in front
-                if not self.nextShowTime or self.nextShowTime <= CurTime() then
-                    self.nextShowTime = CurTime() + 0.5
-                    net.Start("ixPersonalIDShowForward")
-                    net.SendToServer()
-                end
-            end
+        if lmb and CurTime() >= (self.nextShowTime or 0) then
+            self.nextShowTime = CurTime() + 0.5
+            net.Start("ixPersonalIDShowForward")
+            net.SendToServer()
+        end
 
-            self.wasLMBDown = lmbDown
-        else
-            self.wasLMBDown = false
+        if rmb and CurTime() >= (self.nextViewTime or 0) then
+            self.nextViewTime = CurTime() + 0.5
+            self:ViewSelfID()
         end
     end
-end
-
--- Disable default attacks
-function SWEP:PrimaryAttack()
-    return false
-end
-
-function SWEP:SecondaryAttack()
-    return false
 end
 
 -- ============================================================================

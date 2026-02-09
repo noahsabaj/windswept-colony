@@ -134,26 +134,10 @@ end
 
 if CLIENT then
     function ITEM:PaintOver(item, w, h)
-        -- Resource level bar
-        local resource = item:GetData(item.resourceName, item.maxResource)
-        local percent = resource / item.maxResource
-        local barW = w - 4
-        local barH = 3
-        local barX = 2
-        local barY = h - 5
+        local percent = item:GetData(item.resourceName, item.maxResource) / item.maxResource
+        local color = item:GetStrokeColor()
+        ix.constants.DrawDurabilityBar(w, h, percent, Color(color[1], color[2], color[3], 255), "thin")
 
-        -- Background
-        surface.SetDrawColor(50, 50, 50, 200)
-        surface.DrawRect(barX, barY, barW, barH)
-
-        -- Resource level (stroke color)
-        if percent > 0 then
-            local color = item:GetStrokeColor()
-            surface.SetDrawColor(color[1], color[2], color[3], 255)
-            surface.DrawRect(barX, barY, barW * percent, barH)
-        end
-
-        -- Eraser indicator (small pink square in top-left)
         if item.hasEraser then
             surface.SetDrawColor(255, 150, 180, 200)
             surface.DrawRect(6, 6, 6, 6)

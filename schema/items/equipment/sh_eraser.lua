@@ -63,22 +63,7 @@ end
 
 if CLIENT then
     function ITEM:PaintOver(item, w, h)
-        -- Durability bar
-        local durability = item:GetData("durability", item.maxDurability)
-        local durPercent = durability / item.maxDurability
-        local barW = w - 4
-        local barH = 3
-        local barX = 2
-        local barY = h - 5
-
-        -- Background
-        surface.SetDrawColor(50, 50, 50, 200)
-        surface.DrawRect(barX, barY, barW, barH)
-
-        -- Durability level (pink)
-        if durPercent > 0 then
-            surface.SetDrawColor(255, 150, 180, 255)
-            surface.DrawRect(barX, barY, barW * durPercent, barH)
-        end
+        local durPercent = item:GetData("durability", item.maxDurability) / item.maxDurability
+        ix.constants.DrawDurabilityBar(w, h, durPercent, Color(255, 150, 180, 255), "thin")
     end
 end

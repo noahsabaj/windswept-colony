@@ -55,13 +55,10 @@ function PLUGIN:PlayerUse(client, entity)
         entity:NotifyLocalized("unrestrained")
 
         -- Give the zip tie to the untier
-        local character = client:GetCharacter()
-        if character then
-            local inventory = character:GetInventory()
-            if inventory then
-                inventory:Add("ziptie", 1)
-                client:NotifyLocalized("zipTieRecovered")
-            end
+        local _, inventory = ix.constants.GetCharacterInventory(client)
+        if inventory then
+            inventory:Add("ziptie", 1)
+            client:NotifyLocalized("zipTieRecovered")
         end
     end, 5, function()
         -- Cancelled

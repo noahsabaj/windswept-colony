@@ -132,34 +132,14 @@ net.Receive("ixLocksmithProgramLock", function(len, ply)
     if not IsValid(ent) or ent:GetClass() ~= "ix_auto_locksmith" then return end
     if ent:GetUser() ~= ply then return end
 
-    local lockItem = ix.item.instances[lockItemID]
+    local lockItem = ix.constants.VerifyItemOwnership(ply, lockItemID, "lock_blank")
     if not lockItem then
         ply:NotifyLocalized("locksmithInvalidItem")
         return
     end
 
-    -- Verify ownership
-    local character, inventory = ix.constants.GetCharacterInventory(ply)
-    if not character or not inventory then return end
-
-    local found = false
-    for _, item in pairs(inventory:GetItems()) do
-        if item:GetID() == lockItemID then
-            found = true
-            break
-        end
-    end
-
-    if not found then
-        ply:NotifyLocalized("locksmithNotYourItem")
-        return
-    end
-
-    -- Must be a blank lock
-    if lockItem.uniqueID ~= "lock_blank" then
-        ply:NotifyLocalized("locksmithNeedBlankLock")
-        return
-    end
+    local _, inventory = ix.constants.GetCharacterInventory(ply)
+    if not inventory then return end
 
     -- Generate keying
     local keying = ent:GenerateKeying()
@@ -198,34 +178,21 @@ net.Receive("ixLocksmithProgramKey", function(len, ply)
     if not IsValid(ent) or ent:GetClass() ~= "ix_auto_locksmith" then return end
     if ent:GetUser() ~= ply then return end
 
-    local blankKey = ix.item.instances[blankKeyID]
-    local sourceItem = ix.item.instances[sourceID]
-
-    if not blankKey or not sourceItem then
+    local blankKey = ix.constants.VerifyItemOwnership(ply, blankKeyID, "key_blank")
+    if not blankKey then
         ply:NotifyLocalized("locksmithInvalidItem")
         return
     end
 
-    local character, inventory = ix.constants.GetCharacterInventory(ply)
-    if not character or not inventory then return end
-
-    -- Verify ownership of both items
-    local foundBlank, foundSource = false, false
-    for _, item in pairs(inventory:GetItems()) do
-        if item:GetID() == blankKeyID then foundBlank = true end
-        if item:GetID() == sourceID then foundSource = true end
-    end
-
-    if not foundBlank or not foundSource then
+    -- Source can be a lock or key (no uniqueID filter)
+    local sourceItem = ix.constants.VerifyItemOwnership(ply, sourceID)
+    if not sourceItem then
         ply:NotifyLocalized("locksmithNotYourItem")
         return
     end
 
-    -- Blank key must be blank
-    if blankKey.uniqueID ~= "key_blank" then
-        ply:NotifyLocalized("locksmithNeedBlankKey")
-        return
-    end
+    local _, inventory = ix.constants.GetCharacterInventory(ply)
+    if not inventory then return end
 
     -- Source must be a lock or key
     local keying = nil
@@ -279,36 +246,14 @@ net.Receive("ixLocksmithAddKeying", function(len, ply)
     if not IsValid(ent) or ent:GetClass() ~= "ix_auto_locksmith" then return end
     if ent:GetUser() ~= ply then return end
 
-    local lockItem = ix.item.instances[lockID]
-    local keyItem = ix.item.instances[keyID]
-
-    if not lockItem or not keyItem then
+    local lockItem = ix.constants.VerifyItemOwnership(ply, lockID, "lock")
+    if not lockItem then
         ply:NotifyLocalized("locksmithInvalidItem")
         return
     end
 
-    local character, inventory = ix.constants.GetCharacterInventory(ply)
-    if not character or not inventory then return end
-
-    -- Verify ownership
-    local foundLock, foundKey = false, false
-    for _, item in pairs(inventory:GetItems()) do
-        if item:GetID() == lockID then foundLock = true end
-        if item:GetID() == keyID then foundKey = true end
-    end
-
-    if not foundLock or not foundKey then
-        ply:NotifyLocalized("locksmithNotYourItem")
-        return
-    end
-
-    -- Validate items
-    if lockItem.uniqueID ~= "lock" then
-        ply:NotifyLocalized("locksmithNeedLock")
-        return
-    end
-
-    if keyItem.uniqueID ~= "key" then
+    local keyItem = ix.constants.VerifyItemOwnership(ply, keyID, "key")
+    if not keyItem then
         ply:NotifyLocalized("locksmithNeedKey")
         return
     end
@@ -357,26 +302,10 @@ net.Receive("ixLocksmithRename", function(len, ply)
     if not IsValid(ent) or ent:GetClass() ~= "ix_auto_locksmith" then return end
     if ent:GetUser() ~= ply then return end
 
-    local item = ix.item.instances[itemID]
+    -- No uniqueID filter - rename works on both locks and keys
+    local item = ix.constants.VerifyItemOwnership(ply, itemID)
     if not item then
         ply:NotifyLocalized("locksmithInvalidItem")
-        return
-    end
-
-    local character, inventory = ix.constants.GetCharacterInventory(ply)
-    if not character or not inventory then return end
-
-    -- Verify ownership
-    local found = false
-    for _, invItem in pairs(inventory:GetItems()) do
-        if invItem:GetID() == itemID then
-            found = true
-            break
-        end
-    end
-
-    if not found then
-        ply:NotifyLocalized("locksmithNotYourItem")
         return
     end
 
@@ -427,26 +356,9 @@ net.Receive("ixLocksmithViewKeyings", function(len, ply)
     if not IsValid(ent) or ent:GetClass() ~= "ix_auto_locksmith" then return end
     if ent:GetUser() ~= ply then return end
 
-    local lockItem = ix.item.instances[lockID]
-    if not lockItem or lockItem.uniqueID ~= "lock" then
+    local lockItem = ix.constants.VerifyItemOwnership(ply, lockID, "lock")
+    if not lockItem then
         ply:NotifyLocalized("locksmithInvalidItem")
-        return
-    end
-
-    local character, inventory = ix.constants.GetCharacterInventory(ply)
-    if not character or not inventory then return end
-
-    -- Verify ownership
-    local found = false
-    for _, item in pairs(inventory:GetItems()) do
-        if item:GetID() == lockID then
-            found = true
-            break
-        end
-    end
-
-    if not found then
-        ply:NotifyLocalized("locksmithNotYourItem")
         return
     end
 

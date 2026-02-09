@@ -9,32 +9,12 @@
 
 AddCSLuaFile()
 
+SWEP.Base = "base_windswept_swep"
 SWEP.PrintName = "Lock"
-SWEP.Author = "Windswept"
 SWEP.Purpose = "Install locks on doors."
 SWEP.Instructions = "RMB on door: Install lock"
 
-SWEP.Spawnable = false
-SWEP.Drop = false
-
-SWEP.ViewModelFOV = 54
-SWEP.ViewModel = "models/weapons/c_arms.mdl"
-SWEP.WorldModel = "models/props_c17/tools_pliers01a.mdl"  -- Placeholder
-SWEP.UseHands = true
-SWEP.HoldType = "normal"
-
-SWEP.Primary.ClipSize = -1
-SWEP.Primary.DefaultClip = -1
-SWEP.Primary.Automatic = false
-SWEP.Primary.Ammo = ""
-
-SWEP.Secondary.ClipSize = -1
-SWEP.Secondary.DefaultClip = -1
-SWEP.Secondary.Automatic = false
-SWEP.Secondary.Ammo = ""
-
-SWEP.DrawAmmo = false
-SWEP.DrawCrosshair = true
+SWEP.WorldModel = "models/props_c17/tools_pliers01a.mdl"
 
 -- Maximum distance to interact with doors
 SWEP.MaxUseDistance = 96
@@ -63,15 +43,13 @@ end
 -- ============================================================================
 
 function SWEP:Initialize()
-    self:SetHoldType(self.HoldType)
+    self.BaseClass.Initialize(self)
     self:SetInstalling(false)
-    self.wasRMBDown = false
-    self.wasLMBDown = false
     self.nextInstallAttempt = 0
 end
 
 function SWEP:Deploy()
-    self:SetHoldType(self.HoldType)
+    self.BaseClass.Deploy(self)
     self:SetInstalling(false)
     return true
 end
@@ -94,27 +72,7 @@ function SWEP:GetTargetDoor()
 end
 
 function SWEP:HasToolkit()
-    local owner = self:GetOwner()
-    if not IsValid(owner) then return false, nil end
-
-    local character, inventory = ix.constants.GetCharacterInventory(owner)
-    if not character or not inventory then return false, nil end
-
-    -- Find best toolkit in inventory
-    local bestToolkit = nil
-    local bestSpeed = 0
-
-    for _, item in pairs(inventory:GetItems()) do
-        if item.uniqueID and string.find(item.uniqueID, "toolkit") then
-            local speed = item.installSpeed or 1
-            if speed > bestSpeed then
-                bestSpeed = speed
-                bestToolkit = item
-            end
-        end
-    end
-
-    return bestToolkit ~= nil, bestToolkit
+    return ix.constants.FindBestToolkit(self:GetOwner())
 end
 
 function SWEP:GetInstallTime()
@@ -210,12 +168,9 @@ function SWEP:CompleteInstall()
     end
 
     -- Remove lock from inventory
-    local character = owner:GetCharacter()
-    if character then
-        local inventory = character:GetInventory()
-        if inventory then
-            inventory:Remove(item:GetID())
-        end
+    local _, inventory = ix.constants.GetCharacterInventory(owner)
+    if inventory then
+        inventory:Remove(item:GetID())
     end
 
     -- Strip weapon and clean up
@@ -256,23 +211,11 @@ function SWEP:Think()
     -- Installation progress checks (server only)
     if self:GetInstalling() then
         if SERVER then
-            local currentDoor = self:GetTargetDoor()
-            if currentDoor ~= self.targetDoor then
+            local valid, reason = ix.weapon.IsTargetValid(owner, self:GetTargetDoor(), self.targetDoor, self.MaxUseDistance)
+            if not valid then
                 self:CancelInstall()
-                owner:NotifyLocalized("lockLookedAway")
-                return
-            end
-
-            -- Check if owner moved too far
-            if not IsValid(self.targetDoor) then
-                self:CancelInstall()
-                return
-            end
-
-            local distance = owner:GetPos():Distance(self.targetDoor:GetPos())
-            if distance > self.MaxUseDistance + 32 then
-                self:CancelInstall()
-                owner:NotifyLocalized("lockTooFar")
+                if reason == "looked_away" then owner:NotifyLocalized("lockLookedAway")
+                elseif reason == "too_far" then owner:NotifyLocalized("lockTooFar") end
                 return
             end
         end
@@ -303,29 +246,7 @@ if CLIENT then
     function SWEP:DrawHUD()
         if not self:GetInstalling() then return end
 
-        local elapsed = CurTime() - self:GetInstallStartTime()
-        local duration = self:GetInstallDuration()
-        local progress = math.Clamp(elapsed / duration, 0, 1)
-
-        local w, h = ScrW(), ScrH()
-        local barW, barH = ScreenScale(100), ScreenScale(10)
-        local pad = ScreenScale(2)
-        local x, y = (w - barW) / 2, h * 0.6
-
-        -- Background
-        surface.SetDrawColor(30, 30, 30, 200)
-        surface.DrawRect(x, y, barW, barH)
-
-        -- Progress fill
-        surface.SetDrawColor(100, 150, 200, 255)
-        surface.DrawRect(x + pad, y + pad, (barW - pad * 2) * progress, barH - pad * 2)
-
-        -- Border
-        surface.SetDrawColor(200, 200, 200, 255)
-        surface.DrawOutlinedRect(x, y, barW, barH, 2)
-
-        -- Text
-        draw.SimpleText("Installing Lock...", "ixSmallFont", w / 2, y - ScreenScale(10), Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
-        draw.SimpleText("LMB to cancel", "ixSmallFont", w / 2, y + barH + ScreenScale(5), Color(150, 150, 150), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+        local progress = math.Clamp((CurTime() - self:GetInstallStartTime()) / self:GetInstallDuration(), 0, 1)
+        ix.constants.DrawProgressBar("Installing Lock...", progress, Color(100, 150, 200), "LMB to cancel")
     end
 end

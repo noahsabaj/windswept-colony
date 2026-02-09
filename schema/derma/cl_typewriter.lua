@@ -74,31 +74,12 @@ function PANEL:Init()
     self.charCounter:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
 
     -- Button panel
-    local btnPanel = vgui.Create("DPanel", bottomPanel)
-    btnPanel:Dock(BOTTOM)
-    btnPanel:SetTall(40)
-    btnPanel.Paint = function() end
-
-    -- Cancel button
-    local cancelBtn = vgui.Create("DButton", btnPanel)
-    cancelBtn:Dock(RIGHT)
-    cancelBtn:SetWide(80)
-    cancelBtn:DockMargin(5, 5, 10, 5)
-    cancelBtn:SetText("Cancel")
-    cancelBtn.DoClick = function()
-        self:Close()
-    end
-
-    -- Type button
-    self.typeBtn = vgui.Create("DButton", btnPanel)
-    self.typeBtn:Dock(RIGHT)
-    self.typeBtn:SetWide(80)
-    self.typeBtn:DockMargin(5, 5, 5, 5)
-    self.typeBtn:SetText("Type")
+    local btnPanel, btns = ix.constants.CreateButtonBar(bottomPanel, {
+        {"Cancel", 80, RIGHT, function() self:Close() end},
+        {"Type", 80, RIGHT, function() self:TypeDocument() end},
+    })
+    self.typeBtn = btns[2]
     self.typeBtn:SetEnabled(false)
-    self.typeBtn.DoClick = function()
-        self:TypeDocument()
-    end
 end
 
 function PANEL:SetTypewriter(typewriter)

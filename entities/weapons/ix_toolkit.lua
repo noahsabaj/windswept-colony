@@ -13,32 +13,12 @@
 
 AddCSLuaFile()
 
+SWEP.Base = "base_windswept_swep"
 SWEP.PrintName = "Toolkit"
-SWEP.Author = "Windswept"
 SWEP.Purpose = "Work on doors and locks."
 SWEP.Instructions = "RMB: Remove | LMB: Repair"
 
-SWEP.Spawnable = false
-SWEP.Drop = false
-
-SWEP.ViewModelFOV = 54
-SWEP.ViewModel = "models/weapons/c_arms.mdl"
 SWEP.WorldModel = "models/props_c17/tools_wrench01a.mdl"
-SWEP.UseHands = true
-SWEP.HoldType = "normal"
-
-SWEP.Primary.ClipSize = -1
-SWEP.Primary.DefaultClip = -1
-SWEP.Primary.Automatic = false
-SWEP.Primary.Ammo = ""
-
-SWEP.Secondary.ClipSize = -1
-SWEP.Secondary.DefaultClip = -1
-SWEP.Secondary.Automatic = false
-SWEP.Secondary.Ammo = ""
-
-SWEP.DrawAmmo = false
-SWEP.DrawCrosshair = true
 
 -- Maximum distance to interact
 SWEP.MaxUseDistance = 96
@@ -69,14 +49,8 @@ end
 -- INITIALIZATION
 -- ============================================================================
 
-function SWEP:Initialize()
-    self:SetHoldType(self.HoldType)
-    self.wasLMBDown = false
-    self.wasRMBDown = false
-end
-
 function SWEP:Deploy()
-    self:SetHoldType(self.HoldType)
+    self.BaseClass.Deploy(self)
     self:CancelWork()
     return true
 end
@@ -406,14 +380,8 @@ function SWEP:CompleteWork()
 end
 
 function SWEP:CompleteRemoveDoor(owner, door, item)
-    local character = owner:GetCharacter()
-    if not character then
-        self:CancelWork()
-        return
-    end
-
-    local inventory = character:GetInventory()
-    if not inventory then
+    local character, inventory = ix.constants.GetCharacterInventory(owner)
+    if not character or not inventory then
         self:CancelWork()
         return
     end
@@ -464,14 +432,8 @@ function SWEP:CompleteRemoveDoor(owner, door, item)
 end
 
 function SWEP:CompleteRemoveLock(owner, door, item)
-    local character = owner:GetCharacter()
-    if not character then
-        self:CancelWork()
-        return
-    end
-
-    local inventory = character:GetInventory()
-    if not inventory then
+    local character, inventory = ix.constants.GetCharacterInventory(owner)
+    if not character or not inventory then
         self:CancelWork()
         return
     end
@@ -509,14 +471,8 @@ function SWEP:CompleteRemoveLock(owner, door, item)
 end
 
 function SWEP:CompleteRepairDoor(owner, door, item)
-    local character = owner:GetCharacter()
-    if not character then
-        self:CancelWork()
-        return
-    end
-
-    local inventory = character:GetInventory()
-    if not inventory then
+    local character, inventory = ix.constants.GetCharacterInventory(owner)
+    if not character or not inventory then
         self:CancelWork()
         return
     end
@@ -549,14 +505,8 @@ function SWEP:CompleteRepairDoor(owner, door, item)
 end
 
 function SWEP:CompleteRepairLock(owner, door, item)
-    local character = owner:GetCharacter()
-    if not character then
-        self:CancelWork()
-        return
-    end
-
-    local inventory = character:GetInventory()
-    if not inventory then
+    local character, inventory = ix.constants.GetCharacterInventory(owner)
+    if not character or not inventory then
         self:CancelWork()
         return
     end
@@ -618,24 +568,11 @@ function SWEP:Think()
     -- Work progress checks
     if self:IsWorking() then
         if SERVER then
-            -- Check if still looking at the same door
-            local currentDoor = self:GetTargetDoor()
-            if currentDoor ~= self.targetDoor then
+            local valid, reason = ix.weapon.IsTargetValid(owner, self:GetTargetDoor(), self.targetDoor, self.MaxUseDistance)
+            if not valid then
                 self:CancelWork()
-                owner:NotifyLocalized("toolkitLookedAway")
-                return
-            end
-
-            -- Check if owner moved too far
-            if not IsValid(self.targetDoor) then
-                self:CancelWork()
-                return
-            end
-
-            local distance = owner:GetPos():Distance(self.targetDoor:GetPos())
-            if distance > self.MaxUseDistance + 32 then
-                self:CancelWork()
-                owner:NotifyLocalized("toolkitTooFar")
+                if reason == "looked_away" then owner:NotifyLocalized("toolkitLookedAway")
+                elseif reason == "too_far" then owner:NotifyLocalized("toolkitTooFar") end
                 return
             end
         end

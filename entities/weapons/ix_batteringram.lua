@@ -9,48 +9,20 @@
 
 AddCSLuaFile()
 
+SWEP.Base = "base_windswept_swep"
 SWEP.PrintName = "Battering Ram"
-SWEP.Author = "Windswept"
 SWEP.Purpose = "Breach doors"
 
 SWEP.Slot = 0
 SWEP.SlotPos = 1
 
-SWEP.Spawnable = false
-SWEP.AdminSpawnable = false
-SWEP.Drop = false
-
-SWEP.Primary.ClipSize = -1
-SWEP.Primary.DefaultClip = -1
-SWEP.Primary.Automatic = false
-SWEP.Primary.Ammo = "none"
-
-SWEP.Secondary.ClipSize = -1
-SWEP.Secondary.DefaultClip = -1
-SWEP.Secondary.Automatic = false
-SWEP.Secondary.Ammo = "none"
-
-SWEP.DrawAmmo = false
-SWEP.DrawCrosshair = true
-
 SWEP.ViewModel = "models/weapons/c_stunstick.mdl"
 SWEP.WorldModel = "models/props_c17/tools/toolbox01.mdl"
-
-SWEP.UseHands = true
 SWEP.HoldType = "melee2"
 
 -- Configuration
 SWEP.SwingCooldown = 1.5
 SWEP.MaxRange = 80
-
-function SWEP:Initialize()
-	self:SetHoldType(self.HoldType)
-end
-
-function SWEP:Deploy()
-	self:SetHoldType(self.HoldType)
-	return true
-end
 
 function SWEP:PrimaryAttack()
 	if CLIENT then return end

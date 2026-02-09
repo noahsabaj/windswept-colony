@@ -728,8 +728,7 @@ function PLUGIN:ConsumeDefibCharge(item, client)
         end
     end
 
-    local character = client:GetCharacter()
-    local inventory = character and character:GetInventory()
+    local character, inventory = ix.constants.GetCharacterInventory(client)
 
     -- Auto-eject: remove non-full batteries if enabled (0up and partial)
     if inventory and ix.option.Get(client, "batteryAutoEject", true) then

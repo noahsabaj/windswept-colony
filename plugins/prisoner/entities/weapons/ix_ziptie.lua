@@ -10,48 +10,18 @@
 
 AddCSLuaFile()
 
+SWEP.Base = "base_windswept_swep"
 SWEP.PrintName = "Zip Tie"
-SWEP.Author = "Windswept"
 SWEP.Purpose = "Restrain players."
 SWEP.Instructions = "Raise (R) then LMB on a player to restrain them."
 
-SWEP.Spawnable = false
-SWEP.Drop = false
-
 SWEP.ViewModel = ""
 SWEP.WorldModel = Model("models/items/crossbowrounds.mdl")
-
 SWEP.UseHands = false
-SWEP.HoldType = "normal"
-
-SWEP.Primary.ClipSize = -1
-SWEP.Primary.DefaultClip = -1
-SWEP.Primary.Automatic = false
-SWEP.Primary.Ammo = ""
-
-SWEP.Secondary.ClipSize = -1
-SWEP.Secondary.DefaultClip = -1
-SWEP.Secondary.Automatic = false
-SWEP.Secondary.Ammo = ""
-
-SWEP.DrawAmmo = false
-SWEP.DrawCrosshair = true
 
 -- ============================================================================
--- INITIALIZATION
+-- DATA TABLES
 -- ============================================================================
-
-function SWEP:Initialize()
-    self:SetHoldType(self.HoldType)
-end
-
-function SWEP:Deploy()
-    return true
-end
-
-function SWEP:Holster()
-    return true
-end
 
 function SWEP:SetupDataTables()
     self:NetworkVar("Bool", 0, "Tying")
@@ -95,15 +65,6 @@ function SWEP:Think()
             self.wasLMBDown = false
         end
     end
-end
-
-function SWEP:PrimaryAttack()
-    -- Handled in Think via net message
-    return false
-end
-
-function SWEP:SecondaryAttack()
-    return false
 end
 
 -- ============================================================================

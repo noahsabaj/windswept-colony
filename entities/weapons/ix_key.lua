@@ -10,32 +10,12 @@
 
 AddCSLuaFile()
 
+SWEP.Base = "base_windswept_swep"
 SWEP.PrintName = "Key"
-SWEP.Author = "Windswept"
 SWEP.Purpose = "Lock and unlock doors."
 SWEP.Instructions = "LMB: Lock door | RMB: Unlock door"
 
-SWEP.Spawnable = false
-SWEP.Drop = false
-
-SWEP.ViewModelFOV = 54
-SWEP.ViewModel = "models/weapons/c_arms.mdl"  -- Empty hands
-SWEP.WorldModel = "models/props_c17/tools_wrench01a.mdl"  -- Placeholder key model
-SWEP.UseHands = true
-SWEP.HoldType = "normal"
-
-SWEP.Primary.ClipSize = -1
-SWEP.Primary.DefaultClip = -1
-SWEP.Primary.Automatic = false
-SWEP.Primary.Ammo = ""
-
-SWEP.Secondary.ClipSize = -1
-SWEP.Secondary.DefaultClip = -1
-SWEP.Secondary.Automatic = false
-SWEP.Secondary.Ammo = ""
-
-SWEP.DrawAmmo = false
-SWEP.DrawCrosshair = true
+SWEP.WorldModel = "models/props_c17/tools_wrench01a.mdl"
 
 -- Maximum distance to interact with doors
 SWEP.MaxUseDistance = 96
@@ -64,16 +44,14 @@ end
 -- ============================================================================
 
 function SWEP:Initialize()
-    self:SetHoldType(self.HoldType)
-    self.wasLMBDown = false
-    self.wasRMBDown = false
+    self.BaseClass.Initialize(self)
     self.nextActionAttempt = 0
     self:SetLocking(false)
     self:SetUnlocking(false)
 end
 
 function SWEP:Deploy()
-    self:SetHoldType(self.HoldType)
+    self.BaseClass.Deploy(self)
     self:CancelAction()
     return true
 end
@@ -305,25 +283,11 @@ function SWEP:Think()
     -- Action progress checks
     if self:IsPerformingAction() then
         if SERVER then
-            -- Check if still looking at the same door
-            local currentDoor = self:GetTargetDoor()
-            if currentDoor ~= self.targetDoor then
+            local valid, reason = ix.weapon.IsTargetValid(owner, self:GetTargetDoor(), self.targetDoor, self.MaxUseDistance)
+            if not valid then
                 self:CancelAction()
-                owner:NotifyLocalized("keyLookedAway")
-                return
-            end
-
-            -- Check if door still valid
-            if not IsValid(self.targetDoor) then
-                self:CancelAction()
-                return
-            end
-
-            -- Check distance
-            local distance = owner:GetPos():Distance(self.targetDoor:GetPos())
-            if distance > self.MaxUseDistance + 32 then
-                self:CancelAction()
-                owner:NotifyLocalized("keyTooFar")
+                if reason == "looked_away" then owner:NotifyLocalized("keyLookedAway")
+                elseif reason == "too_far" then owner:NotifyLocalized("keyTooFar") end
                 return
             end
         end

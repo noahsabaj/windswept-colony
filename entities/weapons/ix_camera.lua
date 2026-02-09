@@ -14,34 +14,20 @@
 
 AddCSLuaFile()
 
+SWEP.Base = "base_windswept_swep"
 SWEP.PrintName = "Camera"
-SWEP.Author = "Windswept"
 SWEP.Purpose = "Capture photographs."
 SWEP.Instructions = "RMB: Aim | LMB: Photo | Middle Mouse: Flash | Scroll: Zoom"
-
-SWEP.Spawnable = false
-SWEP.Drop = false
 
 SWEP.ViewModelFOV = 50
 SWEP.ViewModel = Model("models/weapons/infra/c_camera.mdl")
 SWEP.WorldModel = Model("models/weapons/infra/w_camera.mdl")
-SWEP.UseHands = true
 SWEP.HoldType = "camera"
 
 -- INFRA Camera models: https://steamcommunity.com/sharedfiles/filedetails/?id=3410154200
 if SERVER then
     resource.AddWorkshop("3410154200")
 end
-
-SWEP.Primary.ClipSize = -1
-SWEP.Primary.DefaultClip = -1
-SWEP.Primary.Automatic = false
-SWEP.Primary.Ammo = ""
-
-SWEP.Secondary.ClipSize = -1
-SWEP.Secondary.DefaultClip = -1
-SWEP.Secondary.Automatic = false
-SWEP.Secondary.Ammo = ""
 
 -- Configuration
 SWEP.MinFOV = 10      -- Maximum zoom (lowest FOV)
@@ -70,11 +56,8 @@ end
 -- INITIALIZATION
 -- ============================================================================
 
-function SWEP:Initialize()
-    self:SetHoldType(self.HoldType)
-end
-
 function SWEP:Deploy()
+    self.BaseClass.Deploy(self)
     self:SetAiming(false)
     self:SetCurrentFOV(self.DefaultFOV)
     return true
@@ -300,15 +283,8 @@ if CLIENT then
             return nil
         end
 
-        local character = owner:GetCharacter()
-        if not character then
-            self._cameraItemCache = nil
-            self._cameraItemCacheTime = now
-            return nil
-        end
-
-        local inventory = character:GetInventory()
-        if not inventory then
+        local character, inventory = ix.constants.GetCharacterInventory(owner)
+        if not character or not inventory then
             self._cameraItemCache = nil
             self._cameraItemCacheTime = now
             return nil

@@ -82,30 +82,14 @@ function PANEL:Init()
     self.sigStatus:SetTextColor(Color(150, 200, 150))
 
     -- Button panel
-    local btnPanel = vgui.Create("DPanel", bottomPanel)
-    btnPanel:Dock(BOTTOM)
-    btnPanel:SetTall(40)
-    btnPanel.Paint = function() end
-
-    -- Sign button
-    self.signBtn = vgui.Create("DButton", btnPanel)
-    self.signBtn:Dock(LEFT)
-    self.signBtn:SetWide(100)
-    self.signBtn:DockMargin(10, 5, 5, 5)
-    self.signBtn:SetText("Add Signature")
-    self.signBtn.DoClick = function()
-        self:OpenSignaturePad()
-    end
-
-    -- Use Saved button
-    self.useSavedBtn = vgui.Create("DButton", btnPanel)
-    self.useSavedBtn:Dock(LEFT)
-    self.useSavedBtn:SetWide(90)
-    self.useSavedBtn:DockMargin(5, 5, 5, 5)
-    self.useSavedBtn:SetText("Use Saved")
-    self.useSavedBtn.DoClick = function()
-        self:UseSavedSignature()
-    end
+    local btnPanel, btns = ix.constants.CreateButtonBar(bottomPanel, {
+        {"Add Signature", 100, LEFT, function() self:OpenSignaturePad() end},
+        {"Use Saved", 90, LEFT, function() self:UseSavedSignature() end},
+        {"Cancel", 80, RIGHT, function() self:Remove() end},
+        {"Save", 80, RIGHT, function() self:SaveDocument() end},
+    })
+    self.signBtn = btns[1]
+    self.useSavedBtn = btns[2]
 
     -- Check if character has a saved signature
     local char = LocalPlayer():GetCharacter()
@@ -113,26 +97,6 @@ function PANEL:Init()
     self.useSavedBtn:SetEnabled(savedSig ~= nil)
     if not savedSig then
         self.useSavedBtn:SetTooltip("No saved signature")
-    end
-
-    -- Cancel button
-    local cancelBtn = vgui.Create("DButton", btnPanel)
-    cancelBtn:Dock(RIGHT)
-    cancelBtn:SetWide(80)
-    cancelBtn:DockMargin(5, 5, 10, 5)
-    cancelBtn:SetText("Cancel")
-    cancelBtn.DoClick = function()
-        self:Remove()
-    end
-
-    -- Save button
-    local saveBtn = vgui.Create("DButton", btnPanel)
-    saveBtn:Dock(RIGHT)
-    saveBtn:SetWide(80)
-    saveBtn:DockMargin(5, 5, 5, 5)
-    saveBtn:SetText("Save")
-    saveBtn.DoClick = function()
-        self:SaveDocument()
     end
 end
 

@@ -5,16 +5,6 @@
     Handles writing, reading, erasing, and signatures.
 ]]--
 
--- Check if a specific item (by ID) exists in an inventory
-local function InvHasItem(inv, itemID)
-    for _, invItem in pairs(inv:GetItems()) do
-        if invItem:GetID() == itemID then
-            return true
-        end
-    end
-    return false
-end
-
 -- ============================================================================
 -- DOCUMENT WRITE HANDLER
 -- ============================================================================
@@ -26,35 +16,21 @@ net.Receive("ixDocumentWrite", function(len, client)
     local hasSignature = net.ReadBool()
     local signatureJSON = hasSignature and net.ReadString() or nil
 
-    -- Validate character
+    -- Validate paper item ownership
+    local item = ix.constants.VerifyItemOwnership(client, itemID, "paper")
+    if not item then return end
+
     local char = client:GetCharacter()
     if not char then return end
-
-    -- Validate paper item
-    local item = ix.item.instances[itemID]
-    if not item then return end
-    if item.uniqueID ~= "paper" then return end
-
-    -- Validate ownership
-    local inv = char:GetInventory()
-    if not inv then return end
-
-    if not InvHasItem(inv, itemID) then return end
 
     -- Check if there's content to write
     if content == "" and not hasSignature then
         return
     end
 
-    -- Validate writing tool from inventory
-    local toolItem = ix.item.instances[toolItemID]
+    -- Validate writing tool ownership
+    local toolItem = ix.constants.VerifyItemOwnership(client, toolItemID)
     if not toolItem then
-        client:NotifyLocalized("needWritingTool")
-        return
-    end
-
-    -- Verify tool is in player's inventory
-    if not InvHasItem(inv, toolItemID) then
         client:NotifyLocalized("needWritingTool")
         return
     end
@@ -234,20 +210,9 @@ end)
 net.Receive("ixDocumentErase", function(len, client)
     local itemID = net.ReadUInt(32)
 
-    -- Validate character
-    local char = client:GetCharacter()
-    if not char then return end
-
-    -- Validate item
-    local item = ix.item.instances[itemID]
+    -- Validate paper item ownership
+    local item = ix.constants.VerifyItemOwnership(client, itemID, "paper")
     if not item then return end
-    if item.uniqueID ~= "paper" then return end
-
-    -- Validate ownership
-    local inv = char:GetInventory()
-    if not inv then return end
-
-    if not InvHasItem(inv, itemID) then return end
 
     -- Check if document is erasable (pencil only)
     if item:GetDocumentType() ~= "pencil" then
@@ -256,6 +221,9 @@ net.Receive("ixDocumentErase", function(len, client)
     end
 
     -- Find eraser in inventory (standalone eraser or pencil with eraser)
+    local _, inv = ix.constants.GetCharacterInventory(client)
+    if not inv then return end
+
     local eraserItem = nil
     for _, invItem in pairs(inv:GetItems()) do
         if invItem.uniqueID == "eraser" and invItem:GetDurability() > 0 then
@@ -322,19 +290,9 @@ net.Receive("ixDocumentDestroy", function(len, client)
     local itemID = net.ReadUInt(32)
 
     -- Validate character
-    local char = client:GetCharacter()
-    if not char then return end
-
-    -- Validate item
-    local item = ix.item.instances[itemID]
+    -- Validate paper item ownership
+    local item = ix.constants.VerifyItemOwnership(client, itemID, "paper")
     if not item then return end
-    if item.uniqueID ~= "paper" then return end
-
-    -- Validate ownership
-    local inv = char:GetInventory()
-    if not inv then return end
-
-    if not InvHasItem(inv, itemID) then return end
 
     -- Delete document file if exists
     local paperID = item:GetPaperID()
@@ -356,12 +314,8 @@ net.Receive("ixContainerRename", function(len, client)
     local itemID = net.ReadUInt(32)
     local newName = net.ReadString()
 
-    -- Validate character
-    local char = client:GetCharacter()
-    if not char then return end
-
-    -- Validate item
-    local item = ix.item.instances[itemID]
+    -- Validate container ownership (no specific uniqueID filter)
+    local item = ix.constants.VerifyItemOwnership(client, itemID)
     if not item then return end
 
     -- Only allow renaming containers (envelopes, folders)
@@ -372,12 +326,6 @@ net.Receive("ixContainerRename", function(len, client)
     }
 
     if not validContainers[item.uniqueID] then return end
-
-    -- Validate ownership
-    local inv = char:GetInventory()
-    if not inv then return end
-
-    if not InvHasItem(inv, itemID) then return end
 
     -- Check for writing tool in inventory
     if not ix.documents.HasWritingTool(client) then
@@ -453,23 +401,12 @@ net.Receive("ixPenRefill", function(len, client)
     local penItemID = net.ReadUInt(32)
     local cartridgeItemID = net.ReadUInt(32)
 
-    -- Validate character
-    local char = client:GetCharacter()
-    if not char then return end
+    -- Validate item ownership
+    local penItem = ix.constants.VerifyItemOwnership(client, penItemID, "pen")
+    if not penItem then return end
 
-    -- Validate items
-    local penItem = ix.item.instances[penItemID]
-    local cartridgeItem = ix.item.instances[cartridgeItemID]
-
-    if not penItem or not cartridgeItem then return end
-    if penItem.uniqueID ~= "pen" then return end
-    if cartridgeItem.uniqueID ~= "ink_cartridge" then return end
-
-    -- Validate ownership
-    local inv = char:GetInventory()
-    if not inv then return end
-
-    if not InvHasItem(inv, penItemID) or not InvHasItem(inv, cartridgeItemID) then return end
+    local cartridgeItem = ix.constants.VerifyItemOwnership(client, cartridgeItemID, "ink_cartridge")
+    if not cartridgeItem then return end
 
     -- Check if pen needs refill
     if penItem:GetInk() >= penItem.maxInk then

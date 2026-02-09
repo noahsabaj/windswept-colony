@@ -12,31 +12,16 @@
 
 AddCSLuaFile()
 
+SWEP.Base = "base_windswept_swep"
 SWEP.PrintName = "Lantern"
-SWEP.Author = "Windswept"
 SWEP.Purpose = "Portable ambient light source."
 SWEP.Instructions = "LMB: Toggle light | RMB: Place on ground"
-
-SWEP.Spawnable = false
-SWEP.Drop = false
 
 SWEP.ViewModelFOV = 85
 SWEP.ViewModel = "models/weapons/cof/v_lantern.mdl"
 SWEP.WorldModel = "models/weapons/cof/w_lantern.mdl"
 SWEP.UseHands = false -- This viewmodel has arms baked in
 SWEP.HoldType = "pistol"
-
-SWEP.Primary.ClipSize = -1
-SWEP.Primary.DefaultClip = -1
-SWEP.Primary.Automatic = false
-SWEP.Primary.Ammo = ""
-
-SWEP.Secondary.ClipSize = -1
-SWEP.Secondary.DefaultClip = -1
-SWEP.Secondary.Automatic = false
-SWEP.Secondary.Ammo = ""
-
-SWEP.DrawAmmo = false
 SWEP.DrawCrosshair = false
 
 -- Battery drain rate: 100up / 600 seconds = ~0.167up per second (10 minutes per full battery)
@@ -82,13 +67,8 @@ end
 -- INITIALIZATION
 -- ============================================================================
 
-function SWEP:Initialize()
-    self:SetHoldType(self.HoldType)
-    self.wasLMBDown = false
-end
-
 function SWEP:Deploy()
-    self:SetHoldType(self.HoldType)
+    self.BaseClass.Deploy(self)
     self:SendWeaponAnim(ACT_VM_DRAW)
     self:EmitSound("weapons/cof/sleeve_generic" .. math.random(1, 3) .. ".wav")
 
@@ -237,12 +217,9 @@ if SERVER then
         ent.OwnerPlayer = owner
 
         -- Remove item from inventory
-        local character = owner:GetCharacter()
-        if character then
-            local inventory = character:GetInventory()
-            if inventory then
-                inventory:Remove(item:GetID())
-            end
+        local _, inventory = ix.constants.GetCharacterInventory(owner)
+        if inventory then
+            inventory:Remove(item:GetID())
         end
 
         -- Strip weapon
@@ -264,30 +241,28 @@ function SWEP:Think()
         -- Don't process input if a UI panel is open
         if vgui.CursorVisible() then
             self.wasLMBDown = false
+            self.wasRMBDown = false
             self.rmbStartTime = nil
             return
         end
 
         local owner = self:GetOwner()
         if IsValid(owner) then
-            local lmbDown = input.IsMouseDown(MOUSE_LEFT)
-            local rmbDown = input.IsMouseDown(MOUSE_RIGHT)
+            -- LMB edge detection via shared helper
+            local lmb = ix.constants.ProcessSWEPInput(self)
 
-            -- LMB pressed - toggle light
-            if lmbDown and not self.wasLMBDown then
+            if lmb then
                 net.Start("ixLanternSetLight")
                 net.WriteBool(not self:GetLanternOn())
                 net.SendToServer()
             end
 
-            self.wasLMBDown = lmbDown
-
-            -- RMB hold detection for placement
+            -- RMB hold detection for placement (manual - hold pattern differs from edge detection)
+            local rmbDown = input.IsMouseDown(MOUSE_RIGHT)
             if rmbDown then
                 if not self.rmbStartTime then
                     self.rmbStartTime = CurTime()
                 elseif CurTime() - self.rmbStartTime >= 0.5 then
-                    -- Held for 0.5 seconds - place lantern
                     self.rmbStartTime = nil
                     net.Start("ixLanternPlace")
                     net.SendToServer()

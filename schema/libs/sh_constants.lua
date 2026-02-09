@@ -90,11 +90,55 @@ function C.CanInteractClose(player, target)
     return C.WithinRange(player, target, C.RANGE_INTERACTION_CLOSE)
 end
 
+-- Find best toolkit in a player's inventory (returns hasToolkit, toolkitItem)
+function C.FindBestToolkit(client)
+    if not IsValid(client) then return false, nil end
+
+    local character, inventory = C.GetCharacterInventory(client)
+    if not character or not inventory then return false, nil end
+
+    local bestToolkit = nil
+    local bestSpeed = 0
+
+    for _, item in pairs(inventory:GetItems()) do
+        if item.uniqueID and string.find(item.uniqueID, "toolkit") then
+            local speed = item.installSpeed or 1
+            if speed > bestSpeed then
+                bestSpeed = speed
+                bestToolkit = item
+            end
+        end
+    end
+
+    return bestToolkit ~= nil, bestToolkit
+end
+
 -- Draw green equipped indicator dot on inventory icon (CLIENT only)
 if CLIENT then
     function C.DrawEquippedIndicator(w, h)
         surface.SetDrawColor(110, 255, 110, 200)
         surface.DrawRect(w - 14, h - 14, 8, 8)
+    end
+
+    -- Draw a durability/resource bar on an inventory icon
+    -- style: "thick" (8px, lock/toolkit) or "thin" (3px, eraser/writer)
+    function C.DrawDurabilityBar(w, h, percent, color, style)
+        local barW, barH, barX, barY, bgColor
+        if style == "thin" then
+            barW, barH, barX, barY = w - 4, 3, 2, h - 5
+            bgColor = Color(50, 50, 50, 200)
+        else
+            barW, barH, barX, barY = w - 8, 8, 4, h - 12
+            bgColor = Color(30, 30, 30, 200)
+        end
+
+        surface.SetDrawColor(bgColor)
+        surface.DrawRect(barX, barY, barW, barH)
+
+        if percent > 0 then
+            surface.SetDrawColor(color)
+            surface.DrawRect(barX, barY, barW * math.min(percent, 1), barH)
+        end
     end
 
     -- Get bright status color for PaintOver bars (charge, durability, health)
@@ -231,6 +275,119 @@ if CLIENT then
         return not IsValid(item.entity) and item:GetData("id") and not IsValid(ix.gui["inv" .. item:GetData("id", "")])
     end
 
+    -- =========================================================================
+    -- DERMA HELPERS
+    -- =========================================================================
+
+    -- Header bar colors (shared by Personal ID, Radio Frequency, and future panels)
+    local COLOR_HEADER_BG = Color(30, 58, 95)
+
+    -- Create a dark header bar with rounded top corners, title text, and close button.
+    -- parent: parent panel
+    -- title: header title string
+    -- height: header height in pixels (default 36)
+    -- onClose: function to call when close button is clicked (default: parent:Remove())
+    -- Returns: header panel, close button
+    function C.CreateHeaderBar(parent, title, height, onClose)
+        height = height or 36
+
+        local header = vgui.Create("DPanel", parent)
+        header:SetTall(height)
+        header:Dock(TOP)
+        header.text = title
+        header.Paint = function(pnl, w, h)
+            draw.RoundedBoxEx(4, 0, 0, w, h, COLOR_HEADER_BG, true, true, false, false)
+
+            surface.SetFont("ixMediumFont")
+            local tw, th = surface.GetTextSize(pnl.text)
+            surface.SetTextColor(255, 255, 255, 255)
+            surface.SetTextPos(12, (h - th) / 2)
+            surface.DrawText(pnl.text)
+        end
+
+        local closeBtn = vgui.Create("DButton", header)
+        closeBtn:SetSize(height - 12, height - 12)
+        closeBtn:Dock(RIGHT)
+        closeBtn:DockMargin(0, 6, 6, 6)
+        closeBtn:SetText("\xC3\x97")  -- multiplication sign (x)
+        closeBtn:SetFont("ixMediumFont")
+        closeBtn:SetTextColor(C.COLOR_UI_NEUTRAL)
+        closeBtn.Paint = function(btn, w, h)
+            if btn:IsHovered() then
+                surface.SetDrawColor(255, 255, 255, 30)
+                surface.DrawRect(0, 0, w, h)
+            end
+        end
+        closeBtn.DoClick = onClose or function()
+            parent:Remove()
+        end
+
+        return header, closeBtn
+    end
+
+    -- Create a bottom button bar: a transparent DPanel (height 40) docked BOTTOM
+    -- with buttons created from a spec list.
+    -- parent: parent panel for the bar
+    -- buttons: sequential table of button specs, each a table:
+    --   {text, width, dock, onClick}
+    --   - text: button label string
+    --   - width: button width in pixels
+    --   - dock: LEFT or RIGHT
+    --   - onClick: DoClick handler function
+    --   Buttons are created in list order. Margins: 10px on the outside edge
+    --   (first LEFT button gets 10 left, last RIGHT button gets 10 right),
+    --   5px between adjacent buttons, 5px top/bottom.
+    -- Returns: btnPanel, {button1, button2, ...} (buttons in spec order)
+    function C.CreateButtonBar(parent, buttons)
+        local btnPanel = vgui.Create("DPanel", parent)
+        btnPanel:Dock(BOTTOM)
+        btnPanel:SetTall(40)
+        btnPanel.Paint = function() end
+
+        local created = {}
+        local leftCount = 0
+        local rightCount = 0
+
+        -- Count totals for margin calculation
+        local totalLeft = 0
+        local totalRight = 0
+        for _, spec in ipairs(buttons) do
+            if spec[3] == LEFT then
+                totalLeft = totalLeft + 1
+            else
+                totalRight = totalRight + 1
+            end
+        end
+
+        for _, spec in ipairs(buttons) do
+            local text, width, dock, onClick = spec[1], spec[2], spec[3], spec[4]
+
+            local btn = vgui.Create("DButton", btnPanel)
+            btn:Dock(dock)
+            btn:SetWide(width)
+            btn:SetText(text)
+
+            -- Calculate margins: outside edges get 10, inner gaps get 5
+            local marginL, marginR = 5, 5
+            if dock == LEFT then
+                leftCount = leftCount + 1
+                if leftCount == 1 then marginL = 10 end
+            else
+                rightCount = rightCount + 1
+                if rightCount == 1 then marginR = 10 end
+            end
+            btn:DockMargin(marginL, 5, marginR, 5)
+
+            if onClick then
+                btn.DoClick = onClick
+            end
+
+            table.insert(created, btn)
+        end
+
+        return btnPanel, created
+    end
+
     -- Process SWEP input: cursor check, LMB/RMB polling, edge detection
     -- Returns lmbPressed, rmbPressed (true only on the frame the button was first pressed)
     function C.ProcessSWEPInput(weapon)
@@ -258,6 +415,30 @@ function C.GetCharacterInventory(client)
     local character = client:GetCharacter()
     if not character then return nil, nil end
     return character, character:GetInventory()
+end
+
+-- Verify that a client owns an item in their inventory (SERVER only)
+-- Returns the item if found and valid, nil otherwise
+if SERVER then
+    function C.VerifyItemOwnership(client, itemID, expectedUniqueID)
+        local item = ix.item.instances[itemID]
+        if not item then return nil end
+
+        if expectedUniqueID and item.uniqueID ~= expectedUniqueID then
+            return nil
+        end
+
+        local character, inventory = C.GetCharacterInventory(client)
+        if not character or not inventory then return nil end
+
+        for _, invItem in pairs(inventory:GetItems()) do
+            if invItem:GetID() == itemID then
+                return item
+            end
+        end
+
+        return nil
+    end
 end
 
 -- Shared SWEP cancel action: check state, run cleanup, play cancel sound (SERVER only)

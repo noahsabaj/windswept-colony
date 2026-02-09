@@ -106,18 +106,8 @@ if CLIENT then
     function ITEM:PopulateTooltip(tooltip)
         local keys = self:GetKeys()
 
-        local keyRow = tooltip:AddRow("keys")
-        keyRow:SetText(string.format("Keys: %d / 20", #keys))
-
-        if #keys >= 18 then
-            keyRow:SetBackgroundColor(Color(150, 100, 50))
-        elseif #keys > 0 then
-            keyRow:SetBackgroundColor(Color(50, 80, 100))
-        else
-            keyRow:SetBackgroundColor(Color(100, 100, 100))
-        end
-
-        keyRow:SizeToContents()
+        local bgColor = #keys >= 18 and Color(150, 100, 50) or (#keys > 0 and Color(50, 80, 100) or Color(100, 100, 100))
+        ix.constants.AddTooltipRow(tooltip, "keys", string.format("Keys: %d / 20", #keys), bgColor)
 
         if self:GetData("equipped") then
             local currentKey = self:GetCurrentKey()

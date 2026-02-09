@@ -7,48 +7,24 @@
 
 AddCSLuaFile()
 
+SWEP.Base = "base_windswept_swep"
+
 if CLIENT then
     SWEP.PrintName = "Gavel"
     SWEP.Slot = 0
     SWEP.SlotPos = 2
-    SWEP.DrawAmmo = false
-    SWEP.DrawCrosshair = true
 end
 
-SWEP.Author = "Windswept"
 SWEP.Instructions = "Primary: Slam gavel to make noise."
 SWEP.Purpose = "Making authoritative noise."
-SWEP.Drop = false
 
-SWEP.Spawnable = false
-SWEP.AdminSpawnable = false
-
-SWEP.Primary.ClipSize = -1
-SWEP.Primary.DefaultClip = -1
-SWEP.Primary.Automatic = false
-SWEP.Primary.Ammo = ""
-
-SWEP.Secondary.ClipSize = -1
-SWEP.Secondary.DefaultClip = -1
-SWEP.Secondary.Automatic = false
-SWEP.Secondary.Ammo = ""
-
-SWEP.ViewModel = ""  -- No viewmodel - prop model only
+SWEP.ViewModel = ""
 SWEP.WorldModel = Model("models/judge gavels & more/judge_gavel.mdl")
-
 SWEP.UseHands = false
 SWEP.HoldType = "melee"
 
-function SWEP:Initialize()
-    self:SetHoldType(self.HoldType)
-end
-
 function SWEP:SetupDataTables()
     self:NetworkVar("Float", 0, "NextIdle")
-end
-
-function SWEP:Deploy()
-    return true
 end
 
 function SWEP:CanDeploy()
@@ -64,11 +40,6 @@ function SWEP:PrimaryAttack()
     if SERVER then
         self:EmitSound("physics/wood/wood_crate_impact_hard2.wav", 100, math.random(95, 105))
     end
-end
-
--- Secondary attack: Does nothing (gavel is just for noise)
-function SWEP:SecondaryAttack()
-    -- No action
 end
 
 function SWEP:Reload()

@@ -148,18 +148,8 @@ if CLIENT then
     function ITEM:PopulateTooltip(tooltip)
         local photos = self:GetPhotos()
 
-        local photoRow = tooltip:AddRow("photos")
-        photoRow:SetText(string.format("Photos: %d / 50", #photos))
-
-        if #photos >= 45 then
-            photoRow:SetBackgroundColor(Color(150, 100, 50))
-        elseif #photos > 0 then
-            photoRow:SetBackgroundColor(Color(50, 100, 100))
-        else
-            photoRow:SetBackgroundColor(Color(100, 100, 100))
-        end
-
-        photoRow:SizeToContents()
+        local bgColor = #photos >= 45 and Color(150, 100, 50) or (#photos > 0 and Color(50, 100, 100) or Color(100, 100, 100))
+        ix.constants.AddTooltipRow(tooltip, "photos", string.format("Photos: %d / 50", #photos), bgColor)
     end
 end
 

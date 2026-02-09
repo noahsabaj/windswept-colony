@@ -13,39 +13,20 @@
 
 AddCSLuaFile()
 
+SWEP.Base = "base_windswept_swep"
+
 if CLIENT then
     SWEP.PrintName = "Defibrillator"
     SWEP.Slot = 0
     SWEP.SlotPos = 3
-    SWEP.DrawAmmo = false
-    SWEP.DrawCrosshair = true
 end
 
-SWEP.Author = "Windswept"
 SWEP.Instructions = "Right-click: Charge | Left-click: Shock"
 SWEP.Purpose = "Revive knocked players or incapacitate the living."
-SWEP.Drop = false
-
-SWEP.Spawnable = false
-SWEP.AdminOnly = false
 
 SWEP.ViewModelFOV = 75
-SWEP.ViewModelFlip = false
-
-SWEP.Primary.ClipSize = -1
-SWEP.Primary.DefaultClip = -1
-SWEP.Primary.Automatic = false
-SWEP.Primary.Ammo = ""
-
-SWEP.Secondary.ClipSize = -1
-SWEP.Secondary.DefaultClip = -1
-SWEP.Secondary.Automatic = false
-SWEP.Secondary.Ammo = ""
-
 SWEP.ViewModel = Model("models/weapons/defib/v_defibrillator.mdl")
 SWEP.WorldModel = Model("models/weapons/defib/w_eq_defibrillator_paddles.mdl")
-
-SWEP.UseHands = true
 SWEP.HoldType = "duel"
 
 -- Timing configuration
@@ -63,7 +44,7 @@ function SWEP:SetupDataTables()
 end
 
 function SWEP:Initialize()
-    self:SetHoldType(self.HoldType)
+    self.BaseClass.Initialize(self)
     self:ResetState()
 end
 
@@ -492,37 +473,13 @@ if CLIENT then
         -- Cleanup
     end
 
-    -- Draw charging progress bar on HUD
     function SWEP:DrawHUD()
         if not self:GetCharging() then return end
 
         local progress = math.Clamp((CurTime() - self:GetChargeStartTime()) / self.ChargeDuration, 0, 1)
-
         if progress <= 0 or progress >= 1 then return end
 
-        local scrW, scrH = ScrW(), ScrH()
-
-        -- Bar dimensions (similar to looting progress bar)
-        local barWidth = ScreenScale(100)
-        local barHeight = ScreenScale(6)
-        local barX = (scrW - barWidth) / 2
-        local barY = scrH * 0.6  -- Below center of screen
-        local pad = ScreenScale(1)
-
-        -- Background
-        surface.SetDrawColor(0, 0, 0, 200)
-        surface.DrawRect(barX, barY, barWidth, barHeight)
-
-        -- Progress fill (blue for defibrillator)
-        surface.SetDrawColor(60, 150, 255, 255)
-        surface.DrawRect(barX + pad, barY + pad, (barWidth - pad * 2) * progress, barHeight - pad * 2)
-
-        -- Border
-        surface.SetDrawColor(255, 255, 255, 100)
-        surface.DrawOutlinedRect(barX, barY, barWidth, barHeight)
-
-        -- Label
-        draw.SimpleText("CHARGING", "DermaDefault", scrW / 2, barY - ScreenScale(3), Color(255, 255, 255, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
+        ix.constants.DrawProgressBar("CHARGING", progress, Color(60, 150, 255))
     end
 end
 

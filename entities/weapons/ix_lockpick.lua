@@ -12,32 +12,12 @@
 
 AddCSLuaFile()
 
+SWEP.Base = "base_windswept_swep"
 SWEP.PrintName = "Lockpick"
-SWEP.Author = "Windswept"
 SWEP.Purpose = "Pick locks on doors."
 SWEP.Instructions = "RMB on locked door: Pick lock"
 
-SWEP.Spawnable = false
-SWEP.Drop = false
-
-SWEP.ViewModelFOV = 54
-SWEP.ViewModel = "models/weapons/c_arms.mdl"
 SWEP.WorldModel = "models/props_c17/tools_pliers01a.mdl"
-SWEP.UseHands = true
-SWEP.HoldType = "normal"
-
-SWEP.Primary.ClipSize = -1
-SWEP.Primary.DefaultClip = -1
-SWEP.Primary.Automatic = false
-SWEP.Primary.Ammo = ""
-
-SWEP.Secondary.ClipSize = -1
-SWEP.Secondary.DefaultClip = -1
-SWEP.Secondary.Automatic = false
-SWEP.Secondary.Ammo = ""
-
-SWEP.DrawAmmo = false
-SWEP.DrawCrosshair = true
 
 SWEP.MaxUseDistance = 96
 
@@ -70,9 +50,7 @@ end
 -- ============================================================================
 
 function SWEP:Initialize()
-    self:SetHoldType(self.HoldType)
-    self.wasLMBDown = false
-    self.wasRMBDown = false
+    self.BaseClass.Initialize(self)
     self.nextPickAttempt = 0
 
     if self.SetPicking then
@@ -81,7 +59,7 @@ function SWEP:Initialize()
 end
 
 function SWEP:Deploy()
-    self:SetHoldType(self.HoldType)
+    self.BaseClass.Deploy(self)
     if self.SetPicking then
         self:SetPicking(false)
     end
@@ -293,12 +271,9 @@ function SWEP:OnPickFail()
         owner:NotifyLocalized("lockpickBroke")
 
         -- Remove the lockpick item
-        local character = owner:GetCharacter()
-        if character then
-            local inventory = character:GetInventory()
-            if inventory then
-                inventory:Remove(item:GetID())
-            end
+        local _, inventory = ix.constants.GetCharacterInventory(owner)
+        if inventory then
+            inventory:Remove(item:GetID())
         end
 
         owner:StripWeapon("ix_lockpick")
@@ -364,24 +339,11 @@ function SWEP:Think()
     -- Picking progress checks (server only)
     if self:IsPicking() then
         if SERVER then
-            -- Check if still looking at the same door
-            local currentDoor = self:GetTargetDoor()
-            if currentDoor ~= self.targetDoor then
+            local valid, reason = ix.weapon.IsTargetValid(owner, self:GetTargetDoor(), self.targetDoor, self.MaxUseDistance)
+            if not valid then
                 self:CancelPicking()
-                owner:NotifyLocalized("lockpickLookedAway")
-                return
-            end
-
-            -- Check distance
-            if not IsValid(self.targetDoor) then
-                self:CancelPicking()
-                return
-            end
-
-            local distance = owner:GetPos():Distance(self.targetDoor:GetPos())
-            if distance > self.MaxUseDistance + 32 then
-                self:CancelPicking()
-                owner:NotifyLocalized("lockpickTooFar")
+                if reason == "looked_away" then owner:NotifyLocalized("lockpickLookedAway")
+                elseif reason == "too_far" then owner:NotifyLocalized("lockpickTooFar") end
                 return
             end
         end

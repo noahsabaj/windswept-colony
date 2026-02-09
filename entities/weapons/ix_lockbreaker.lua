@@ -10,32 +10,13 @@
 
 AddCSLuaFile()
 
+SWEP.Base = "base_windswept_swep"
 SWEP.PrintName = "Lockbreaker"
-SWEP.Author = "Windswept"
 SWEP.Purpose = "Destroy locks through brute force."
 SWEP.Instructions = "RMB on door: Break lock (20s, loud)"
 
-SWEP.Spawnable = false
-SWEP.Drop = false
-
-SWEP.ViewModelFOV = 54
-SWEP.ViewModel = "models/weapons/c_arms.mdl"
 SWEP.WorldModel = "models/weapons/w_crowbar.mdl"
-SWEP.UseHands = true
 SWEP.HoldType = "melee2"
-
-SWEP.Primary.ClipSize = -1
-SWEP.Primary.DefaultClip = -1
-SWEP.Primary.Automatic = false
-SWEP.Primary.Ammo = ""
-
-SWEP.Secondary.ClipSize = -1
-SWEP.Secondary.DefaultClip = -1
-SWEP.Secondary.Automatic = false
-SWEP.Secondary.Ammo = ""
-
-SWEP.DrawAmmo = false
-SWEP.DrawCrosshair = true
 
 SWEP.MaxUseDistance = 64
 SWEP.BreakTime = 20  -- 20 seconds to break lock
@@ -61,9 +42,7 @@ end
 -- ============================================================================
 
 function SWEP:Initialize()
-    self:SetHoldType(self.HoldType)
-    self.wasLMBDown = false
-    self.wasRMBDown = false
+    self.BaseClass.Initialize(self)
     self.nextBreakAttempt = 0
 
     if self.SetBreaking then
@@ -72,7 +51,7 @@ function SWEP:Initialize()
 end
 
 function SWEP:Deploy()
-    self:SetHoldType(self.HoldType)
+    self.BaseClass.Deploy(self)
     if self.SetBreaking then
         self:SetBreaking(false)
     end
@@ -215,24 +194,11 @@ function SWEP:Think()
     -- Breaking progress checks
     if self:IsBreaking() then
         if SERVER then
-            -- Check if still looking at the same door
-            local currentDoor = self:GetTargetDoor()
-            if currentDoor ~= self.targetDoor then
+            local valid, reason = ix.weapon.IsTargetValid(owner, self:GetTargetDoor(), self.targetDoor, self.MaxUseDistance, 16)
+            if not valid then
                 self:CancelBreaking()
-                owner:NotifyLocalized("lockbreakerLookedAway")
-                return
-            end
-
-            -- Check distance
-            if not IsValid(self.targetDoor) then
-                self:CancelBreaking()
-                return
-            end
-
-            local distance = owner:GetPos():Distance(self.targetDoor:GetPos())
-            if distance > self.MaxUseDistance + 16 then
-                self:CancelBreaking()
-                owner:NotifyLocalized("lockbreakerTooFar")
+                if reason == "looked_away" then owner:NotifyLocalized("lockbreakerLookedAway")
+                elseif reason == "too_far" then owner:NotifyLocalized("lockbreakerTooFar") end
                 return
             end
 

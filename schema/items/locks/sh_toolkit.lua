@@ -180,22 +180,13 @@ end
 
 if CLIENT then
     function ITEM:PaintOver(item, w, h)
-        local durability = item:GetData("durability", item:GetMaxDurability())
-        local maxDurability = item:GetMaxDurability()
-        local durPercent = (durability / maxDurability) * 100
-
-        -- Draw equipped indicator (green dot)
         if item:GetData("equipped") then
             ix.constants.DrawEquippedIndicator(w, h)
         end
 
-        -- Draw durability bar
-        surface.SetDrawColor(30, 30, 30, 200)
-        surface.DrawRect(4, h - 12, w - 8, 8)
-
-        local durWidth = ((w - 8) / 100) * durPercent
-        surface.SetDrawColor(ix.constants.GetChargeColor(durPercent, 75, 50, 25))
-        surface.DrawRect(4, h - 12, durWidth, 8)
+        local durability = item:GetData("durability", item:GetMaxDurability())
+        local durPercent = durability / item:GetMaxDurability()
+        ix.constants.DrawDurabilityBar(w, h, durPercent, ix.constants.GetChargeColor(durPercent * 100, 75, 50, 25))
     end
 
     function ITEM:PopulateTooltip(tooltip)

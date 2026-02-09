@@ -15,29 +15,13 @@ ix.photo = ix.photo or {}
 
 if SERVER then
     --- Verify that a client owns an item in their inventory.
-    -- Replaces the repeated character→inventory→find item pattern.
+    -- Thin wrapper around ix.constants.VerifyItemOwnership for API compatibility.
     -- @param client Player to check
     -- @param itemID Numeric item ID
     -- @param expectedUniqueID Optional uniqueID to validate (e.g., "photo")
     -- @return item if found and valid, nil otherwise
     function ix.photo.VerifyOwnership(client, itemID, expectedUniqueID)
-        local item = ix.item.instances[itemID]
-        if not item then return nil end
-
-        if expectedUniqueID and item.uniqueID ~= expectedUniqueID then
-            return nil
-        end
-
-        local character, inventory = ix.constants.GetCharacterInventory(client)
-        if not character or not inventory then return nil end
-
-        for _, invItem in pairs(inventory:GetItems()) do
-            if invItem:GetID() == itemID then
-                return item
-            end
-        end
-
-        return nil
+        return ix.constants.VerifyItemOwnership(client, itemID, expectedUniqueID)
     end
 
     --- Read a photo file by ID with path traversal protection.

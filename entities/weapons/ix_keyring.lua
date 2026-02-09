@@ -11,32 +11,12 @@
 
 AddCSLuaFile()
 
+SWEP.Base = "base_windswept_swep"
 SWEP.PrintName = "Key Ring"
-SWEP.Author = "Windswept"
 SWEP.Purpose = "Manage multiple keys."
 SWEP.Instructions = "R: Cycle | LMB: Lock | RMB: Unlock"
 
-SWEP.Spawnable = false
-SWEP.Drop = false
-
-SWEP.ViewModelFOV = 54
-SWEP.ViewModel = "models/weapons/c_arms.mdl"
 SWEP.WorldModel = "models/props_c17/tools_wrench01a.mdl"
-SWEP.UseHands = true
-SWEP.HoldType = "normal"
-
-SWEP.Primary.ClipSize = -1
-SWEP.Primary.DefaultClip = -1
-SWEP.Primary.Automatic = false
-SWEP.Primary.Ammo = ""
-
-SWEP.Secondary.ClipSize = -1
-SWEP.Secondary.DefaultClip = -1
-SWEP.Secondary.Automatic = false
-SWEP.Secondary.Ammo = ""
-
-SWEP.DrawAmmo = false
-SWEP.DrawCrosshair = true
 
 SWEP.MaxUseDistance = 96
 
@@ -61,10 +41,8 @@ end
 -- ============================================================================
 
 function SWEP:Initialize()
-    self:SetHoldType(self.HoldType)
+    self.BaseClass.Initialize(self)
     self:SetCurrentKeyIndex(1)
-    self.wasLMBDown = false
-    self.wasRMBDown = false
     self.wasReloadDown = false
     self.nextLockAttempt = 0
     self.nextUnlockAttempt = 0
@@ -72,7 +50,7 @@ function SWEP:Initialize()
 end
 
 function SWEP:Deploy()
-    self:SetHoldType(self.HoldType)
+    self.BaseClass.Deploy(self)
     self:UpdateCurrentKey()
     return true
 end

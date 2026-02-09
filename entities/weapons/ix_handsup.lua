@@ -9,41 +9,19 @@
 
 AddCSLuaFile()
 
+SWEP.Base = "base_windswept_swep"
+
 if CLIENT then
     SWEP.PrintName = "Hands Up"
     SWEP.Slot = 0
     SWEP.SlotPos = 3
-    SWEP.DrawAmmo = false
     SWEP.DrawCrosshair = false
 end
 
-SWEP.Author = "Windswept"
 SWEP.Instructions = "Equip to raise your hands in surrender."
 SWEP.Purpose = "Indicating surrender."
-SWEP.Drop = false
 
 SWEP.ViewModelFOV = 45
-SWEP.ViewModelFlip = false
-
-SWEP.Primary.ClipSize = -1
-SWEP.Primary.DefaultClip = -1
-SWEP.Primary.Automatic = false
-SWEP.Primary.Ammo = ""
-
-SWEP.Secondary.ClipSize = -1
-SWEP.Secondary.DefaultClip = -1
-SWEP.Secondary.Automatic = false
-SWEP.Secondary.Ammo = ""
-
-SWEP.ViewModel = Model("models/weapons/c_arms.mdl")
-SWEP.WorldModel = ""
-
-SWEP.UseHands = true
-SWEP.HoldType = "normal"
-
-function SWEP:Initialize()
-    self:SetHoldType(self.HoldType)
-end
 
 function SWEP:Deploy()
     local owner = self:GetOwner()
@@ -70,14 +48,6 @@ function SWEP:OnRemove()
     if SERVER and IsValid(owner) then
         owner:SetNetVar("handsUp", nil)
     end
-end
-
-function SWEP:PrimaryAttack()
-    -- Do nothing
-end
-
-function SWEP:SecondaryAttack()
-    -- Do nothing
 end
 
 function SWEP:Reload()

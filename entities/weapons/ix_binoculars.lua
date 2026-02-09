@@ -8,33 +8,15 @@
 
 AddCSLuaFile()
 
+SWEP.Base = "base_windswept_swep"
 SWEP.PrintName = "Binoculars"
-SWEP.Author = "Windswept"
 SWEP.Purpose = "See far distances."
 SWEP.Instructions = "RMB to zoom. LMB to cycle zoom levels."
 
-SWEP.Spawnable = false
-SWEP.AdminSpawnable = false
-SWEP.Drop = false
-
-SWEP.UseHands = true
 SWEP.ViewModel = Model("models/weapons/c_binoculars.mdl")
 SWEP.WorldModel = Model("models/weapons/w_binocularsbp.mdl")
-
 SWEP.HoldType = "slam"
 SWEP.HoldTypeZoomed = "camera"
-
-SWEP.Primary.ClipSize = -1
-SWEP.Primary.DefaultClip = -1
-SWEP.Primary.Automatic = false
-SWEP.Primary.Ammo = ""
-
-SWEP.Secondary.ClipSize = -1
-SWEP.Secondary.DefaultClip = -1
-SWEP.Secondary.Automatic = false
-SWEP.Secondary.Ammo = ""
-
-SWEP.DrawAmmo = false
 SWEP.DrawCrosshair = false
 
 -- Zoom settings
@@ -56,15 +38,15 @@ function SWEP:SetupDataTables()
 end
 
 function SWEP:Initialize()
-    self:SetHoldType(self.HoldType)
+    self.BaseClass.Initialize(self)
     self:SetZoomed(false)
     self:SetZoomLevel(1)
 end
 
 function SWEP:Deploy()
+    self.BaseClass.Deploy(self)
     self:SetZoomed(false)
     self:SetZoomLevel(1)
-    self:SetHoldType(self.HoldType)
 
     local owner = self:GetOwner()
     if IsValid(owner) then

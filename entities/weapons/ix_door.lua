@@ -9,32 +9,12 @@
 
 AddCSLuaFile()
 
+SWEP.Base = "base_windswept_swep"
 SWEP.PrintName = "Door"
-SWEP.Author = "Windswept"
 SWEP.Purpose = "Install doors in frames."
 SWEP.Instructions = "RMB on frame: Install door"
 
-SWEP.Spawnable = false
-SWEP.Drop = false
-
-SWEP.ViewModelFOV = 54
-SWEP.ViewModel = "models/weapons/c_arms.mdl"
 SWEP.WorldModel = "models/props_c17/door01_left.mdl"
-SWEP.UseHands = true
-SWEP.HoldType = "normal"
-
-SWEP.Primary.ClipSize = -1
-SWEP.Primary.DefaultClip = -1
-SWEP.Primary.Automatic = false
-SWEP.Primary.Ammo = ""
-
-SWEP.Secondary.ClipSize = -1
-SWEP.Secondary.DefaultClip = -1
-SWEP.Secondary.Automatic = false
-SWEP.Secondary.Ammo = ""
-
-SWEP.DrawAmmo = false
-SWEP.DrawCrosshair = true
 
 -- Maximum distance to interact with frames
 SWEP.MaxUseDistance = 240
@@ -63,9 +43,7 @@ end
 -- ============================================================================
 
 function SWEP:Initialize()
-    self:SetHoldType(self.HoldType)
-    self.wasLMBDown = false
-    self.wasRMBDown = false
+    self.BaseClass.Initialize(self)
     self.nextInstallAttempt = 0
 
     if self.SetInstalling then
@@ -74,7 +52,7 @@ function SWEP:Initialize()
 end
 
 function SWEP:Deploy()
-    self:SetHoldType(self.HoldType)
+    self.BaseClass.Deploy(self)
     if self.SetInstalling then
         self:SetInstalling(false)
     end
@@ -131,27 +109,7 @@ function SWEP:GetTargetFrame()
 end
 
 function SWEP:HasToolkit()
-    local owner = self:GetOwner()
-    if not IsValid(owner) then return false, nil end
-
-    local character, inventory = ix.constants.GetCharacterInventory(owner)
-    if not character or not inventory then return false, nil end
-
-    -- Find best toolkit in inventory
-    local bestToolkit = nil
-    local bestSpeed = 0
-
-    for _, item in pairs(inventory:GetItems()) do
-        if item.uniqueID and string.find(item.uniqueID, "toolkit") then
-            local speed = item.installSpeed or 1
-            if speed > bestSpeed then
-                bestSpeed = speed
-                bestToolkit = item
-            end
-        end
-    end
-
-    return bestToolkit ~= nil, bestToolkit
+    return ix.constants.FindBestToolkit(self:GetOwner())
 end
 
 function SWEP:IsInstalling()
@@ -251,12 +209,9 @@ function SWEP:CompleteInstall()
     end
 
     -- Remove door from inventory
-    local character = owner:GetCharacter()
-    if character then
-        local inventory = character:GetInventory()
-        if inventory then
-            inventory:Remove(item:GetID())
-        end
+    local _, inventory = ix.constants.GetCharacterInventory(owner)
+    if inventory then
+        inventory:Remove(item:GetID())
     end
 
     -- Strip weapon and clean up

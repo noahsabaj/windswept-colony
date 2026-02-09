@@ -11,7 +11,6 @@ if SERVER then return end
 
 -- Colors (matching Personal ID card style)
 local COLOR_BACKGROUND = Color(35, 35, 35, 250)
-local COLOR_HEADER = Color(30, 58, 95)
 local COLOR_DIGIT_BG = Color(50, 50, 50)
 local COLOR_DIGIT_BORDER = Color(80, 80, 80)
 local COLOR_ARROW = Color(255, 255, 255, 150)
@@ -65,36 +64,9 @@ end
 
 function PANEL:BuildUI()
     -- Header
-    self.header = self:Add("DPanel")
-    self.header:SetTall(self.headerHeight)
-    self.header:Dock(TOP)
-    self.header.Paint = function(pnl, w, h)
-        draw.RoundedBoxEx(4, 0, 0, w, h, COLOR_HEADER, true, true, false, false)
-
-        surface.SetFont("ixMediumFont")
-        local tw, th = surface.GetTextSize("Set Frequency")
-        surface.SetTextColor(255, 255, 255)
-        surface.SetTextPos(self.padding, (h - th) / 2)
-        surface.DrawText("Set Frequency")
-    end
-
-    -- Close button (X)
-    self.closeBtn = self.header:Add("DButton")
-    self.closeBtn:SetSize(self.headerHeight - 8, self.headerHeight - 8)
-    self.closeBtn:Dock(RIGHT)
-    self.closeBtn:DockMargin(0, 4, 4, 4)
-    self.closeBtn:SetText("×")
-    self.closeBtn:SetFont("ixMediumFont")
-    self.closeBtn:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
-    self.closeBtn.Paint = function(btn, w, h)
-        if btn:IsHovered() then
-            surface.SetDrawColor(255, 255, 255, 30)
-            surface.DrawRect(0, 0, w, h)
-        end
-    end
-    self.closeBtn.DoClick = function()
+    self.header, self.closeBtn = ix.constants.CreateHeaderBar(self, "Set Frequency", self.headerHeight, function()
         self:Remove()
-    end
+    end)
 
     -- Digit area container
     local digitAreaHeight = self.arrowHeight + self.digitSize + self.arrowHeight

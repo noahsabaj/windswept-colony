@@ -27,8 +27,8 @@ ITEM.functions.LoadAmmo = {
     icon = "icon16/bullet_add.png",
     OnRun = function(item)
         local client = item.player
-        local character = client:GetCharacter()
-        local inventory = character:GetInventory()
+        local character, inventory = ix.constants.GetCharacterInventory(client)
+        if not character or not inventory then return false end
 
         -- Find a .357 ammo item in the player's inventory
         local ammoItem = inventory:HasItem("357ammo")
@@ -74,13 +74,8 @@ ITEM.functions.LoadAmmo = {
         end
 
         -- Must have ammo in inventory
-        local character = client:GetCharacter()
-        if not character then
-            return false
-        end
-
-        local inventory = character:GetInventory()
-        if not inventory:HasItem("357ammo") then
+        local _, inventory = ix.constants.GetCharacterInventory(client)
+        if not inventory or not inventory:HasItem("357ammo") then
             return false
         end
 

@@ -17,8 +17,10 @@ do
     end
 
     function COMMAND:OnRun(client, message)
-        local character = client:GetCharacter()
-        local radios = character:GetInventory():GetItemsByUniqueID("handheld_radio", true)
+        local character, inventory = ix.constants.GetCharacterInventory(client)
+        if not character or not inventory then return end
+
+        local radios = inventory:GetItemsByUniqueID("handheld_radio", true)
         local activeRadio
 
         -- Find active radio
@@ -74,8 +76,9 @@ do
     COMMAND.arguments = ix.type.text
 
     function COMMAND:OnRun(client, frequency)
-        local character = client:GetCharacter()
-        local inventory = character:GetInventory()
+        local character, inventory = ix.constants.GetCharacterInventory(client)
+        if not character or not inventory then return end
+
         local radio = inventory:HasItem("handheld_radio")
 
         if radio then

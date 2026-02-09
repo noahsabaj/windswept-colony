@@ -20,6 +20,55 @@ local function getInventoryItems(cachedItems)
     return inventory:GetItems()
 end
 
+-- Creates a DListView with standard styling, single column, and single-select.
+local function CreateItemListView(parent, label, x, y, w, h)
+    local listView = vgui.Create("DListView", parent)
+    listView:SetPos(x, y)
+    listView:SetSize(w, h)
+    listView:AddColumn(label)
+    listView:SetMultiSelect(false)
+    return listView
+end
+
+-- Creates a DButton that sends a net message with station entity + item ID (UInt 32).
+-- getItemIDFn() should return an item ID or nil to abort.
+-- refreshFn is called after a 0.5s delay if provided.
+local function CreateNetButton(parent, text, x, y, w, h, panelRef, netMsg, getItemIDFn, refreshFn)
+    local btn = vgui.Create("DButton", parent)
+    btn:SetPos(x, y)
+    btn:SetSize(w, h)
+    btn:SetText(text)
+    btn.DoClick = function()
+        local itemID = getItemIDFn()
+        if not itemID then return end
+
+        net.Start(netMsg)
+            net.WriteEntity(panelRef.station)
+            net.WriteUInt(itemID, 32)
+        net.SendToServer()
+
+        if refreshFn then
+            timer.Simple(0.5, function()
+                if IsValid(panelRef) then
+                    refreshFn()
+                end
+            end)
+        end
+    end
+    return btn
+end
+
+-- Helper to get selected item ID from a DListView, or nil if nothing is selected.
+local function GetSelectedItemID(listView)
+    local selected = listView:GetSelectedLine()
+    if not selected then return nil end
+
+    local data = listView:GetLine(selected)
+    if not data then return nil end
+
+    return data.itemID
+end
+
 function PANEL:Init()
     self:SetSize(450, 400)
     self:SetTitle("Locksmith")
@@ -77,37 +126,13 @@ function PANEL:CreateProgramLockTab()
     label:SetSize(400, 20)
     label:SetText("Select a blank lock to program:")
 
-    self.blankLockList = vgui.Create("DListView", panel)
-    self.blankLockList:SetPos(10, 35)
-    self.blankLockList:SetSize(400, 200)
-    self.blankLockList:AddColumn("Blank Locks")
-    self.blankLockList:SetMultiSelect(false)
+    self.blankLockList = CreateItemListView(panel, "Blank Locks", 10, 35, 400, 200)
 
-    local btn = vgui.Create("DButton", panel)
-    btn:SetPos(10, 245)
-    btn:SetSize(400, 30)
-    btn:SetText("Program Lock")
-    btn.DoClick = function()
-        local selected = self.blankLockList:GetSelectedLine()
-        if not selected then return end
-
-        local data = self.blankLockList:GetLine(selected)
-        if not data then return end
-
-        local itemID = data.itemID
-        if not itemID then return end
-
-        net.Start("ixLocksmithProgramLock")
-            net.WriteEntity(self.station)
-            net.WriteUInt(itemID, 32)
-        net.SendToServer()
-
-        timer.Simple(0.5, function()
-            if IsValid(self) then
-                self:RefreshInventory()
-            end
-        end)
-    end
+    CreateNetButton(panel, "Program Lock", 10, 245, 400, 30, self,
+        "ixLocksmithProgramLock",
+        function() return GetSelectedItemID(self.blankLockList) end,
+        function() self:RefreshInventory() end
+    )
 
     self.tabs:AddSheet("Program Lock", panel, "icon16/lock_add.png")
 end
@@ -140,42 +165,29 @@ function PANEL:CreateProgramKeyTab()
     label1:SetSize(200, 20)
     label1:SetText("Select a blank key:")
 
-    self.blankKeyList = vgui.Create("DListView", panel)
-    self.blankKeyList:SetPos(10, 35)
-    self.blankKeyList:SetSize(200, 150)
-    self.blankKeyList:AddColumn("Blank Keys")
-    self.blankKeyList:SetMultiSelect(false)
+    self.blankKeyList = CreateItemListView(panel, "Blank Keys", 10, 35, 200, 150)
 
     local label2 = vgui.Create("DLabel", panel)
     label2:SetPos(220, 10)
     label2:SetSize(200, 20)
     label2:SetText("Select source (lock or key):")
 
-    self.sourceList = vgui.Create("DListView", panel)
-    self.sourceList:SetPos(220, 35)
-    self.sourceList:SetSize(200, 150)
-    self.sourceList:AddColumn("Source")
-    self.sourceList:SetMultiSelect(false)
+    self.sourceList = CreateItemListView(panel, "Source", 220, 35, 200, 150)
 
     local btn = vgui.Create("DButton", panel)
     btn:SetPos(10, 195)
     btn:SetSize(410, 30)
     btn:SetText("Program Key")
     btn.DoClick = function()
-        local blankLine = self.blankKeyList:GetSelectedLine()
-        local sourceLine = self.sourceList:GetSelectedLine()
+        local blankItemID = GetSelectedItemID(self.blankKeyList)
+        local sourceItemID = GetSelectedItemID(self.sourceList)
 
-        if not blankLine or not sourceLine then return end
-
-        local blankData = self.blankKeyList:GetLine(blankLine)
-        local sourceData = self.sourceList:GetLine(sourceLine)
-
-        if not blankData or not sourceData then return end
+        if not blankItemID or not sourceItemID then return end
 
         net.Start("ixLocksmithProgramKey")
             net.WriteEntity(self.station)
-            net.WriteUInt(blankData.itemID, 32)
-            net.WriteUInt(sourceData.itemID, 32)
+            net.WriteUInt(blankItemID, 32)
+            net.WriteUInt(sourceItemID, 32)
         net.SendToServer()
 
         timer.Simple(0.5, function()
@@ -243,42 +255,29 @@ function PANEL:CreateAddKeyingTab()
     label1:SetSize(200, 20)
     label1:SetText("Select lock:")
 
-    self.lockListForKeying = vgui.Create("DListView", panel)
-    self.lockListForKeying:SetPos(10, 35)
-    self.lockListForKeying:SetSize(200, 150)
-    self.lockListForKeying:AddColumn("Lock")
-    self.lockListForKeying:SetMultiSelect(false)
+    self.lockListForKeying = CreateItemListView(panel, "Lock", 10, 35, 200, 150)
 
     local label2 = vgui.Create("DLabel", panel)
     label2:SetPos(220, 10)
     label2:SetSize(200, 20)
     label2:SetText("Select key to add:")
 
-    self.keyListForKeying = vgui.Create("DListView", panel)
-    self.keyListForKeying:SetPos(220, 35)
-    self.keyListForKeying:SetSize(200, 150)
-    self.keyListForKeying:AddColumn("Key")
-    self.keyListForKeying:SetMultiSelect(false)
+    self.keyListForKeying = CreateItemListView(panel, "Key", 220, 35, 200, 150)
 
     local btn = vgui.Create("DButton", panel)
     btn:SetPos(10, 195)
     btn:SetSize(410, 30)
     btn:SetText("Add Keying to Lock")
     btn.DoClick = function()
-        local lockLine = self.lockListForKeying:GetSelectedLine()
-        local keyLine = self.keyListForKeying:GetSelectedLine()
+        local lockItemID = GetSelectedItemID(self.lockListForKeying)
+        local keyItemID = GetSelectedItemID(self.keyListForKeying)
 
-        if not lockLine or not keyLine then return end
-
-        local lockData = self.lockListForKeying:GetLine(lockLine)
-        local keyData = self.keyListForKeying:GetLine(keyLine)
-
-        if not lockData or not keyData then return end
+        if not lockItemID or not keyItemID then return end
 
         net.Start("ixLocksmithAddKeying")
             net.WriteEntity(self.station)
-            net.WriteUInt(lockData.itemID, 32)
-            net.WriteUInt(keyData.itemID, 32)
+            net.WriteUInt(lockItemID, 32)
+            net.WriteUInt(keyItemID, 32)
         net.SendToServer()
 
         timer.Simple(0.5, function()
@@ -340,11 +339,7 @@ function PANEL:CreateRenameTab()
     label:SetSize(400, 20)
     label:SetText("Select lock or key to rename (one-time only):")
 
-    self.renameList = vgui.Create("DListView", panel)
-    self.renameList:SetPos(10, 35)
-    self.renameList:SetSize(400, 140)
-    self.renameList:AddColumn("Item")
-    self.renameList:SetMultiSelect(false)
+    self.renameList = CreateItemListView(panel, "Item", 10, 35, 400, 140)
 
     local labelName = vgui.Create("DLabel", panel)
     labelName:SetPos(10, 185)
@@ -361,18 +356,15 @@ function PANEL:CreateRenameTab()
     btn:SetSize(400, 30)
     btn:SetText("Rename")
     btn.DoClick = function()
-        local selected = self.renameList:GetSelectedLine()
-        if not selected then return end
-
-        local data = self.renameList:GetLine(selected)
-        if not data then return end
+        local itemID = GetSelectedItemID(self.renameList)
+        if not itemID then return end
 
         local newName = self.renameEntry:GetValue()
         if newName == "" then return end
 
         net.Start("ixLocksmithRename")
             net.WriteEntity(self.station)
-            net.WriteUInt(data.itemID, 32)
+            net.WriteUInt(itemID, 32)
             net.WriteString(newName)
         net.SendToServer()
 
@@ -430,28 +422,13 @@ function PANEL:CreateViewKeyingsTab()
     label:SetSize(400, 20)
     label:SetText("Select lock to view its keyings:")
 
-    self.viewLockList = vgui.Create("DListView", panel)
-    self.viewLockList:SetPos(10, 35)
-    self.viewLockList:SetSize(400, 180)
-    self.viewLockList:AddColumn("Lock")
-    self.viewLockList:SetMultiSelect(false)
+    self.viewLockList = CreateItemListView(panel, "Lock", 10, 35, 400, 180)
 
-    local btn = vgui.Create("DButton", panel)
-    btn:SetPos(10, 225)
-    btn:SetSize(400, 30)
-    btn:SetText("View Keyings")
-    btn.DoClick = function()
-        local selected = self.viewLockList:GetSelectedLine()
-        if not selected then return end
-
-        local data = self.viewLockList:GetLine(selected)
-        if not data then return end
-
-        net.Start("ixLocksmithViewKeyings")
-            net.WriteEntity(self.station)
-            net.WriteUInt(data.itemID, 32)
-        net.SendToServer()
-    end
+    CreateNetButton(panel, "View Keyings", 10, 225, 400, 30, self,
+        "ixLocksmithViewKeyings",
+        function() return GetSelectedItemID(self.viewLockList) end,
+        nil
+    )
 
     self.tabs:AddSheet("View Keyings", panel, "icon16/magnifier.png")
 end
