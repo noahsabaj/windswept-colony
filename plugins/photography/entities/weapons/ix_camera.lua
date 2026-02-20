@@ -35,7 +35,6 @@ SWEP.MaxFOV = 90      -- Minimum zoom (highest FOV)
 SWEP.DefaultFOV = 70
 SWEP.ZoomSpeed = 5
 
-SWEP.BatteryDrainPerPhoto = 2
 SWEP.FlashDuration = 0.25
 
 -- ============================================================================
@@ -370,22 +369,31 @@ if CLIENT then
         surface.SetDrawColor(0, 0, 0, 150)
         surface.DrawRect(squareX, infoY - 5, squareSize, 40)
 
-        -- Battery indicator (left)
+        -- Battery indicator (optional, if using Windswept bridge)
+        local hasBatterySystem = false
         local batteryCharge = 0
-        if item then
+
+        if item and item.GetBatteries then
+            hasBatterySystem = true
             local batteries = item:GetData("batteries", {})
             batteryCharge = batteries[1] or 0
         end
 
-        local batteryColor = batteryCharge >= 20 and Color(100, 255, 100) or Color(255, 100, 100)
-        draw.SimpleText(string.format("⚡ %dup", batteryCharge), "ixMediumFont", squareX + 20, infoY, batteryColor, TEXT_ALIGN_LEFT)
-
-        -- Flash + Zoom indicator (center) - combined so entire string is centered
         local flashText = self:GetFlashEnabled() and "FLASH: ON" or "FLASH: OFF"
         local zoomPercent = math.Round(100 - ((self:GetCurrentFOV() - self.MinFOV) / (self.MaxFOV - self.MinFOV)) * 100)
-        local centerText = string.format("[%s | Zoom: %d%%]", flashText, zoomPercent)
         local flashColor = self:GetFlashEnabled() and Color(255, 255, 100) or ix.constants.COLOR_UI_NEUTRAL
-        draw.SimpleText(centerText, "ixMediumFont", cx, infoY, flashColor, TEXT_ALIGN_CENTER)
+        local infoText = string.format("[%s | Zoom: %d%%]", flashText, zoomPercent)
+
+        if hasBatterySystem then
+            local batteryColor = batteryCharge >= 20 and Color(100, 255, 100) or Color(255, 100, 100)
+            draw.SimpleText(string.format("⚡ %dup", batteryCharge), "ixMediumFont", squareX + 20, infoY, batteryColor, TEXT_ALIGN_LEFT)
+            
+            -- Show tools in center
+            draw.SimpleText(infoText, "ixMediumFont", cx, infoY, flashColor, TEXT_ALIGN_CENTER)
+        else
+            -- No battery, shift tools to left
+            draw.SimpleText(infoText, "ixMediumFont", squareX + 20, infoY, flashColor, TEXT_ALIGN_LEFT)
+        end
 
         -- Film indicator (right)
         local filmShots = 0
@@ -542,26 +550,18 @@ if SERVER then
         if not weapon:GetAiming() then return end
 
         local item = weapon.ixItem
-        if not item then
-            client:NotifyLocalized("cameraNoBattery")
-            return
-        end
-
-        -- Check battery
-        local batteries = item:GetData("batteries", {})
-        if #batteries == 0 then
-            client:NotifyLocalized("cameraNoBattery")
-            return
-        end
-        if batteries[1] < weapon.BatteryDrainPerPhoto then
-            client:NotifyLocalized("cameraNoCharge")
-            return
-        end
+        if not item then return end
 
         -- Check film
         local film = item:GetData("film", nil)
         if not film or film.shots <= 0 then
             client:NotifyLocalized("cameraNoFilm")
+            return
+        end
+
+        -- Call hook to see if any other plugins block this photo (e.g. Battery bridge)
+        -- Passing 'false' as 3rd arg means "just check, don't drain"
+        if hook.Run("ixCameraCanTakePhoto", client, item, false) == false then
             return
         end
 
@@ -624,25 +624,15 @@ if SERVER then
         local item = weapon.ixItem
         if not item then return end
 
-        -- Re-verify resources (in case state changed)
-        local batteries = item:GetData("batteries", {})
-        if #batteries == 0 or batteries[1] < weapon.BatteryDrainPerPhoto then
-            return
-        end
-
         local film = item:GetData("film", nil)
         if not film or film.shots <= 0 then
             return
         end
 
-        -- Drain battery
-        batteries[1] = batteries[1] - weapon.BatteryDrainPerPhoto
-        item:SetData("batteries", batteries)
-
-        -- Check for auto-eject
-        if batteries[1] <= 0 then
-            item:AutoEjectDepleted(client)
-            item:AutoLoadFromInventory(client)
+        -- Hook verification (re-run draining/blocking logic)
+        -- Passing 'true' as 3rd arg means "really drain"
+        if hook.Run("ixCameraCanTakePhoto", client, item, true) == false then 
+            return
         end
 
         -- Consume film shot

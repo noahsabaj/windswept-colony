@@ -23,8 +23,7 @@ ix.util.Include("libs/sh_radio.lua")
 -- Include document system library (for paper, writing tools, document containers)
 ix.util.Include("libs/sh_documents.lua")
 
--- Include photo system library (for photo viewer base panel, ownership verification)
-ix.util.Include("libs/sh_photo.lua")
+
 
 -- Schema Configuration
 Schema.colony = Schema.colony or {}

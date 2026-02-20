@@ -10,25 +10,21 @@
 ]]--
 
 ITEM.name = "Camera"
-ITEM.description = "A camera for taking photographs. Requires battery and film."
+ITEM.description = "A camera for taking photographs. Requires film."
 ITEM.model = "models/weapons/infra/w_camera.mdl"
-ITEM.base = "base_battery_device"
 ITEM.width = 2
 ITEM.height = 2
 ITEM.category = "Equipment"
 ITEM.noBusiness = true
 
--- Battery device configuration
-ITEM.maxBatteries = 1
+-- Weapon configuration
 ITEM.weaponClass = "ix_camera"
-ITEM.playerItemKey = "ixCameraItem"
 ITEM.equipSound = "items/flashlight1.wav"
+ITEM.unequipSound = "items/flashlight1.wav"
 ITEM.notifyPrefix = "camera"
-ITEM.hasLightToggle = false
 
 -- Camera-specific configuration
 ITEM.maxFilm = 1
-ITEM.batteryDrainPerPhoto = 2
 
 -- ============================================================================
 -- FILM HELPER FUNCTIONS (camera-specific)
@@ -67,27 +63,12 @@ function ITEM:ConsumeFilmShot()
     end
 end
 
-function ITEM:HasSufficientCharge()
-    return self:GetFirstBatteryCharge() >= self.batteryDrainPerPhoto
-end
-
-function ITEM:DrainBattery(amount)
-    local batteries = self:GetBatteries()
-    if #batteries == 0 then return false end
-
-    batteries[1] = math.max(0, batteries[1] - amount)
-    self:SetBatteries(batteries)
-
-    return true
-end
-
 -- ============================================================================
--- CLIENT VISUALS (override to show both battery and film)
+-- CLIENT VISUALS (override to show film)
 -- ============================================================================
 
 if CLIENT then
     function ITEM:PaintOver(item, w, h)
-        local batteries = item:GetData("batteries", {})
         local film = item:GetData("film", nil)
         local isEquipped = item:GetData("equipped")
 
@@ -96,18 +77,28 @@ if CLIENT then
             ix.constants.DrawEquippedIndicator(w, h)
         end
 
-        local barY = h - 12
-        local barHeight = 6
+        local barY = h - 6
+        local barHeight = 4
 
-        -- Draw battery bar (top)
-        if #batteries > 0 then
+        -- Draw battery bar (optional, if using Windswept bridge)
+        local batteries
+        if item.GetBatteries then
+            batteries = item:GetData("batteries", {})
+        end
+
+        if batteries and #batteries > 0 then
+            barY = h - 12
             local charge = batteries[1]
-
             surface.SetDrawColor(30, 30, 30, 200)
             surface.DrawRect(4, barY - barHeight - 2, w - 8, barHeight)
 
             local chargeWidth = ((w - 8) / 100) * charge
-            surface.SetDrawColor(ix.constants.GetChargeColor(charge))
+            -- Optional helper for charge colors (use fallback if missing)
+            local function GetChargeColor(c)
+                if ix.constants and ix.constants.GetChargeColor then return ix.constants.GetChargeColor(c) end
+                return c >= 20 and Color(100, 255, 100) or Color(255, 100, 100)
+            end
+            surface.SetDrawColor(GetChargeColor(charge))
             surface.DrawRect(4, barY - barHeight - 2, chargeWidth, barHeight)
         end
 
@@ -123,20 +114,32 @@ if CLIENT then
     end
 
     function ITEM:PopulateTooltip(tooltip)
-        local batteries = self:GetData("batteries", {})
         local film = self:GetData("film", nil)
 
-        -- Battery row
-        local batteryRow = tooltip:AddRow("battery")
-        if #batteries == 0 then
-            batteryRow:SetText("No battery inserted.")
-            batteryRow:SetBackgroundColor(Color(100, 100, 100))
-        else
-            local charge = batteries[1]
-            batteryRow:SetText(string.format("Battery: %dup / 100up", charge))
-            batteryRow:SetBackgroundColor(ix.constants.GetChargeColorDark(charge))
+        -- Battery row (optional, if using Windswept bridge)
+        local batteries
+        if self.GetBatteries then
+            batteries = self:GetData("batteries", {})
         end
-        batteryRow:SizeToContents()
+
+        if batteries then
+            local batteryRow = tooltip:AddRow("battery")
+            if #batteries == 0 then
+                batteryRow:SetText("No battery inserted.")
+                batteryRow:SetBackgroundColor(Color(100, 100, 100))
+            else
+                local charge = batteries[1]
+                batteryRow:SetText(string.format("Battery: %dup / 100up", charge))
+                
+                local function GetChargeColorDark(c)
+                    if ix.constants and ix.constants.GetChargeColorDark then return ix.constants.GetChargeColorDark(c) end
+                    return c >= 20 and Color(50, 150, 50) or Color(150, 50, 50)
+                end
+                
+                batteryRow:SetBackgroundColor(GetChargeColorDark(charge))
+            end
+            batteryRow:SizeToContents()
+        end
 
         -- Film row
         local filmRow = tooltip:AddRow("film")
@@ -236,3 +239,129 @@ ITEM.functions.LoadFilm = {
         return false
     end
 }
+
+-- ============================================================================
+-- EQUIP/UNEQUIP FUNCTIONS (Replacing base_battery_device)
+-- ============================================================================
+
+ITEM.functions.Equip = {
+    name = "Equip",
+    tip = "Hold this item in your hands.",
+    icon = "icon16/tick.png",
+    OnRun = function(item)
+        local client = item.player
+
+        if not item.weaponClass then
+            return false
+        end
+
+        local existingItem = client.ixCameraItem
+        if existingItem and existingItem ~= item then
+            existingItem:SetData("equipped", nil)
+        end
+
+        if client:HasWeapon(item.weaponClass) then
+            client:StripWeapon(item.weaponClass)
+        end
+
+        local weapon = client:Give(item.weaponClass)
+        if IsValid(weapon) then
+            weapon.ixItem = item
+            client:SelectWeapon(item.weaponClass)
+        end
+
+        client.ixCameraItem = item
+        item:SetData("equipped", true)
+
+        client:EmitSound(item.equipSound, 50)
+        return false
+    end,
+    OnCanRun = function(item)
+        if IsValid(item.entity) then return false end
+        if item:GetData("equipped") then return false end
+        if not item.weaponClass then return false end
+        return true
+    end
+}
+
+ITEM.functions.Unequip = {
+    name = "Unequip",
+    tip = "Put this item away.",
+    icon = "icon16/cross.png",
+    OnRun = function(item)
+        local client = item.player
+        if not item.weaponClass then return false end
+
+        local weapon = client:GetWeapon(item.weaponClass)
+        if IsValid(weapon) then
+            client:StripWeapon(item.weaponClass)
+        end
+
+        client.ixCameraItem = nil
+        item:SetData("equipped", nil)
+
+        local pitch = item.unequipSound and 100 or 90
+        client:EmitSound(item.unequipSound or item.equipSound, 50, pitch)
+
+        return false
+    end,
+    OnCanRun = function(item)
+        return item:GetData("equipped") == true
+    end
+}
+
+-- ============================================================================
+-- BACKEND HOOKS
+-- ============================================================================
+
+function ITEM.postHooks.drop(item, result)
+    if item:GetData("equipped") and item.weaponClass then
+        local client = item:GetOwner()
+        if IsValid(client) then
+            local weapon = client:GetWeapon(item.weaponClass)
+            if IsValid(weapon) then
+                client:StripWeapon(item.weaponClass)
+            end
+            client.ixCameraItem = nil
+        end
+        item:SetData("equipped", nil)
+    end
+end
+
+function ITEM:OnTransferred(oldInventory, newInventory)
+    if self:GetData("equipped") and self.weaponClass then
+        local oldOwner = oldInventory and oldInventory.GetOwner and oldInventory:GetOwner()
+        if IsValid(oldOwner) then
+            local weapon = oldOwner:GetWeapon(self.weaponClass)
+            if IsValid(weapon) then
+                oldOwner:StripWeapon(self.weaponClass)
+            end
+            oldOwner.ixCameraItem = nil
+        end
+        self:SetData("equipped", nil)
+    end
+end
+
+function ITEM:CanTransfer(oldInventory, newInventory)
+    if newInventory and self:GetData("equipped") then
+        local owner = self:GetOwner()
+        if IsValid(owner) then
+            owner:NotifyLocalized(self.notifyPrefix .. "Equipped")
+        end
+        return false
+    end
+    return true
+end
+
+function ITEM:OnLoadout()
+    if self:GetData("equipped") and self.weaponClass then
+        local client = self.player
+        if not IsValid(client) then return end
+
+        local weapon = client:Give(self.weaponClass, true)
+        if IsValid(weapon) then
+            weapon.ixItem = self
+            client.ixCameraItem = self
+        end
+    end
+end
