@@ -436,7 +436,7 @@ ix.char.RegisterVar("physHairColor", {
         -- Hide when bald
         payload:AddHook("physHairLength", function(hairLength)
             if not IsValid(panel) then return end
-            panel:SetVisible(hairLength ~= "Bald")
+            ix.charCreate.SetFieldVisible(panel, hairLength ~= "Bald")
         end)
 
         return panel
@@ -446,7 +446,7 @@ ix.char.RegisterVar("physHairColor", {
         -- Check if model is bald-locked
         local modelPath = ix.physical.GetModelPath(payload.model or 1)
         if ix.physical.IsBaldModel(modelPath) then
-            panel:SetVisible(false)
+            ix.charCreate.SetFieldVisible(panel, false)
         end
         payload:Set("physHairColor", panel:GetValue())
     end
@@ -482,7 +482,7 @@ ix.char.RegisterVar("physHairType", {
         -- Hide when bald
         payload:AddHook("physHairLength", function(hairLength)
             if not IsValid(panel) then return end
-            panel:SetVisible(hairLength ~= "Bald")
+            ix.charCreate.SetFieldVisible(panel, hairLength ~= "Bald")
         end)
 
         return panel
@@ -492,7 +492,7 @@ ix.char.RegisterVar("physHairType", {
         -- Check if model is bald-locked
         local modelPath = ix.physical.GetModelPath(payload.model or 1)
         if ix.physical.IsBaldModel(modelPath) then
-            panel:SetVisible(false)
+            ix.charCreate.SetFieldVisible(panel, false)
         end
         payload:Set("physHairType", panel:GetValue())
     end

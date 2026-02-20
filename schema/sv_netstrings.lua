@@ -12,13 +12,11 @@
 ]]--
 
 -- =============================================================================
--- CURRENCY SYSTEM (schema/sv_schema.lua handlers)
+-- CURRENCY SYSTEM
+-- ixMoneyGive, ixMoneyDestroy, ixCurrencySplit, ixCurrencySplitConfirm
+-- are now registered in helix/gamemode/core/libs/sh_currency.lua
 -- =============================================================================
-util.AddNetworkString("ixMoneyDestroy")
-util.AddNetworkString("ixMoneyGive")
 util.AddNetworkString("ixWalletGive")
-util.AddNetworkString("ixCurrencySplit")
-util.AddNetworkString("ixCurrencySplitConfirm")
 util.AddNetworkString("ixBagDrop")  -- Wallet/bag drop functionality
 
 -- =============================================================================

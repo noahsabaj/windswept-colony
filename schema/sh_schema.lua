@@ -38,24 +38,6 @@ Schema.economy = Schema.economy or {}
 Schema.economy.eecCut = 0.70  -- 70% to Eagle Extraction
 Schema.economy.adminCut = 0.30  -- 30% to Colonial Administration
 
--- Get the player the client is looking at within range
-function Schema:GetLookAtPlayer(client, maxRange)
-    maxRange = maxRange or 100
-
-    local trace = util.TraceLine({
-        start = client:EyePos(),
-        endpos = client:EyePos() + client:GetAimVector() * maxRange,
-        filter = client
-    })
-
-    local target = trace.Entity
-    if IsValid(target) and target:IsPlayer() then
-        return target
-    end
-
-    return nil
-end
-
 -- Include other schema files
 ix.util.Include("cl_schema.lua")
 ix.util.Include("sv_schema.lua")

@@ -336,7 +336,7 @@ ITEM.functions.Give = {
     end,
     OnClick = function(item)
         local client = LocalPlayer()
-        local target = Schema:GetLookAtPlayer(client, 100)
+        local target = ix.util.GetLookAtPlayer(client, 100)
 
         if not IsValid(target) then
             client:NotifyLocalized("noTargetInFront")
