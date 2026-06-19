@@ -26,7 +26,7 @@ ITEM.base = "base_equippable"
 
 -- Equippable configuration
 ITEM.equipWeaponClass = "ix_lock"
-ITEM.equipPlayerKey = "ixLockItem"
+ITEM.equipPlayerKey = "wsLockItem"
 ITEM.equipNotifyKey = "lockEquipped"
 ITEM.equipSound = "physics/metal/metal_solid_impact_soft3.wav"
 ITEM.equipSoundVolume = 0.5
@@ -106,11 +106,11 @@ end
 if CLIENT then
     function ITEM:PaintOver(item, w, h)
         if item:GetData("equipped") then
-            ix.constants.DrawEquippedIndicator(w, h)
+            ws.constants.DrawEquippedIndicator(w, h)
         end
 
         local durability = item:GetData("durability", 100)
-        ix.constants.DrawDurabilityBar(w, h, durability / 100, ix.constants.GetChargeColor(durability, 75, 50, 25))
+        ws.constants.DrawDurabilityBar(w, h, durability / 100, ws.constants.GetChargeColor(durability, 75, 50, 25))
     end
 
     function ITEM:PopulateTooltip(tooltip)
@@ -118,15 +118,15 @@ if CLIENT then
         local durability = self:GetDurability()
 
         -- Keying count
-        ix.constants.AddTooltipRow(tooltip, "keyings", "Keyings: " .. #keyings .. "/" .. self.maxKeyings, Color(80, 80, 120))
+        ws.constants.AddTooltipRow(tooltip, "keyings", "Keyings: " .. #keyings .. "/" .. self.maxKeyings, Color(80, 80, 120))
 
         -- Durability
-        ix.constants.AddTooltipRow(tooltip, "durability", "Durability: " .. math.floor(durability) .. "%", ix.constants.GetChargeColorDark(durability, 75, 50, 25))
+        ws.constants.AddTooltipRow(tooltip, "durability", "Durability: " .. math.floor(durability) .. "%", ws.constants.GetChargeColorDark(durability, 75, 50, 25))
 
         -- Lock name
         local lockName = self:GetLockName()
         if lockName and lockName ~= "" then
-            ix.constants.AddTooltipRow(tooltip, "lockName", "Label: " .. lockName, Color(60, 100, 60))
+            ws.constants.AddTooltipRow(tooltip, "lockName", "Label: " .. lockName, Color(60, 100, 60))
         end
     end
 end

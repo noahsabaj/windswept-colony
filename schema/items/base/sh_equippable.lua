@@ -6,7 +6,7 @@
 
     Configuration (child items must set these):
         ITEM.equipWeaponClass   - The SWEP class to give (e.g., "ix_binoculars")
-        ITEM.equipPlayerKey     - Key to store item reference on player (e.g., "ixBinocularsItem")
+        ITEM.equipPlayerKey     - Key to store item reference on player (e.g., "wsBinocularsItem")
         ITEM.equipNotifyKey     - Localization key for "unequip first" message (e.g., "binocularsEquipped")
 
     Optional configuration:
@@ -25,7 +25,7 @@
         ITEM.base = "base_equippable"
 
         ITEM.equipWeaponClass = "ix_binoculars"
-        ITEM.equipPlayerKey = "ixBinocularsItem"
+        ITEM.equipPlayerKey = "wsBinocularsItem"
         ITEM.equipNotifyKey = "binocularsEquipped"
 ]]--
 
@@ -53,7 +53,7 @@ ITEM.unequipTip = "Put this item away."
 if CLIENT then
     function ITEM:PaintOver(item, w, h)
         if item:GetData("equipped") then
-            ix.constants.DrawEquippedIndicator(w, h)
+            ws.constants.DrawEquippedIndicator(w, h)
         end
     end
 end
@@ -91,7 +91,7 @@ ITEM.functions.Equip = {
         -- Give the SWEP
         local weapon = client:Give(weaponClass)
         if IsValid(weapon) then
-            weapon.ixItem = item
+            weapon.wsItem = item
             client:SelectWeapon(weaponClass)
         end
 
@@ -216,7 +216,7 @@ function ITEM:OnLoadout()
 
         local weapon = client:Give(weaponClass, true)
         if IsValid(weapon) then
-            weapon.ixItem = self
+            weapon.wsItem = self
             client[playerKey] = self
         end
     end

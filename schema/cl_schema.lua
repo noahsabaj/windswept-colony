@@ -7,7 +7,7 @@
 -- ============================================================================
 
 -- Receive split dialog request from server
-net.Receive("ixCurrencySplit", function()
+net.Receive("wsCurrencySplit", function()
     local itemID = net.ReadUInt(32)
     local maxQuantity = net.ReadUInt(16)
     local itemType = net.ReadString()
@@ -31,7 +31,7 @@ net.Receive("ixCurrencySplit", function()
                 return
             end
 
-            net.Start("ixCurrencySplitConfirm")
+            net.Start("wsCurrencySplitConfirm")
                 net.WriteUInt(itemID, 32)
                 net.WriteUInt(math.floor(amount), 16)
             net.SendToServer()
@@ -47,12 +47,12 @@ end)
 -- ============================================================================
 
 -- Receive frequency dialog request from server
-netstream.Hook("ixRadioFrequency", function(currentFreq)
+netstream.Hook("wsRadioFrequency", function(currentFreq)
     -- Remove existing panel if open
-    if IsValid(ix.gui.radioFrequency) then
-        ix.gui.radioFrequency:Remove()
+    if IsValid(ws.gui.radioFrequency) then
+        ws.gui.radioFrequency:Remove()
     end
 
-    ix.gui.radioFrequency = vgui.Create("ixRadioFrequency")
-    ix.gui.radioFrequency:SetFrequency(currentFreq)
+    ws.gui.radioFrequency = vgui.Create("wsRadioFrequency")
+    ws.gui.radioFrequency:SetFrequency(currentFreq)
 end)

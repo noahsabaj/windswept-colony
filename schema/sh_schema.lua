@@ -3,25 +3,25 @@ Schema.author = "kwabaj"
 Schema.description = "A serious roleplay experience on the mining colony of Redrock."
 
 -- Include netstream library (required for radio frequency dialog)
-ix.util.Include("libs/thirdparty/sh_netstream2.lua")
+ws.util.Include("libs/thirdparty/sh_netstream2.lua")
 
 -- Include birth data library (for Personal ID and character creation)
-ix.util.Include("libs/sh_birthdata.lua")
+ws.util.Include("libs/sh_birthdata.lua")
 
 -- Include physical description system (for character creation and Personal ID)
-ix.util.Include("libs/sh_physical.lua")
+ws.util.Include("libs/sh_physical.lua")
 
 -- Include door frame management library (for physical lock & key system)
-ix.util.Include("libs/sh_doors.lua")
+ws.util.Include("libs/sh_doors.lua")
 
 -- Include wallet system library (for currency routing to wallets)
-ix.util.Include("libs/sh_wallet.lua")
+ws.util.Include("libs/sh_wallet.lua")
 
 -- Include radio utilities library (for handheld and stationary radios)
-ix.util.Include("libs/sh_radio.lua")
+ws.util.Include("libs/sh_radio.lua")
 
 -- Include document system library (for paper, writing tools, document containers)
-ix.util.Include("libs/sh_documents.lua")
+ws.util.Include("libs/sh_documents.lua")
 
 
 
@@ -38,13 +38,13 @@ Schema.economy.eecCut = 0.70  -- 70% to Eagle Extraction
 Schema.economy.adminCut = 0.30  -- 30% to Colonial Administration
 
 -- Include other schema files
-ix.util.Include("cl_schema.lua")
-ix.util.Include("sv_schema.lua")
-ix.util.Include("cl_hooks.lua")
-ix.util.Include("sv_hooks.lua")
-ix.util.Include("sh_configs.lua")
-ix.util.Include("sh_commands.lua")
-ix.util.Include("sh_options.lua")
+ws.util.Include("cl_schema.lua")
+ws.util.Include("sv_schema.lua")
+ws.util.Include("cl_hooks.lua")
+ws.util.Include("sv_hooks.lua")
+ws.util.Include("sh_configs.lua")
+ws.util.Include("sh_commands.lua")
+ws.util.Include("sh_options.lua")
 
 -- ============================================================================
 -- RADIO CHAT CLASSES
@@ -95,8 +95,8 @@ do
         if not listenerRadio then return false end
 
         -- Drain listener's battery for receiving (server-side only)
-        if SERVER and ix.radioMessageLength then
-            local speakingTime = math.max(0.5, ix.radioMessageLength / 15)
+        if SERVER and ws.radioMessageLength then
+            local speakingTime = math.max(0.5, ws.radioMessageLength / 15)
             listenerRadio:DrainActive(speakingTime)
         end
 
@@ -110,7 +110,7 @@ do
         chat.AddText(self.color, string.format(self.format, name, text))
     end
 
-    ix.chat.Register("radio", CLASS)
+    ws.chat.Register("radio", CLASS)
 end
 
 -- Radio eavesdrop (nearby players hear you talking into radio, but not on frequency)
@@ -128,12 +128,12 @@ do
 
     function CLASS:CanHear(speaker, listener)
         -- Don't double-send to people who can hear via radio
-        if ix.chat.classes.radio:CanHear(speaker, listener) then
+        if ws.chat.classes.radio:CanHear(speaker, listener) then
             return false
         end
 
         -- Only nearby players
-        local chatRange = ix.config.Get("chatRange", 280)
+        local chatRange = ws.config.Get("chatRange", 280)
         return (speaker:GetPos() - listener:GetPos()):LengthSqr() <= (chatRange * chatRange)
     end
 
@@ -143,5 +143,5 @@ do
         chat.AddText(self.color, string.format(self.format, name, text))
     end
 
-    ix.chat.Register("radio_eavesdrop", CLASS)
+    ws.chat.Register("radio_eavesdrop", CLASS)
 end

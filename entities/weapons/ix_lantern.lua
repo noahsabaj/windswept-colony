@@ -125,7 +125,7 @@ end
 function SWEP:SetLight(value)
     if CLIENT then
         -- Request server
-        net.Start("ixLanternSetLight")
+        net.Start("wsLanternSetLight")
         net.WriteBool(value)
         net.SendToServer()
         return
@@ -134,7 +134,7 @@ function SWEP:SetLight(value)
     -- SERVER
     if value then
         -- Check battery
-        local item = self.ixItem
+        local item = self.wsItem
         if not item then
             self:GetOwner():NotifyLocalized("lanternNoBattery")
             return
@@ -157,7 +157,7 @@ function SWEP:SetLight(value)
 end
 
 if SERVER then
-    net.Receive("ixLanternSetLight", function(len, ply)
+    net.Receive("wsLanternSetLight", function(len, ply)
         local weapon = ply:GetWeapon("ix_lantern")
         if not IsValid(weapon) then return end
         if weapon.ratelimit and weapon.ratelimit > CurTime() then return end
@@ -171,9 +171,11 @@ end
 -- PrimaryAttack/SecondaryAttack not used - input handled in Think() for Helix compatibility
 
 if SERVER then
-    net.Receive("ixLanternPlace", function(len, ply)
+    net.Receive("wsLanternPlace", function(len, ply)
         local weapon = ply:GetWeapon("ix_lantern")
         if not IsValid(weapon) then return end
+        if weapon.ratelimit and weapon.ratelimit > CurTime() then return end
+        weapon.ratelimit = CurTime() + 0.2
 
         weapon:PlaceLantern()
     end)
@@ -181,6 +183,15 @@ if SERVER then
     function SWEP:PlaceLantern()
         local owner = self:GetOwner()
         if not IsValid(owner) then return end
+
+        -- Idempotency guard: StripWeapon / inventory:Remove only take effect next
+        -- tick, so without this a duplicate wsLanternPlace in the same batch would
+        -- spawn a second dropped lantern from one item (a dupe).
+        if self.wsPlacing then return end
+
+        -- Get item data
+        local item = self.wsItem
+        if not item then return end
 
         -- Trace to find placement position
         local tr = util.TraceLine({
@@ -194,9 +205,8 @@ if SERVER then
             return
         end
 
-        -- Get item data
-        local item = self.ixItem
-        if not item then return end
+        -- Commit: from here the item is consumed; block re-entry.
+        self.wsPlacing = true
 
         local batteries = item:GetData("batteries", {})
         local charge = batteries[1] or 0
@@ -204,7 +214,7 @@ if SERVER then
 
         -- Create world entity (using distinct name to avoid conflict with weapon class)
         local ent = ents.Create("ix_lantern_dropped")
-        if not IsValid(ent) then return end
+        if not IsValid(ent) then self.wsPlacing = nil return end
 
         ent:SetPos(tr.HitPos + tr.HitNormal * 2)
         ent:SetAngles(Angle(0, owner:EyeAngles().y, 0))
@@ -217,14 +227,15 @@ if SERVER then
         ent.OwnerPlayer = owner
 
         -- Remove item from inventory
-        local _, inventory = ix.constants.GetCharacterInventory(owner)
+        local _, inventory = ws.constants.GetCharacterInventory(owner)
         if inventory then
             inventory:Remove(item:GetID())
         end
 
         -- Strip weapon
+        self.wsItem = nil
         owner:StripWeapon("ix_lantern")
-        owner.ixLanternItem = nil
+        owner.wsLanternItem = nil
 
         owner:EmitSound("weapons/slam/throw.wav", 60)
     end
@@ -249,10 +260,10 @@ function SWEP:Think()
         local owner = self:GetOwner()
         if IsValid(owner) then
             -- LMB edge detection via shared helper
-            local lmb = ix.constants.ProcessSWEPInput(self)
+            local lmb = ws.constants.ProcessSWEPInput(self)
 
             if lmb then
-                net.Start("ixLanternSetLight")
+                net.Start("wsLanternSetLight")
                 net.WriteBool(not self:GetLanternOn())
                 net.SendToServer()
             end
@@ -264,7 +275,7 @@ function SWEP:Think()
                     self.rmbStartTime = CurTime()
                 elseif CurTime() - self.rmbStartTime >= 0.5 then
                     self.rmbStartTime = nil
-                    net.Start("ixLanternPlace")
+                    net.Start("wsLanternPlace")
                     net.SendToServer()
                 end
             else
@@ -282,7 +293,7 @@ function SWEP:Think()
     if self.drainAccumulator < 1 then return end
     self.drainAccumulator = self.drainAccumulator - 1
 
-    local item = self.ixItem
+    local item = self.wsItem
     if not item then
         self:SetLanternOn(false)
         return
@@ -302,10 +313,10 @@ function SWEP:Think()
         self:GetOwner():NotifyLocalized("lanternBatteryDead")
 
         local owner = self:GetOwner()
-        if ix.option.Get(owner, "batteryAutoEject", true) then
+        if ws.option.Get(owner, "batteryAutoEject", true) then
             item:AutoEjectDepleted(owner)
         end
-        if ix.option.Get(owner, "batteryAutoLoad", true) then
+        if ws.option.Get(owner, "batteryAutoLoad", true) then
             item:AutoLoadFromInventory(owner)
         end
     else
@@ -348,6 +359,6 @@ end
 -- HOOKS - Turn Off Light on Death/Knockout
 -- ============================================================================
 
-ix.weapon.RegisterCleanupHooks("ix_lantern", "ixLantern", function(weapon)
+ws.weapon.RegisterCleanupHooks("ix_lantern", "wsLantern", function(weapon)
     if weapon.SetLight then weapon:SetLight(false) end
 end)

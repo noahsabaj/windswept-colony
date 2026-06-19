@@ -100,7 +100,7 @@ function SWEP:GetTargetDoor()
     end
 
     -- Check if it's our managed door
-    if ent.ixIsWindsweptDoor then
+    if ent.wsIsWindsweptDoor then
         self._cachedDoor = ent
         return ent
     end
@@ -110,7 +110,7 @@ function SWEP:GetTargetDoor()
 end
 
 function SWEP:GetTimeMultiplier(workType)
-    local item = self.ixItem
+    local item = self.wsItem
     if not item then return 1 end
 
     if workType == "removeDoor" then
@@ -130,7 +130,7 @@ function SWEP:HasRepairMaterial(materialType)
     local owner = self:GetOwner()
     if not IsValid(owner) then return false, nil end
 
-    local character, inventory = ix.constants.GetCharacterInventory(owner)
+    local character, inventory = ws.constants.GetCharacterInventory(owner)
     if not character or not inventory then return false, nil end
 
     local targetID = materialType == "wood" and "wood_planks" or "metal_sheets"
@@ -148,10 +148,10 @@ function SWEP:HasMatchingKey(door)
     local owner = self:GetOwner()
     if not IsValid(owner) then return false end
 
-    local character, inventory = ix.constants.GetCharacterInventory(owner)
+    local character, inventory = ws.constants.GetCharacterInventory(owner)
     if not character or not inventory then return false end
 
-    local lockData = door.ixLockData
+    local lockData = door.wsLockData
     if not lockData or not lockData.keyings then return false end
 
     -- Check inventory for a key with matching keying
@@ -174,9 +174,9 @@ end
 -- ============================================================================
 
 if SERVER then
-    ix.weapon.NetReceive("ixToolkitStartRemove", "ix_toolkit", "StartRemove")
-    ix.weapon.NetReceive("ixToolkitStartRepair", "ix_toolkit", "StartRepair")
-    ix.weapon.NetReceive("ixToolkitCancel", "ix_toolkit", "CancelWork")
+    ws.weapon.NetReceive("wsToolkitStartRemove", "ix_toolkit", "StartRemove")
+    ws.weapon.NetReceive("wsToolkitStartRepair", "ix_toolkit", "StartRepair")
+    ws.weapon.NetReceive("wsToolkitCancel", "ix_toolkit", "CancelWork")
 end
 
 -- ============================================================================
@@ -202,7 +202,7 @@ function SWEP:StartRemove()
         return
     end
 
-    local hasLock = ix.doors.HasLock(door)
+    local hasLock = ws.doors.HasLock(door)
 
     if hasLock then
         -- Door has lock - since door is already verified unlocked, we can remove the lock
@@ -257,10 +257,10 @@ function SWEP:StartRepair()
         return
     end
 
-    local lockData = door.ixLockData
-    local config = ix.doors.GetTypeConfig(door)
-    local maxHealth = door.ixMaxHealth or config.maxHealth
-    local health = door.ixHealth or maxHealth
+    local lockData = door.wsLockData
+    local config = ws.doors.GetTypeConfig(door)
+    local maxHealth = door.wsMaxHealth or config.maxHealth
+    local health = door.wsHealth or maxHealth
     local doorDamaged = health < maxHealth
     local lockDamaged = lockData and lockData.durability and lockData.durability < 100
 
@@ -278,7 +278,7 @@ function SWEP:StartRepairDoor(door)
     local owner = self:GetOwner()
 
     -- Determine material needed
-    local config = ix.doors.GetTypeConfig(door)
+    local config = ws.doors.GetTypeConfig(door)
     local materialType = config.material or "wood"
     local hasMaterial, materialItem = self:HasRepairMaterial(materialType)
 
@@ -292,8 +292,8 @@ function SWEP:StartRepairDoor(door)
     end
 
     -- Calculate repair time based on damage
-    local maxHealth = door.ixMaxHealth or config.maxHealth
-    local health = door.ixHealth or maxHealth
+    local maxHealth = door.wsMaxHealth or config.maxHealth
+    local health = door.wsHealth or maxHealth
     local damagePercent = 1 - (health / maxHealth)
     local baseRepairTime = 10  -- Base time for full repair
     local repairTime = baseRepairTime * damagePercent * self:GetTimeMultiplier("repairDoor")
@@ -311,6 +311,9 @@ end
 function SWEP:StartRepairLock(door)
     local owner = self:GetOwner()
 
+    -- Guard against the lock having been removed/destroyed before this call.
+    if not IsValid(door) or not door.wsLockData then return end
+
     -- Need metal sheets for lock repair
     local hasMaterial, materialItem = self:HasRepairMaterial("metal")
     if not hasMaterial then
@@ -319,7 +322,7 @@ function SWEP:StartRepairLock(door)
     end
 
     -- Calculate repair time based on damage
-    local durability = door.ixLockData.durability or 100
+    local durability = door.wsLockData.durability or 100
     local damagePercent = 1 - (durability / 100)
     local baseRepairTime = 6  -- Base time for full lock repair
     local repairTime = baseRepairTime * damagePercent * self:GetTimeMultiplier("repairLock")
@@ -339,7 +342,7 @@ end
 -- ============================================================================
 
 function SWEP:CancelWork()
-    ix.constants.CancelSWEPAction(self, function() return self:IsWorking() end, function()
+    ws.constants.CancelSWEPAction(self, function() return self:IsWorking() end, function()
         self:SetWorking(false)
         self.targetDoor = nil
         self.repairMaterial = nil
@@ -362,7 +365,7 @@ function SWEP:CompleteWork()
         return
     end
 
-    local item = self.ixItem
+    local item = self.wsItem
 
     if workType == "removeDoor" then
         self:CompleteRemoveDoor(owner, door, item)
@@ -380,16 +383,16 @@ function SWEP:CompleteWork()
 end
 
 function SWEP:CompleteRemoveDoor(owner, door, item)
-    local character, inventory = ix.constants.GetCharacterInventory(owner)
+    local character, inventory = ws.constants.GetCharacterInventory(owner)
     if not character or not inventory then
         self:CancelWork()
         return
     end
 
     -- Determine door type item
-    local doorType = door.ixDoorType or "wood"
+    local doorType = door.wsDoorType or "wood"
     local doorItemID = "door_" .. doorType
-    local doorHealth = door.ixHealth or 100
+    local doorHealth = door.wsHealth or 100
     local doorPos = door:GetPos()
 
     -- Try to add door to inventory
@@ -399,19 +402,19 @@ function SWEP:CompleteRemoveDoor(owner, door, item)
 
     if not success then
         -- Inventory full - drop door on ground
-        ix.item.Spawn(doorItemID, doorPos + Vector(0, 0, 10), nil, nil, {
+        ws.item.Spawn(doorItemID, doorPos + Vector(0, 0, 10), nil, nil, {
             health = doorHealth
         })
         owner:NotifyLocalized("toolkitDoorDropped")
     end
 
     -- Clear frame and remove door
-    local frameID = door.ixFrameID
+    local frameID = door.wsFrameID
     if frameID then
         local mapID = tonumber(frameID)
-        if mapID and ix.doors.frames[mapID] then
-            ix.doors.frames[mapID].hasDoor = false
-            ix.doors.frames[mapID].doorEntity = nil
+        if mapID and ws.doors.frames[mapID] then
+            ws.doors.frames[mapID].hasDoor = false
+            ws.doors.frames[mapID].doorEntity = nil
         end
     end
 
@@ -427,18 +430,25 @@ function SWEP:CompleteRemoveDoor(owner, door, item)
     owner:NotifyLocalized("toolkitDoorRemoved")
 
     -- Sync and save
-    ix.doors.SyncToAll()
-    ix.doors.Save()
+    ws.doors.SyncToAll()
+    ws.doors.Save()
 end
 
 function SWEP:CompleteRemoveLock(owner, door, item)
-    local character, inventory = ix.constants.GetCharacterInventory(owner)
+    local character, inventory = ws.constants.GetCharacterInventory(owner)
     if not character or not inventory then
         self:CancelWork()
         return
     end
 
-    local lockData = door.ixLockData
+    -- The lock can be removed/destroyed by another player or a breach during the
+    -- multi-second work window; re-validate before reading it (was a nil-index crash).
+    if not IsValid(door) or not door.wsLockData then
+        self:CancelWork()
+        return
+    end
+
+    local lockData = door.wsLockData
     local doorPos = door:GetPos()
 
     -- Try to add lock to inventory
@@ -450,7 +460,7 @@ function SWEP:CompleteRemoveLock(owner, door, item)
 
     if not success then
         -- Inventory full - drop lock on ground
-        ix.item.Spawn("lock", doorPos + Vector(0, 0, 10), nil, nil, {
+        ws.item.Spawn("lock", doorPos + Vector(0, 0, 10), nil, nil, {
             keyings = lockData.keyings,
             durability = lockData.durability,
             lockName = lockData.name
@@ -459,7 +469,7 @@ function SWEP:CompleteRemoveLock(owner, door, item)
     end
 
     -- Remove lock from door
-    ix.doors.RemoveLock(door)
+    ws.doors.RemoveLock(door)
 
     -- Damage toolkit
     if item and item.TakeDurabilityDamage then
@@ -471,7 +481,7 @@ function SWEP:CompleteRemoveLock(owner, door, item)
 end
 
 function SWEP:CompleteRepairDoor(owner, door, item)
-    local character, inventory = ix.constants.GetCharacterInventory(owner)
+    local character, inventory = ws.constants.GetCharacterInventory(owner)
     if not character or not inventory then
         self:CancelWork()
         return
@@ -479,7 +489,7 @@ function SWEP:CompleteRepairDoor(owner, door, item)
 
     -- Consume repair material
     local materialItem = self.repairMaterial
-    if not materialItem or not ix.item.instances[materialItem:GetID()] then
+    if not materialItem or not ws.item.instances[materialItem:GetID()] then
         owner:NotifyLocalized("toolkitNoMaterial")
         self:CancelWork()
         return
@@ -493,7 +503,7 @@ function SWEP:CompleteRepairDoor(owner, door, item)
     end
 
     -- Repair door to full
-    ix.doors.RepairDoor(door)
+    ws.doors.RepairDoor(door)
 
     -- Damage toolkit
     if item and item.TakeDurabilityDamage then
@@ -505,15 +515,22 @@ function SWEP:CompleteRepairDoor(owner, door, item)
 end
 
 function SWEP:CompleteRepairLock(owner, door, item)
-    local character, inventory = ix.constants.GetCharacterInventory(owner)
+    local character, inventory = ws.constants.GetCharacterInventory(owner)
     if not character or not inventory then
+        self:CancelWork()
+        return
+    end
+
+    -- Lock may have been removed/destroyed during the work window; bail before
+    -- consuming repair material so we don't waste it on a missing lock.
+    if not IsValid(door) or not door.wsLockData then
         self:CancelWork()
         return
     end
 
     -- Consume repair material (metal)
     local materialItem = self.repairMaterial
-    if not materialItem or not ix.item.instances[materialItem:GetID()] then
+    if not materialItem or not ws.item.instances[materialItem:GetID()] then
         owner:NotifyLocalized("toolkitNoMaterial")
         self:CancelWork()
         return
@@ -527,7 +544,7 @@ function SWEP:CompleteRepairLock(owner, door, item)
     end
 
     -- Repair lock to full
-    ix.doors.RepairLock(door)
+    ws.doors.RepairLock(door)
 
     -- Damage toolkit
     if item and item.TakeDurabilityDamage then
@@ -547,20 +564,20 @@ function SWEP:Think()
     if not IsValid(owner) then return end
 
     if CLIENT then
-        local lmb, rmb = ix.constants.ProcessSWEPInput(self)
+        local lmb, rmb = ws.constants.ProcessSWEPInput(self)
 
         if lmb then
             if self:IsWorking() then
-                net.Start("ixToolkitCancel")
+                net.Start("wsToolkitCancel")
                 net.SendToServer()
             else
-                net.Start("ixToolkitStartRepair")
+                net.Start("wsToolkitStartRepair")
                 net.SendToServer()
             end
         end
 
         if rmb and not self:IsWorking() then
-            net.Start("ixToolkitStartRemove")
+            net.Start("wsToolkitStartRemove")
             net.SendToServer()
         end
     end
@@ -568,7 +585,7 @@ function SWEP:Think()
     -- Work progress checks
     if self:IsWorking() then
         if SERVER then
-            local valid, reason = ix.weapon.IsTargetValid(owner, self:GetTargetDoor(), self.targetDoor, self.MaxUseDistance)
+            local valid, reason = ws.weapon.IsTargetValid(owner, self:GetTargetDoor(), self.targetDoor, self.MaxUseDistance)
             if not valid then
                 self:CancelWork()
                 if reason == "looked_away" then owner:NotifyLocalized("toolkitLookedAway")
@@ -592,7 +609,7 @@ end
 -- ============================================================================
 
 function SWEP:DrawWorldModel()
-    ix.constants.DrawWorldModelBone(self, {4, 1, -2}, {{"Forward", 90}})
+    ws.constants.DrawWorldModelBone(self, {4, 1, -2}, {{"Forward", 90}})
 end
 
 -- ============================================================================
@@ -613,6 +630,6 @@ if CLIENT then
         local progress = math.Clamp((CurTime() - self:GetWorkStartTime()) / self:GetWorkDuration(), 0, 1)
         local workType = self.GetWorkType and self:GetWorkType() or ""
         local workName = workTypeNames[workType] or "Working"
-        ix.constants.DrawProgressBar(workName .. "...", progress, Color(100, 150, 100), "LMB to cancel")
+        ws.constants.DrawProgressBar(workName .. "...", progress, Color(100, 150, 100), "LMB to cancel")
     end
 end

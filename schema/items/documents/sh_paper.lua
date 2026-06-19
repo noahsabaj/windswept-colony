@@ -85,7 +85,7 @@ function ITEM:GetDescription()
     end
 
     -- NO author shown (fog of war)
-    local docType = ix.documents.FormatType(self:GetDocumentType())
+    local docType = ws.documents.FormatType(self:GetDocumentType())
     local wordCount = self:GetWordCount()
 
     local desc = string.format("%s document.\nWords: %d", docType, wordCount)
@@ -139,7 +139,7 @@ ITEM.functions.Read = {
     tip = "Read the contents of this paper.",
     icon = "icon16/page_white_text.png",
     OnClick = function(item)
-        net.Start("ixDocumentRead")
+        net.Start("wsDocumentRead")
             net.WriteUInt(item:GetID(), 32)
             net.WriteBool(false)  -- Not for editor
         net.SendToServer()
@@ -192,7 +192,7 @@ ITEM.functions.Write = {
         end
 
         -- Open editor
-        local editor = vgui.Create("ixDocumentEditor")
+        local editor = vgui.Create("wsDocumentEditor")
         editor:SetPaper(item)
         editor:SetWritingTool(toolType, toolItem)
 
@@ -263,7 +263,7 @@ ITEM.functions.Erase = {
             "Erase Paper",
             "Yes, Erase",
             function()
-                net.Start("ixDocumentErase")
+                net.Start("wsDocumentErase")
                     net.WriteUInt(item:GetID(), 32)
                 net.SendToServer()
             end,
@@ -313,7 +313,7 @@ ITEM.functions.Destroy = {
             "Destroy Paper",
             "Yes, Destroy",
             function()
-                net.Start("ixDocumentDestroy")
+                net.Start("wsDocumentDestroy")
                     net.WriteUInt(item:GetID(), 32)
                 net.SendToServer()
             end,
@@ -338,7 +338,7 @@ if SERVER then
     function ITEM:OnRemoved()
         local paperID = self:GetPaperID()
         if paperID then
-            ix.documents.Delete(paperID)
+            ws.documents.Delete(paperID)
         end
     end
 end
@@ -354,11 +354,11 @@ function ITEM:OnEntityCreated(entity)
 end
 
 -- Hook for viewing paper on ground
-hook.Add("PlayerUse", "ixPaperGroundView", function(client, entity)
+hook.Add("PlayerUse", "wsPaperGroundView", function(client, entity)
     if not SERVER then return end
     if not IsValid(entity) then return end
 
-    local item = entity.ixItem
+    local item = entity.wsItem
     if not item then return end
     if item.uniqueID ~= "paper" then return end
 
@@ -370,7 +370,7 @@ hook.Add("PlayerUse", "ixPaperGroundView", function(client, entity)
     end
 
     -- Load and send document data
-    local docData = ix.documents.Load(paperID)
+    local docData = ws.documents.Load(paperID)
     if not docData then return end
 
     local response = {
@@ -383,7 +383,7 @@ hook.Add("PlayerUse", "ixPaperGroundView", function(client, entity)
         fromGround = true
     }
 
-    net.Start("ixDocumentData")
+    net.Start("wsDocumentData")
         net.WriteBool(false)  -- Not for editor
         net.WriteString(util.TableToJSON(response))
     net.Send(client)

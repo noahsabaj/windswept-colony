@@ -4,7 +4,7 @@
     Overrides Helix's default door system with the physical lock & key system.
     - Removes door ownership (buying/selling)
     - Removes faction/class door access
-    - Uses prop_door_rotating entities with ixIsWindsweptDoor marker
+    - Uses prop_door_rotating entities with wsIsWindsweptDoor marker
 ]]--
 
 local PLUGIN = PLUGIN
@@ -14,15 +14,15 @@ PLUGIN.author = "Windswept"
 PLUGIN.description = "Physical lock and key door system."
 
 -- Include plugin files
-ix.util.Include("sv_plugin.lua")
-ix.util.Include("cl_plugin.lua")
+ws.util.Include("sv_plugin.lua")
+ws.util.Include("cl_plugin.lua")
 
 -- ============================================================================
 -- DISABLE HELIX DOOR SYSTEM
 -- ============================================================================
 
 -- Override Helix door access to always return false (use physical keys instead)
-hook.Add("CanPlayerAccessDoor", "ixWindsweptDoors", function(client, door, access)
+hook.Add("CanPlayerAccessDoor", "wsWindsweptDoors", function(client, door, access)
     -- If it's a map door that's been hidden by our system, deny access
     -- Our managed doors have their own access system
     if door:IsDoor() and door:GetNoDraw() then
@@ -30,7 +30,7 @@ hook.Add("CanPlayerAccessDoor", "ixWindsweptDoors", function(client, door, acces
     end
 
     -- For our managed doors, access is determined by having the right key
-    if door.ixIsWindsweptDoor then
+    if door.wsIsWindsweptDoor then
         -- Lock/unlock is handled by keys, not by this hook
         -- Use is allowed if door is unlocked
         return not door:IsLocked()
@@ -38,12 +38,12 @@ hook.Add("CanPlayerAccessDoor", "ixWindsweptDoors", function(client, door, acces
 end)
 
 -- Prevent Helix door buying
-hook.Add("CanPlayerBuyDoor", "ixWindsweptDoors", function(client, door)
+hook.Add("CanPlayerBuyDoor", "wsWindsweptDoors", function(client, door)
     return false, "Door ownership has been disabled."
 end)
 
 -- Prevent Helix door selling
-hook.Add("CanPlayerSellDoor", "ixWindsweptDoors", function(client, door)
+hook.Add("CanPlayerSellDoor", "wsWindsweptDoors", function(client, door)
     return false, "Door ownership has been disabled."
 end)
 
@@ -59,7 +59,7 @@ local originalCheckDoorAccess = entityMeta.CheckDoorAccess
 
 function entityMeta:CheckDoorAccess(client, access)
     -- For our managed doors, use lock state
-    if self.ixIsWindsweptDoor then
+    if self.wsIsWindsweptDoor then
         if self:IsLocked() then
             return false  -- Need key to access locked door
         end
@@ -84,8 +84,8 @@ end
 -- ============================================================================
 
 -- Set door cost to 0 and hide from config menu
-hook.Add("InitializedConfig", "ixWindsweptDoorConfig", function()
+hook.Add("InitializedConfig", "wsWindsweptDoorConfig", function()
     -- These configs still exist but are unused in our system
-    ix.config.Set("doorCost", 0)
-    ix.config.Set("doorSellRatio", 0)
+    ws.config.Set("doorCost", 0)
+    ws.config.Set("doorSellRatio", 0)
 end)

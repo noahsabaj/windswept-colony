@@ -13,155 +13,149 @@
 
 -- =============================================================================
 -- CURRENCY SYSTEM
--- ixMoneyGive, ixMoneyDestroy, ixCurrencySplit, ixCurrencySplitConfirm
+-- wsMoneyGive, wsMoneyDestroy, wsCurrencySplit, wsCurrencySplitConfirm
 -- are now registered in helix/gamemode/core/libs/sh_currency.lua
 -- =============================================================================
-util.AddNetworkString("ixWalletGive")
-util.AddNetworkString("ixBagDrop")  -- Wallet/bag drop functionality
+util.AddNetworkString("wsWalletGive")
+util.AddNetworkString("wsBagDrop")  -- Wallet/bag drop functionality
 
 -- =============================================================================
 -- PHOTO SYSTEM (schema/items/documents/)
 -- =============================================================================
-util.AddNetworkString("ixPhotoRename")
-util.AddNetworkString("ixPhotoDestroy")
-util.AddNetworkString("ixPhotoRequest")
-util.AddNetworkString("ixPhotoData")
-util.AddNetworkString("ixPhotoViewFromGround")
-util.AddNetworkString("ixPhotoAlbumView")
-util.AddNetworkString("ixPhotoAlbumViewData")
-util.AddNetworkString("ixPhotoAlbumRename")
-util.AddNetworkString("ixPhotoAlbumViewFromGround")
+util.AddNetworkString("wsPhotoRename")
+util.AddNetworkString("wsPhotoDestroy")
+util.AddNetworkString("wsPhotoRequest")
+util.AddNetworkString("wsPhotoData")
+util.AddNetworkString("wsPhotoViewFromGround")
+util.AddNetworkString("wsPhotoAlbumView")
+util.AddNetworkString("wsPhotoAlbumViewData")
+util.AddNetworkString("wsPhotoAlbumRename")
+util.AddNetworkString("wsPhotoAlbumViewFromGround")
 
 -- =============================================================================
 -- PERSONAL ID (schema/items/documents/)
 -- =============================================================================
-util.AddNetworkString("ixShowPersonalID")
+util.AddNetworkString("wsShowPersonalID")
 
 -- =============================================================================
 -- DOOR SYSTEM (schema/libs/sh_doors.lua)
 -- =============================================================================
-util.AddNetworkString("ixDoorsFrameUpdate")
-util.AddNetworkString("ixDoorsSync")
+util.AddNetworkString("wsDoorsSync")
 
 -- =============================================================================
 -- DOOR INSTALLATION (entities/weapons/ix_door.lua)
 -- =============================================================================
-util.AddNetworkString("ixDoorInstall")
-util.AddNetworkString("ixDoorCancel")
+util.AddNetworkString("wsDoorInstall")
+util.AddNetworkString("wsDoorCancel")
 
 -- =============================================================================
 -- LOCK SYSTEM (entities/weapons/ix_lock.lua)
 -- =============================================================================
-util.AddNetworkString("ixLockInstall")
-util.AddNetworkString("ixLockProgress")
-util.AddNetworkString("ixLockCancel")
+util.AddNetworkString("wsLockInstall")
+util.AddNetworkString("wsLockCancel")
 
 -- =============================================================================
 -- LOCKPICKING (entities/weapons/ix_lockpick.lua)
 -- =============================================================================
-util.AddNetworkString("ixLockpickStart")
-util.AddNetworkString("ixLockpickAttempt")
-util.AddNetworkString("ixLockpickResult")
-util.AddNetworkString("ixLockpickCancel")
-util.AddNetworkString("ixLockpickState")
+util.AddNetworkString("wsLockpickStart")
+util.AddNetworkString("wsLockpickAttempt")
+util.AddNetworkString("wsLockpickCancel")
 
 -- =============================================================================
 -- LOCK BREAKING (entities/weapons/ix_lockbreaker.lua)
 -- =============================================================================
-util.AddNetworkString("ixLockbreakerStart")
-util.AddNetworkString("ixLockbreakerCancel")
+util.AddNetworkString("wsLockbreakerStart")
+util.AddNetworkString("wsLockbreakerCancel")
 
 -- =============================================================================
 -- KEY SYSTEM (entities/weapons/ix_key.lua)
 -- =============================================================================
-util.AddNetworkString("ixKeyStartLock")
-util.AddNetworkString("ixKeyStartUnlock")
-util.AddNetworkString("ixKeyCancel")
+util.AddNetworkString("wsKeyStartLock")
+util.AddNetworkString("wsKeyStartUnlock")
+util.AddNetworkString("wsKeyCancel")
 
 -- =============================================================================
 -- KEYRING (entities/weapons/ix_keyring.lua)
 -- =============================================================================
-util.AddNetworkString("ixKeyringLock")
-util.AddNetworkString("ixKeyringUnlock")
-util.AddNetworkString("ixKeyringCycle")
+util.AddNetworkString("wsKeyringLock")
+util.AddNetworkString("wsKeyringUnlock")
+util.AddNetworkString("wsKeyringCycle")
 
 -- =============================================================================
 -- TOOLKIT (entities/weapons/ix_toolkit.lua)
 -- =============================================================================
-util.AddNetworkString("ixToolkitStartRemove")
-util.AddNetworkString("ixToolkitStartRepair")
-util.AddNetworkString("ixToolkitCancel")
+util.AddNetworkString("wsToolkitStartRemove")
+util.AddNetworkString("wsToolkitStartRepair")
+util.AddNetworkString("wsToolkitCancel")
 
 -- =============================================================================
 -- LOCKSMITH MACHINE (entities/entities/ix_auto_locksmith/)
 -- =============================================================================
-util.AddNetworkString("ixLocksmithOpen")
-util.AddNetworkString("ixLocksmithClose")
-util.AddNetworkString("ixLocksmithProgramLock")
-util.AddNetworkString("ixLocksmithProgramKey")
-util.AddNetworkString("ixLocksmithAddKeying")
-util.AddNetworkString("ixLocksmithRename")
-util.AddNetworkString("ixLocksmithViewKeyings")
-util.AddNetworkString("ixLocksmithResult")
+util.AddNetworkString("wsLocksmithOpen")
+util.AddNetworkString("wsLocksmithClose")
+util.AddNetworkString("wsLocksmithProgramLock")
+util.AddNetworkString("wsLocksmithProgramKey")
+util.AddNetworkString("wsLocksmithAddKeying")
+util.AddNetworkString("wsLocksmithRename")
+util.AddNetworkString("wsLocksmithViewKeyings")
+util.AddNetworkString("wsLocksmithResult")
 
 -- =============================================================================
 -- PERSONAL ID WEAPON (entities/weapons/ix_personalid.lua)
 -- =============================================================================
-util.AddNetworkString("ixPersonalIDShowForward")
-util.AddNetworkString("ixPersonalIDViewSelf")
+util.AddNetworkString("wsPersonalIDShowForward")
 
 -- =============================================================================
 -- FLASHLIGHT (entities/weapons/ix_flashlight.lua)
 -- =============================================================================
-util.AddNetworkString("ixFlashlightSetLight")  -- Renamed from ix_flashlight_SetLight for consistency
+util.AddNetworkString("wsFlashlightSetLight")  -- Renamed from ix_flashlight_SetLight for consistency
 
 -- =============================================================================
 -- LANTERN (entities/weapons/ix_lantern.lua)
 -- =============================================================================
-util.AddNetworkString("ixLanternSetLight")
-util.AddNetworkString("ixLanternPlace")
+util.AddNetworkString("wsLanternSetLight")
+util.AddNetworkString("wsLanternPlace")
 
 -- =============================================================================
 -- CAMERA (entities/weapons/ix_camera.lua)
 -- =============================================================================
-util.AddNetworkString("ixCameraRequestPhoto")
-util.AddNetworkString("ixCameraApprovePhoto")
-util.AddNetworkString("ixCameraPhotoData")
-util.AddNetworkString("ixCameraSetAiming")
-util.AddNetworkString("ixCameraSetZoom")
-util.AddNetworkString("ixCameraToggleFlash")
-util.AddNetworkString("ixCameraFlashToggled")
-util.AddNetworkString("ixCameraFlashEffect")
+util.AddNetworkString("wsCameraRequestPhoto")
+util.AddNetworkString("wsCameraApprovePhoto")
+util.AddNetworkString("wsCameraPhotoData")
+util.AddNetworkString("wsCameraSetAiming")
+util.AddNetworkString("wsCameraSetZoom")
+util.AddNetworkString("wsCameraToggleFlash")
+util.AddNetworkString("wsCameraFlashToggled")
+util.AddNetworkString("wsCameraFlashEffect")
 
 -- =============================================================================
 -- RADIO SYSTEM (schema/items/equipment/sh_handheld_radio.lua)
 -- =============================================================================
-util.AddNetworkString("ixRadioVolume")        -- Server->Client: open volume slider
-util.AddNetworkString("ixRadioVolumeSet")     -- Client->Server: set volume value
-util.AddNetworkString("ixRadioVoiceStart")    -- Client->Server: started transmitting
-util.AddNetworkString("ixRadioVoiceStop")     -- Client->Server: stopped transmitting
-util.AddNetworkString("ixVoiceAmplitude")     -- Client->Server: voice amplitude update
+util.AddNetworkString("wsRadioVolume")        -- Server->Client: open volume slider
+util.AddNetworkString("wsRadioVolumeSet")     -- Client->Server: set volume value
+util.AddNetworkString("wsRadioVoiceStart")    -- Client->Server: started transmitting
+util.AddNetworkString("wsRadioVoiceStop")     -- Client->Server: stopped transmitting
+util.AddNetworkString("wsVoiceAmplitude")     -- Client->Server: voice amplitude update
 
 -- =============================================================================
 -- STATIONARY RADIO (entities/entities/ix_stationary_radio/)
 -- =============================================================================
-util.AddNetworkString("ixStationaryRadioOpen")      -- Server->Client: open UI for entity
-util.AddNetworkString("ixStationaryRadioClose")     -- Client->Server: client closed UI
-util.AddNetworkString("ixStationaryRadioConfig")    -- Client->Server: channel config change
-util.AddNetworkString("ixStationaryRadioTransmit")  -- Client->Server: text message
-util.AddNetworkString("ixStationaryRadioMic")       -- Client->Server: mic toggle
+util.AddNetworkString("wsStationaryRadioOpen")      -- Server->Client: open UI for entity
+util.AddNetworkString("wsStationaryRadioClose")     -- Client->Server: client closed UI
+util.AddNetworkString("wsStationaryRadioConfig")    -- Client->Server: channel config change
+util.AddNetworkString("wsStationaryRadioTransmit")  -- Client->Server: text message
+util.AddNetworkString("wsStationaryRadioMic")       -- Client->Server: mic toggle
 
 -- =============================================================================
 -- DOCUMENT SYSTEM (schema/libs/sh_documents.lua, schema/sv_documents.lua)
 -- =============================================================================
-util.AddNetworkString("ixDocumentWrite")       -- Client->Server: write content to paper
-util.AddNetworkString("ixDocumentRead")        -- Client->Server: request document content
-util.AddNetworkString("ixDocumentData")        -- Server->Client: send document content
-util.AddNetworkString("ixDocumentErase")       -- Client->Server: erase pencil content
-util.AddNetworkString("ixDocumentDestroy")     -- Client->Server: destroy paper item
-util.AddNetworkString("ixContainerRename")     -- Client->Server: rename envelope/folder
-util.AddNetworkString("ixPenRefill")           -- Client->Server: refill pen with ink
-util.AddNetworkString("ixSignatureSave")       -- Client->Server: save signature to character
-util.AddNetworkString("ixTypewriterOpen")      -- Server->Client: open typewriter UI
-util.AddNetworkString("ixTypewriterWrite")     -- Client->Server: type content on paper
-util.AddNetworkString("ixTypewriterClose")     -- Client->Server: close typewriter UI
+util.AddNetworkString("wsDocumentWrite")       -- Client->Server: write content to paper
+util.AddNetworkString("wsDocumentRead")        -- Client->Server: request document content
+util.AddNetworkString("wsDocumentData")        -- Server->Client: send document content
+util.AddNetworkString("wsDocumentErase")       -- Client->Server: erase pencil content
+util.AddNetworkString("wsDocumentDestroy")     -- Client->Server: destroy paper item
+util.AddNetworkString("wsContainerRename")     -- Client->Server: rename envelope/folder
+util.AddNetworkString("wsSignatureSave")       -- Client->Server: save signature to character
+util.AddNetworkString("wsTypewriterOpen")      -- Server->Client: open typewriter UI
+util.AddNetworkString("wsTypewriterWrite")     -- Client->Server: type content on paper
+util.AddNetworkString("wsTypewriterClose")     -- Client->Server: close typewriter UI

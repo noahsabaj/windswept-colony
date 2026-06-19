@@ -5,7 +5,7 @@
     - LMB: Lock door (if keying matches and door is unlocked/closed)
     - RMB: Unlock door (if keying matches and door is locked)
 
-    Works with Windswept managed doors (prop_door_rotating with ixIsWindsweptDoor marker).
+    Works with Windswept managed doors (prop_door_rotating with wsIsWindsweptDoor marker).
 ]]--
 
 AddCSLuaFile()
@@ -70,13 +70,13 @@ end
 -- ============================================================================
 
 function SWEP:GetKeying()
-    local item = self.ixItem
+    local item = self.wsItem
     if not item then return nil end
     return item:GetData("keying", "")
 end
 
 function SWEP:GetTargetDoor()
-    return ix.doors.GetTargetDoor(self:GetOwner(), self.MaxUseDistance)
+    return ws.doors.GetTargetDoor(self:GetOwner(), self.MaxUseDistance)
 end
 
 function SWEP:CanKeyFitLock(door)
@@ -84,7 +84,7 @@ function SWEP:CanKeyFitLock(door)
     if not keying or keying == "" then return false end
 
     -- Use centralized keying check
-    return ix.doors.CheckKeying(door, keying)
+    return ws.doors.CheckKeying(door, keying)
 end
 
 function SWEP:IsPerformingAction()
@@ -93,7 +93,7 @@ function SWEP:IsPerformingAction()
 end
 
 function SWEP:CancelAction()
-    ix.constants.CancelSWEPAction(self, function() return self:IsPerformingAction() end, function()
+    ws.constants.CancelSWEPAction(self, function() return self:IsPerformingAction() end, function()
         self:SetLocking(false)
         self:SetUnlocking(false)
         self.targetDoor = nil
@@ -105,9 +105,9 @@ end
 -- ============================================================================
 
 if SERVER then
-    ix.weapon.NetReceive("ixKeyStartLock", "ix_key", "StartLock")
-    ix.weapon.NetReceive("ixKeyStartUnlock", "ix_key", "StartUnlock")
-    ix.weapon.NetReceive("ixKeyCancel", "ix_key", "CancelAction")
+    ws.weapon.NetReceive("wsKeyStartLock", "ix_key", "StartLock")
+    ws.weapon.NetReceive("wsKeyStartUnlock", "ix_key", "StartUnlock")
+    ws.weapon.NetReceive("wsKeyCancel", "ix_key", "CancelAction")
 end
 
 -- ============================================================================
@@ -128,7 +128,7 @@ function SWEP:StartLock()
     end
 
     -- Check if door has a lock
-    if not ix.doors.HasLock(door) then
+    if not ws.doors.HasLock(door) then
         owner:NotifyLocalized("keyNoLock")
         return
     end
@@ -147,7 +147,7 @@ function SWEP:StartLock()
     end
 
     -- Check if door is open (can't lock an open door)
-    if ix.doors.IsDoorOpen(door) then
+    if ws.doors.IsDoorOpen(door) then
         owner:NotifyLocalized("keyDoorOpen")
         return
     end
@@ -178,7 +178,7 @@ function SWEP:StartUnlock()
     end
 
     -- Check if door has a lock
-    if not ix.doors.HasLock(door) then
+    if not ws.doors.HasLock(door) then
         owner:NotifyLocalized("keyNoLock")
         return
     end
@@ -220,7 +220,7 @@ function SWEP:CompleteLock()
     end
 
     -- Lock the door (syncs to partner for double doors)
-    ix.doors.LockDoor(door)
+    ws.doors.LockDoor(door)
     door:EmitSound("doors/door_latch3.wav", 70)  -- Heavier click for locking
     owner:NotifyLocalized("keyLocked")
 
@@ -240,7 +240,7 @@ function SWEP:CompleteUnlock()
     end
 
     -- Unlock the door (syncs to partner for double doors)
-    ix.doors.UnlockDoor(door)
+    ws.doors.UnlockDoor(door)
     door:EmitSound("doors/door_latch1.wav", 70)  -- Lighter click for unlocking
     owner:NotifyLocalized("keyUnlocked")
 
@@ -253,7 +253,7 @@ end
 -- ============================================================================
 
 function SWEP:DrawWorldModel()
-    ix.constants.DrawWorldModelBone(self, {3, 1, -1}, {{"Forward", 90}, {"Up", 180}})
+    ws.constants.DrawWorldModelBone(self, {3, 1, -1}, {{"Forward", 90}, {"Up", 180}})
 end
 
 -- ============================================================================
@@ -265,17 +265,17 @@ function SWEP:Think()
     if not IsValid(owner) then return end
 
     if CLIENT then
-        local lmb, rmb = ix.constants.ProcessSWEPInput(self)
+        local lmb, rmb = ws.constants.ProcessSWEPInput(self)
 
         if lmb and not self:IsPerformingAction() and CurTime() >= (self.nextActionAttempt or 0) then
             self.nextActionAttempt = CurTime() + 1
-            net.Start("ixKeyStartLock")
+            net.Start("wsKeyStartLock")
             net.SendToServer()
         end
 
         if rmb and not self:IsPerformingAction() and CurTime() >= (self.nextActionAttempt or 0) then
             self.nextActionAttempt = CurTime() + 1
-            net.Start("ixKeyStartUnlock")
+            net.Start("wsKeyStartUnlock")
             net.SendToServer()
         end
     end
@@ -283,7 +283,7 @@ function SWEP:Think()
     -- Action progress checks
     if self:IsPerformingAction() then
         if SERVER then
-            local valid, reason = ix.weapon.IsTargetValid(owner, self:GetTargetDoor(), self.targetDoor, self.MaxUseDistance)
+            local valid, reason = ws.weapon.IsTargetValid(owner, self:GetTargetDoor(), self.targetDoor, self.MaxUseDistance)
             if not valid then
                 self:CancelAction()
                 if reason == "looked_away" then owner:NotifyLocalized("keyLookedAway")
@@ -316,6 +316,6 @@ if CLIENT then
 
         local progress = math.Clamp((CurTime() - self:GetActionStartTime()) / self.ActionTime, 0, 1)
         local label = self:GetLocking() and "Locking..." or "Unlocking..."
-        ix.constants.DrawProgressBar(label, progress, Color(100, 150, 200))
+        ws.constants.DrawProgressBar(label, progress, Color(100, 150, 200))
     end
 end

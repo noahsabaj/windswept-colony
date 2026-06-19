@@ -35,7 +35,7 @@ ITEM.base = "base_equippable"
 
 -- Equippable configuration
 ITEM.equipWeaponClass = "ix_toolkit"
-ITEM.equipPlayerKey = "ixToolkitItem"
+ITEM.equipPlayerKey = "wsToolkitItem"
 ITEM.equipNotifyKey = "toolkitEquipped"
 ITEM.equipSound = "physics/metal/metal_box_impact_soft1.wav"
 ITEM.equipTip = "Hold the toolkit to work on doors and locks."
@@ -181,12 +181,12 @@ end
 if CLIENT then
     function ITEM:PaintOver(item, w, h)
         if item:GetData("equipped") then
-            ix.constants.DrawEquippedIndicator(w, h)
+            ws.constants.DrawEquippedIndicator(w, h)
         end
 
         local durability = item:GetData("durability", item:GetMaxDurability())
         local durPercent = durability / item:GetMaxDurability()
-        ix.constants.DrawDurabilityBar(w, h, durPercent, ix.constants.GetChargeColor(durPercent * 100, 75, 50, 25))
+        ws.constants.DrawDurabilityBar(w, h, durPercent, ws.constants.GetChargeColor(durPercent * 100, 75, 50, 25))
     end
 
     function ITEM:PopulateTooltip(tooltip)
@@ -202,11 +202,11 @@ if CLIENT then
             speedDesc = "Fast"
         end
 
-        ix.constants.AddTooltipRow(tooltip, "size", "Size: " .. sizeConfig.name .. " (" .. speedDesc .. ")", Color(80, 80, 100))
+        ws.constants.AddTooltipRow(tooltip, "size", "Size: " .. sizeConfig.name .. " (" .. speedDesc .. ")", Color(80, 80, 100))
 
         -- Quality/Durability
         local durPercent = (durability / maxDurability) * 100
-        ix.constants.AddTooltipRow(tooltip, "durability", "Durability: " .. math.floor(durability) .. "/" .. maxDurability, ix.constants.GetChargeColorDark(durPercent, 75, 50, 25))
+        ws.constants.AddTooltipRow(tooltip, "durability", "Durability: " .. math.floor(durability) .. "/" .. maxDurability, ws.constants.GetChargeColorDark(durPercent, 75, 50, 25))
     end
 end
 

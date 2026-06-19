@@ -52,6 +52,7 @@ end
 function SWEP:Initialize()
     self.BaseClass.Initialize(self)
     self.nextPickAttempt = 0
+    self.nextServerAttempt = 0
 
     if self.SetPicking then
         self:SetPicking(false)
@@ -85,11 +86,11 @@ end
 -- ============================================================================
 
 function SWEP:GetTargetDoor()
-    return ix.doors.GetTargetDoor(self:GetOwner(), self.MaxUseDistance)
+    return ws.doors.GetTargetDoor(self:GetOwner(), self.MaxUseDistance)
 end
 
 function SWEP:GenerateSweetSpot()
-    local item = self.ixItem
+    local item = self.wsItem
     if not item then return 0.5, 0.1 end
 
     local size = item:GetSweetSpotSize()
@@ -104,12 +105,24 @@ end
 -- ============================================================================
 
 if SERVER then
-    ix.weapon.NetReceive("ixLockpickStart", "ix_lockpick", "StartPicking")
+    ws.weapon.NetReceive("wsLockpickStart", "ix_lockpick", "StartPicking")
 
-    net.Receive("ixLockpickAttempt", function(len, ply)
+    net.Receive("wsLockpickAttempt", function(len, ply)
         local weapon = ply:GetActiveWeapon()
         if not IsValid(weapon) or weapon:GetClass() ~= "ix_lockpick" then return end
         if not weapon:IsPicking() then return end
+
+        -- Server-side rate limit. Hit detection is necessarily client-side (the
+        -- timing ticker runs on the client), so a modified client can always send
+        -- hit=true; this throttle stops a script from completing the minigame
+        -- instantly by spamming attempts. Full protection relies on external
+        -- anticheat. Interval is derived from the ticker speed.
+        local now = CurTime()
+        if weapon.nextServerAttempt and now < weapon.nextServerAttempt then return end
+        weapon.nextServerAttempt = now + math.max(0.1, 1 / (weapon.TickerSpeed * 3))
+
+        -- Defensive: no attempts remaining (IsPicking is normally already cleared)
+        if weapon:GetAttemptsLeft() <= 0 then return end
 
         local hit = net.ReadBool()
 
@@ -136,7 +149,7 @@ if SERVER then
         end
     end)
 
-    ix.weapon.NetReceive("ixLockpickCancel", "ix_lockpick", "CancelPicking")
+    ws.weapon.NetReceive("wsLockpickCancel", "ix_lockpick", "CancelPicking")
 end
 
 function SWEP:StartPicking()
@@ -153,7 +166,7 @@ function SWEP:StartPicking()
     end
 
     -- Check if door has a lock
-    if not ix.doors.HasLock(door) then
+    if not ws.doors.HasLock(door) then
         owner:NotifyLocalized("lockpickNoLock")
         return
     end
@@ -165,13 +178,13 @@ function SWEP:StartPicking()
     end
 
     -- Check if lock is broken
-    local lockData = door.ixLockData
+    local lockData = door.wsLockData
     if lockData.durability and lockData.durability <= 0 then
         owner:NotifyLocalized("lockpickLockBroken")
         return
     end
 
-    local item = self.ixItem
+    local item = self.wsItem
     if not item then return end
 
     -- Initialize minigame state
@@ -188,7 +201,7 @@ function SWEP:StartPicking()
 end
 
 function SWEP:CancelPicking()
-    ix.constants.CancelSWEPAction(self, function() return self:IsPicking() end, function()
+    ws.constants.CancelSWEPAction(self, function() return self:IsPicking() end, function()
         self:SetPicking(false)
         self.targetDoor = nil
     end, 40)
@@ -200,7 +213,7 @@ function SWEP:DoAttempt()
 
     local owner = self:GetOwner()
     local door = self.targetDoor
-    local item = self.ixItem
+    local item = self.wsItem
 
     if not IsValid(door) or not item then
         self:CancelPicking()
@@ -211,16 +224,16 @@ function SWEP:DoAttempt()
     -- In a real implementation, client would send their ticker position
     -- For now, we'll trust the client's timing check
 
-    -- Damage the lock
-    if ix.doors.HasLock(door) then
+    -- Damage the lock. DamageLock returns a BOOLEAN (true = lock destroyed) and
+    -- already fires "unlock" + the break sound on the door when it breaks, so we
+    -- only need to notify the picker and stop. (Previously this compared the
+    -- boolean with <= 0, which errored every attempt and broke lockpicking.)
+    if ws.doors.HasLock(door) then
         local damage = math.random(self.LockDamageMin, self.LockDamageMax)
-        local newDurability = ix.doors.DamageLock(door, damage)
+        local destroyed = ws.doors.DamageLock(door, damage)
 
-        if newDurability <= 0 then
-            -- Lock broken!
-            door:Fire("unlock")
+        if destroyed then
             owner:NotifyLocalized("lockpickLockDestroyed")
-            owner:EmitSound("physics/metal/metal_box_break1.wav", 70)
             self:CancelPicking()
             return
         end
@@ -239,7 +252,7 @@ function SWEP:OnPickSuccess()
     end
 
     -- Unlock the door (syncs to partner for double doors)
-    ix.doors.UnlockDoor(door)
+    ws.doors.UnlockDoor(door)
 
     owner:EmitSound("doors/door_latch1.wav", 60)
     owner:NotifyLocalized("lockpickSuccess")
@@ -247,8 +260,8 @@ function SWEP:OnPickSuccess()
     self:CancelPicking()
 
     -- Save persistence
-    if ix.doors and ix.doors.Save then
-        ix.doors.Save()
+    if ws.doors and ws.doors.Save then
+        ws.doors.Save()
     end
 end
 
@@ -256,7 +269,7 @@ function SWEP:OnPickFail()
     if CLIENT then return end
 
     local owner = self:GetOwner()
-    local item = self.ixItem
+    local item = self.wsItem
 
     if not item then
         self:CancelPicking()
@@ -271,13 +284,13 @@ function SWEP:OnPickFail()
         owner:NotifyLocalized("lockpickBroke")
 
         -- Remove the lockpick item
-        local _, inventory = ix.constants.GetCharacterInventory(owner)
+        local _, inventory = ws.constants.GetCharacterInventory(owner)
         if inventory then
             inventory:Remove(item:GetID())
         end
 
         owner:StripWeapon("ix_lockpick")
-        owner.ixLockpickItem = nil
+        owner.wsLockpickItem = nil
         self:SetPicking(false)
         self.targetDoor = nil
         return
@@ -311,15 +324,15 @@ function SWEP:Think()
     if not IsValid(owner) then return end
 
     if CLIENT then
-        local lmb, rmb = ix.constants.ProcessSWEPInput(self)
+        local lmb, rmb = ws.constants.ProcessSWEPInput(self)
 
         if rmb then
             if self:IsPicking() then
-                net.Start("ixLockpickCancel")
+                net.Start("wsLockpickCancel")
                 net.SendToServer()
             elseif CurTime() >= (self.nextPickAttempt or 0) then
                 self.nextPickAttempt = CurTime() + 0.5
-                net.Start("ixLockpickStart")
+                net.Start("wsLockpickStart")
                 net.SendToServer()
             end
         end
@@ -330,7 +343,7 @@ function SWEP:Think()
             local sweetSize = self:GetSweetSpotSize()
             local hit = tickerPos >= sweetStart and tickerPos <= (sweetStart + sweetSize)
 
-            net.Start("ixLockpickAttempt")
+            net.Start("wsLockpickAttempt")
             net.WriteBool(hit)
             net.SendToServer()
         end
@@ -339,7 +352,7 @@ function SWEP:Think()
     -- Picking progress checks (server only)
     if self:IsPicking() then
         if SERVER then
-            local valid, reason = ix.weapon.IsTargetValid(owner, self:GetTargetDoor(), self.targetDoor, self.MaxUseDistance)
+            local valid, reason = ws.weapon.IsTargetValid(owner, self:GetTargetDoor(), self.targetDoor, self.MaxUseDistance)
             if not valid then
                 self:CancelPicking()
                 if reason == "looked_away" then owner:NotifyLocalized("lockpickLookedAway")
@@ -361,7 +374,7 @@ end
 -- ============================================================================
 
 function SWEP:DrawWorldModel()
-    ix.constants.DrawWorldModelBone(self, {3, 0.5, -1}, {{"Forward", 45}})
+    ws.constants.DrawWorldModelBone(self, {3, 0.5, -1}, {{"Forward", 45}})
 end
 
 -- ============================================================================
@@ -415,13 +428,13 @@ if CLIENT then
         local currentHits = self:GetCurrentHits()
         local requiredHits = self:GetRequiredHits()
 
-        draw.SimpleText("Progress: " .. currentHits .. "/" .. requiredHits, "ixSmallFont", w / 2, y - textGap, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
+        draw.SimpleText("Progress: " .. currentHits .. "/" .. requiredHits, "wsSmallFont", w / 2, y - textGap, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
 
         -- Attempts remaining
         local attemptsLeft = self:GetAttemptsLeft()
-        draw.SimpleText("Attempts: " .. attemptsLeft, "ixSmallFont", w / 2, y + barH + pad * 2, ix.constants.COLOR_UI_NEUTRAL, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+        draw.SimpleText("Attempts: " .. attemptsLeft, "wsSmallFont", w / 2, y + barH + pad * 2, ws.constants.COLOR_UI_NEUTRAL, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
 
         -- Instructions
-        draw.SimpleText("LMB when ticker is in green zone | RMB to cancel", "ixSmallFont", w / 2, y + barH + pad * 2 + textGap, Color(150, 150, 150), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+        draw.SimpleText("LMB when ticker is in green zone | RMB to cancel", "wsSmallFont", w / 2, y + barH + pad * 2 + textGap, Color(150, 150, 150), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
     end
 end

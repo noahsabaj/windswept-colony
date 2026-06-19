@@ -17,8 +17,8 @@ ITEM.base = "base_misc"
 function ITEM:OnInstanced()
     if not self:GetData("channels") then
         -- Safety check for library availability (defensive against load order issues)
-        if ix.radio and ix.radio.GetDefaultChannels then
-            self:SetData("channels", ix.radio.GetDefaultChannels())
+        if ws.radio and ws.radio.GetDefaultChannels then
+            self:SetData("channels", ws.radio.GetDefaultChannels())
         else
             -- Fallback to inline defaults
             self:SetData("channels", {
@@ -52,7 +52,7 @@ if SERVER then
         ent:SetAngles(Angle(0, client:EyeAngles().y, 0))
 
         -- Transfer channel data to entity before spawn
-        local channels = self:GetData("channels") or ix.radio.GetDefaultChannels()
+        local channels = self:GetData("channels") or ws.radio.GetDefaultChannels()
         ent.pendingChannels = channels
 
         ent:Spawn()
@@ -70,7 +70,7 @@ end
 
 -- Tooltip shows channel summary
 function ITEM:PopulateTooltip(tooltip)
-    local channels = self:GetData("channels") or ix.radio.GetDefaultChannels()
+    local channels = self:GetData("channels") or ws.radio.GetDefaultChannels()
 
     local panel = tooltip:AddRowAfter("description", "channels")
     panel:SetBackgroundColor(Color(0, 0, 0, 0))

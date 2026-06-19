@@ -1,6 +1,6 @@
 local PLUGIN = PLUGIN
 
-hook.Add("ixCameraCanTakePhoto", "WindsweptBatteryHook", function(client, cameraItem, bDrain)
+hook.Add("wsCameraCanTakePhoto", "WindsweptBatteryHook", function(client, cameraItem, bDrain)
     -- This hook is called right before taking a photo
     -- In Windswept, cameras use batteries.
 

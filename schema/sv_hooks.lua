@@ -6,7 +6,7 @@
 -- LOG TYPES
 -- ============================================================================
 
-ix.log.AddType("battering_ram_breach", function(client, doorClass, doorIndex)
+ws.log.AddType("battering_ram_breach", function(client, doorClass, doorIndex)
 	return string.format("%s breached a door (%s #%d) with a battering ram.", client:Name(), doorClass, doorIndex)
 end)
 
@@ -21,7 +21,7 @@ end)
 function Schema:CanPlayerUseDoor(client, door)
 	if not IsValid(door) then return end
 
-	-- Get the partner door (double doors are linked via ixPartner)
+	-- Get the partner door (double doors are linked via wsPartner)
 	local partner = door:GetDoorPartner()
 
 	-- Single door - let native handling work
@@ -85,7 +85,7 @@ function Schema:WeaponEquip(weapon, client)
     if not character then return end
 
     -- If they already have an equipped ladder item, it's from our Equip function
-    if client.ixLadderItem and client.ixLadderItem:GetData("equipped") then
+    if client.wsLadderItem and client.wsLadderItem:GetData("equipped") then
         return
     end
 
@@ -104,11 +104,11 @@ function Schema:WeaponEquip(weapon, client)
             for _, item in pairs(inventory:GetItems()) do
                 if item.uniqueID == "ladder" and item:GetData("equipped") and not item.linkedToWeapon then
                     item.linkedToWeapon = true
-                    client.ixLadderItem = item
+                    client.wsLadderItem = item
                     -- Register for efficient ladder tracking
                     Schema.equippedLadderPlayers[client] = true
                     if IsValid(weapon) then
-                        weapon.ixItem = item
+                        weapon.wsItem = item
                     end
                     break
                 end
@@ -126,12 +126,12 @@ end
 Schema.equippedLadderPlayers = Schema.equippedLadderPlayers or {}
 
 -- Monitor equipped ladder items - if weapon disappears, item was deployed
-timer.Create("ixLadderDeployCheck", 0.5, 0, function()
+timer.Create("wsLadderDeployCheck", 0.5, 0, function()
     for client, _ in pairs(Schema.equippedLadderPlayers) do
         if not IsValid(client) then
             Schema.equippedLadderPlayers[client] = nil
         else
-            local item = client.ixLadderItem
+            local item = client.wsLadderItem
             if item and item:GetData("equipped") then
                 -- Item is marked as equipped but check if weapon still exists
                 if not client:HasWeapon("weapon_ladder_yl") then
@@ -143,7 +143,7 @@ timer.Create("ixLadderDeployCheck", 0.5, 0, function()
                             inventory:Remove(item:GetID())
                         end
                     end
-                    client.ixLadderItem = nil
+                    client.wsLadderItem = nil
                     Schema.equippedLadderPlayers[client] = nil
                 end
             else
@@ -176,7 +176,7 @@ function Schema:AdjustCreationPayload(client, payload, newPayload)
     local modelPath = newPayload.model
 
     -- Calculate build from height and weight
-    local build, bmi = ix.physical.CalculateBuild(height, weight)
+    local build, bmi = ws.physical.CalculateBuild(height, weight)
 
     -- Get birth data
     local birthMonth = tonumber(payload.physBirthMonth) or 1
@@ -203,7 +203,7 @@ function Schema:AdjustCreationPayload(client, payload, newPayload)
     }
 
     -- Generate the description
-    local description = ix.physical.GenerateDescription(physicalData)
+    local description = ws.physical.GenerateDescription(physicalData)
 
     -- Set the generated description
     newPayload.description = description
@@ -218,14 +218,14 @@ end
 -- ============================================================================
 
 -- Override money entity pickup to use wallet routing
-ix.currency.HandlePickup = function(client, entity)
+ws.currency.HandlePickup = function(client, entity)
     if not IsValid(client) or not IsValid(entity) then return end
 
     local amount = entity:GetAmount() -- This is in dollars
     local cents = amount * 100
 
     -- Use wallet-aware routing
-    if ix.currency.AddToInventoryWithWallet(client, cents) then
+    if ws.currency.AddToInventoryWithWallet(client, cents) then
         entity:Remove()
 
         -- Play pickup sound
@@ -242,7 +242,7 @@ end
 -- Track who is currently transmitting on radio
 Schema.radioTransmitters = Schema.radioTransmitters or {}
 
--- Voice distance scaling uses ix.constants.RANGE_EAVESDROP_BASE
+-- Voice distance scaling uses ws.constants.RANGE_EAVESDROP_BASE
 
 -- ============================================================================
 -- ENTITY CACHING FOR VOICE SYSTEM PERFORMANCE
@@ -266,7 +266,7 @@ local function UncacheEntity(ent, cacheTable)
 end
 
 -- Cache entities on creation
-hook.Add("OnEntityCreated", "ixRadioEntityCache", function(ent)
+hook.Add("OnEntityCreated", "wsRadioEntityCache", function(ent)
     if not IsValid(ent) then return end
 
     -- Delay slightly to ensure entity is fully initialized
@@ -285,7 +285,7 @@ hook.Add("OnEntityCreated", "ixRadioEntityCache", function(ent)
 end)
 
 -- Remove entities from cache on removal
-hook.Add("EntityRemoved", "ixRadioEntityUncache", function(ent)
+hook.Add("EntityRemoved", "wsRadioEntityUncache", function(ent)
     if not ent then return end
 
     -- Remove from all caches (cheaper than checking class)
@@ -295,7 +295,7 @@ hook.Add("EntityRemoved", "ixRadioEntityUncache", function(ent)
 end)
 
 -- Rebuild cache on map cleanup (fallback safety)
-hook.Add("PostCleanupMap", "ixRadioEntityCacheRebuild", function()
+hook.Add("PostCleanupMap", "wsRadioEntityCacheRebuild", function()
     Schema.entityCache.ragdolls = {}
     Schema.entityCache.knockedBodies = {}
     Schema.entityCache.stationaryRadios = {}
@@ -313,7 +313,7 @@ hook.Add("PostCleanupMap", "ixRadioEntityCacheRebuild", function()
 end)
 
 -- Initialize caches on server start
-hook.Add("InitPostEntity", "ixRadioEntityCacheInit", function()
+hook.Add("InitPostEntity", "wsRadioEntityCacheInit", function()
     timer.Simple(1, function()
         for _, ent in ipairs(ents.FindByClass("prop_ragdoll")) do
             CacheEntity(ent, Schema.entityCache.ragdolls)
@@ -355,11 +355,11 @@ local function GetRagdollRadio(ragdoll)
     if not IsValid(ragdoll) then return nil end
 
     -- Check if this is a Helix ragdoll with inventory
-    local charID = ragdoll.ixCharID
+    local charID = ragdoll.wsCharID
     if not charID then return nil end
 
     -- Find inventory by character ID
-    for _, inv in pairs(ix.item.inventories) do
+    for _, inv in pairs(ws.item.inventories) do
         if inv:GetOwner() == charID then
             local radios = inv:GetItemsByUniqueID("handheld_radio", true)
             for _, radio in ipairs(radios) do
@@ -375,14 +375,14 @@ local function GetRagdollRadio(ragdoll)
 end
 
 -- Net receiver: Player started transmitting
-net.Receive("ixRadioVoiceStart", function(len, client)
+net.Receive("wsRadioVoiceStart", function(len, client)
     if not IsValid(client) then return end
 
     -- Check player can transmit
     if not client:Alive() then return end
-    if client:GetNetVar("ixKnocked") then return end
+    if client:GetNetVar("wsKnocked") then return end
     if client:GetNetVar("gagged") then return end
-    if client:GetNetVar("ixRestricted") then return end
+    if client:GetNetVar("wsRestricted") then return end
 
     local radio = GetActiveRadio(client)
     if not radio then return end
@@ -396,7 +396,7 @@ net.Receive("ixRadioVoiceStart", function(len, client)
 end)
 
 -- Net receiver: Player stopped transmitting
-net.Receive("ixRadioVoiceStop", function(len, client)
+net.Receive("wsRadioVoiceStop", function(len, client)
     if not IsValid(client) then return end
 
     local txData = Schema.radioTransmitters[client]
@@ -412,17 +412,17 @@ net.Receive("ixRadioVoiceStop", function(len, client)
 end)
 
 -- Net receiver: Set radio volume
-net.Receive("ixRadioVolumeSet", function(len, client)
+net.Receive("wsRadioVolumeSet", function(len, client)
     if not IsValid(client) then return end
 
     local itemID = net.ReadUInt(32)
     local volume = net.ReadUInt(7)
 
-    local item = ix.item.instances[itemID]
+    local item = ws.item.instances[itemID]
     if not item or item.uniqueID ~= "handheld_radio" then return end
 
     -- Verify ownership
-    local character, inventory = ix.constants.GetCharacterInventory(client)
+    local character, inventory = ws.constants.GetCharacterInventory(client)
     if not character or not inventory then return end
 
     if item.invID ~= inventory:GetID() then return end
@@ -433,12 +433,12 @@ net.Receive("ixRadioVolumeSet", function(len, client)
 end)
 
 -- Clean up transmitter on disconnect
-hook.Add("PlayerDisconnected", "ixRadioTransmitCleanup", function(client)
+hook.Add("PlayerDisconnected", "wsRadioTransmitCleanup", function(client)
     Schema.radioTransmitters[client] = nil
 end)
 
 -- Drain battery for voice receivers (runs every second while transmissions are active)
-timer.Create("ixRadioVoiceReceiverDrain", 1, 0, function()
+timer.Create("wsRadioVoiceReceiverDrain", 1, 0, function()
     -- Skip if no active transmitters
     if table.IsEmpty(Schema.radioTransmitters) then return end
 
@@ -479,13 +479,13 @@ end)
 Schema.voiceAmplitudes = Schema.voiceAmplitudes or {}
 
 -- Track voice amplitude when player speaks
-hook.Add("PlayerStartVoice", "ixTrackVoiceAmplitude", function(client)
+hook.Add("PlayerStartVoice", "wsTrackVoiceAmplitude", function(client)
     -- Reset amplitude tracking
     Schema.voiceAmplitudes[client] = 0.5  -- Default to medium
 end)
 
 -- Receive amplitude from client (VoiceVolume() is CLIENT-only)
-net.Receive("ixVoiceAmplitude", function(len, client)
+net.Receive("wsVoiceAmplitude", function(len, client)
     if not IsValid(client) then return end
 
     local amp = net.ReadFloat()
@@ -664,7 +664,7 @@ function Schema:PlayerCanHearPlayersVoice(listener, speaker)
         end
 
         -- Calculate eavesdrop range: base * receiver_volume * transmitter_amplitude
-        local eavesdropRange = ix.constants.RANGE_EAVESDROP_BASE * closestReceiverVolume * speakerAmplitude
+        local eavesdropRange = ws.constants.RANGE_EAVESDROP_BASE * closestReceiverVolume * speakerAmplitude
 
         if closestReceiverDist < eavesdropRange then
             return true, false  -- Can hear via eavesdrop

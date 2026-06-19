@@ -1,7 +1,0 @@
-"windswept"
-{
-    "base"        "helix"
-    "title"       "Windswept Colony RP"
-    "author"      "kwabaj"
-    "menusystem"  "1"
-}

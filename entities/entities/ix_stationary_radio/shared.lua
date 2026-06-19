@@ -78,7 +78,7 @@ end
 -- Set all channel data from a table
 function ENT:SetChannelData(channels)
     if not channels or #channels < 4 then
-        channels = ix.radio.GetDefaultChannels()
+        channels = ws.radio.GetDefaultChannels()
     end
 
     self:SetCh1Freq(channels[1].freq or "100.0")

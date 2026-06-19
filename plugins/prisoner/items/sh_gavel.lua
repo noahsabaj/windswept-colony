@@ -38,8 +38,8 @@ ITEM.functions.Equip = {
         local client = item.player
 
         -- Check if already has a gavel equipped
-        if client.ixGavelItem and client.ixGavelItem ~= item then
-            local oldItem = client.ixGavelItem
+        if client.wsGavelItem and client.wsGavelItem ~= item then
+            local oldItem = client.wsGavelItem
             oldItem:SetData("equipped", nil)
         end
 
@@ -51,11 +51,11 @@ ITEM.functions.Equip = {
         -- Give the SWEP
         local weapon = client:Give("ix_gavel")
         if IsValid(weapon) then
-            weapon.ixItem = item
+            weapon.wsItem = item
             client:SelectWeapon("ix_gavel")
         end
 
-        client.ixGavelItem = item
+        client.wsGavelItem = item
         item:SetData("equipped", true)
 
         return false
@@ -82,7 +82,7 @@ ITEM.functions.Unequip = {
             client:StripWeapon("ix_gavel")
         end
 
-        client.ixGavelItem = nil
+        client.wsGavelItem = nil
         item:SetData("equipped", nil)
 
         return false
@@ -104,7 +104,7 @@ function ITEM.postHooks.drop(item, result)
             if client:HasWeapon("ix_gavel") then
                 client:StripWeapon("ix_gavel")
             end
-            client.ixGavelItem = nil
+            client.wsGavelItem = nil
         end
         item:SetData("equipped", nil)
     end
@@ -118,7 +118,7 @@ function ITEM:OnTransferred(oldInventory, newInventory)
             if oldOwner:HasWeapon("ix_gavel") then
                 oldOwner:StripWeapon("ix_gavel")
             end
-            oldOwner.ixGavelItem = nil
+            oldOwner.wsGavelItem = nil
         end
         self:SetData("equipped", nil)
     end
@@ -140,8 +140,8 @@ function ITEM:OnLoadout()
 
         local weapon = client:Give("ix_gavel", true)
         if IsValid(weapon) then
-            weapon.ixItem = self
-            client.ixGavelItem = self
+            weapon.wsItem = self
+            client.wsGavelItem = self
         end
     end
 end

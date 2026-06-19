@@ -62,7 +62,7 @@ if CLIENT then
         -- Draw shot count in corner
         local text = string.format("%d/%d", shots, maxShots)
 
-        surface.SetFont("ixSmallFont")
+        surface.SetFont("wsSmallFont")
         local textW, textH = surface.GetTextSize(text)
 
         -- Background

@@ -18,12 +18,12 @@ function PANEL:Init()
     self.age = 25
 
     -- Set panel height based on font
-    surface.SetFont("ixMenuButtonFont")
+    surface.SetFont("wsMenuButtonFont")
     local _, fontHeight = surface.GetTextSize("W@")
     self:SetTall(fontHeight)
 
-    -- Day dropdown (RIGHT side) - uses ixPhysicalDropdown for consistent styling
-    self.dayDropdown = self:Add("ixPhysicalDropdown")
+    -- Day dropdown (RIGHT side) - uses wsPhysicalDropdown for consistent styling
+    self.dayDropdown = self:Add("wsPhysicalDropdown")
     self.dayDropdown:Dock(RIGHT)
     self.dayDropdown:SetWide(80)
     self.dayDropdown.OnValueChanged = function()
@@ -44,11 +44,11 @@ function PANEL:Init()
     spacer:SetWide(8)
 
     -- Month dropdown (FILL remaining space)
-    self.monthDropdown = self:Add("ixPhysicalDropdown")
+    self.monthDropdown = self:Add("wsPhysicalDropdown")
     self.monthDropdown:Dock(FILL)
     self.monthDropdown.OnValueChanged = function()
         -- Find month index from name
-        for i, name in ipairs(ix.birthdata.months) do
+        for i, name in ipairs(ws.birthdata.months) do
             if name == self.monthDropdown:GetValue() then
                 self.month = i
                 break
@@ -59,11 +59,11 @@ function PANEL:Init()
     end
 
     -- Populate months
-    self.monthDropdown:SetOptions(ix.birthdata.months)
+    self.monthDropdown:SetOptions(ws.birthdata.months)
 end
 
 function PANEL:UpdateDayOptions()
-    local maxDay = ix.birthdata.GetMaxDay(self.month, self.age)
+    local maxDay = ws.birthdata.GetMaxDay(self.month, self.age)
     local currentDay = self.day
 
     -- Rebuild day options for current month
@@ -83,12 +83,12 @@ end
 function PANEL:SetMonth(month)
     month = math.Clamp(tonumber(month) or 1, 1, 12)
     self.month = month
-    self.monthDropdown:SetValue(ix.birthdata.months[month])
+    self.monthDropdown:SetValue(ws.birthdata.months[month])
     self:UpdateDayOptions()
 end
 
 function PANEL:SetDay(day)
-    local maxDay = ix.birthdata.GetMaxDay(self.month, self.age)
+    local maxDay = ws.birthdata.GetMaxDay(self.month, self.age)
     day = math.Clamp(tonumber(day) or 1, 1, maxDay)
     self.day = day
     self.dayDropdown:SetValue(tostring(day))
@@ -111,7 +111,7 @@ function PANEL:OnValueChanged()
     -- Override this
 end
 
-vgui.Register("ixBirthDatePicker", PANEL, "Panel")
+vgui.Register("wsBirthDatePicker", PANEL, "Panel")
 
 -- ============================================================================
 -- PERSONAL ID CARD
@@ -139,7 +139,7 @@ function PANEL:Init()
 end
 
 function PANEL:AddHeader(text)
-    local header, closeBtn = ix.constants.CreateHeaderBar(self.container, text, 36, function()
+    local header, closeBtn = ws.constants.CreateHeaderBar(self.container, text, 36, function()
         self:Remove()
     end)
 
@@ -149,7 +149,7 @@ end
 
 function PANEL:AddSubtitle(text)
     local row = self.container:Add("DLabel")
-    row:SetFont("ixSmallFont")
+    row:SetFont("wsSmallFont")
     row:SetText(text)
     row:SetTextColor(Color(160, 160, 160))
     row:SetContentAlignment(4)
@@ -174,7 +174,7 @@ end
 
 function PANEL:AddTextRow(text)
     local row = self.container:Add("DLabel")
-    row:SetFont("ixSmallFont")
+    row:SetFont("wsSmallFont")
     row:SetText(text)
     row:SetTextColor(Color(224, 224, 224))
     row:SetContentAlignment(4)
@@ -224,12 +224,12 @@ function PANEL:SetData(data)
     end
 
     if data.height then
-        local feet, inches = ix.physical.CmToImperial(data.height)
+        local feet, inches = ws.physical.CmToImperial(data.height)
         self:AddTextRow(string.format("Height: %d'%d\" (%dcm)", feet, inches, data.height))
     end
 
     if data.weight then
-        local kg = ix.physical.LbsToKg(data.weight)
+        local kg = ws.physical.LbsToKg(data.weight)
         self:AddTextRow(string.format("Weight: %dlbs (%dkg)", data.weight, kg))
     end
 
@@ -265,7 +265,7 @@ function PANEL:SetData(data)
     -- Bottom padding
     self:AddSpacer(8)
 
-    -- Calculate size based on content (Helix-idiomatic pattern from ixTooltip)
+    -- Calculate size based on content (Helix-idiomatic pattern from wsTooltip)
     self:InvalidateLayout(true)
 
     -- Find max width needed - children already sized via SizeToContents()
@@ -345,4 +345,4 @@ function PANEL:OnKeyCodePressed(key)
     end
 end
 
-vgui.Register("ixPersonalIDCard", PANEL, "EditablePanel")
+vgui.Register("wsPersonalIDCard", PANEL, "EditablePanel")

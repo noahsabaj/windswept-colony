@@ -7,7 +7,7 @@
     Physical attributes are set at character creation and cannot be changed.
 ]]--
 
-ix.physical = ix.physical or {}
+ws.physical = ws.physical or {}
 
 -- ============================================================================
 -- MODEL MAPPINGS
@@ -17,7 +17,7 @@ ix.physical = ix.physical or {}
 -- Black models get darker skin options
 -- Asian models get specific options
 -- White models get lighter skin options
-ix.physical.modelSkinTones = {
+ws.physical.modelSkinTones = {
     -- Black models
     ["male_01"] = {"Brown", "Dark Brown", "Dark"},
     ["male_03"] = {"Brown", "Dark Brown", "Dark"},
@@ -33,7 +33,7 @@ ix.physical.modelSkinTones = {
 }
 
 -- Models that are locked to bald
-ix.physical.baldModels = {
+ws.physical.baldModels = {
     ["male_04"] = true
 }
 
@@ -41,7 +41,7 @@ ix.physical.baldModels = {
 -- DROPDOWN OPTIONS
 -- ============================================================================
 
-ix.physical.hairColors = {
+ws.physical.hairColors = {
     "Black",
     "Dark Brown",
     "Brown",
@@ -53,14 +53,14 @@ ix.physical.hairColors = {
     "White"
 }
 
-ix.physical.hairTypes = {
+ws.physical.hairTypes = {
     "Straight",
     "Wavy",
     "Curly",
     "Coily"
 }
 
-ix.physical.hairLengths = {
+ws.physical.hairLengths = {
     "Bald",
     "Very Short",
     "Short",
@@ -68,7 +68,7 @@ ix.physical.hairLengths = {
     "Long"
 }
 
-ix.physical.eyeColors = {
+ws.physical.eyeColors = {
     "Brown",
     "Dark Brown",
     "Blue",
@@ -78,7 +78,7 @@ ix.physical.eyeColors = {
     "Amber"
 }
 
-ix.physical.facialHairOptions = {
+ws.physical.facialHairOptions = {
     "None",
     "Stubble",
     "Mustache",
@@ -91,7 +91,7 @@ ix.physical.facialHairOptions = {
 -- BUILD THRESHOLDS (BMI-based)
 -- ============================================================================
 
-ix.physical.buildThresholds = {
+ws.physical.buildThresholds = {
     {max = 18.5, name = "thin"},
     {max = 25, name = "average"},
     {max = 30, name = "stocky"},
@@ -102,7 +102,7 @@ ix.physical.buildThresholds = {
 -- AGE DESCRIPTORS
 -- ============================================================================
 
-ix.physical.ageDescriptors = {
+ws.physical.ageDescriptors = {
     {max = 19, desc = "late teens"},
     {max = 24, desc = "early twenties"},
     {max = 29, desc = "late twenties"},
@@ -118,36 +118,36 @@ ix.physical.ageDescriptors = {
 -- ============================================================================
 
 -- Extract model name from full path (e.g., "male_01" from "models/player/group01/male_01.mdl")
-function ix.physical.GetModelName(modelPath)
+function ws.physical.GetModelName(modelPath)
     if not modelPath then return nil end
     return string.match(modelPath, "(male_%d%d)%.mdl") or
            string.match(modelPath, "(female_%d%d)%.mdl")
 end
 
 -- Get skin tone options for a given model path
-function ix.physical.GetSkinTonesForModel(modelPath)
-    local modelName = ix.physical.GetModelName(modelPath)
+function ws.physical.GetSkinTonesForModel(modelPath)
+    local modelName = ws.physical.GetModelName(modelPath)
 
-    if modelName and ix.physical.modelSkinTones[modelName] then
-        return ix.physical.modelSkinTones[modelName]
+    if modelName and ws.physical.modelSkinTones[modelName] then
+        return ws.physical.modelSkinTones[modelName]
     end
 
-    return ix.physical.modelSkinTones["default"]
+    return ws.physical.modelSkinTones["default"]
 end
 
 -- Check if a model is female
-function ix.physical.IsFemaleModel(modelPath)
+function ws.physical.IsFemaleModel(modelPath)
     return modelPath and string.find(modelPath, "female") ~= nil
 end
 
 -- Check if a model is locked to bald
-function ix.physical.IsBaldModel(modelPath)
-    local modelName = ix.physical.GetModelName(modelPath)
-    return modelName and ix.physical.baldModels[modelName] or false
+function ws.physical.IsBaldModel(modelPath)
+    local modelName = ws.physical.GetModelName(modelPath)
+    return modelName and ws.physical.baldModels[modelName] or false
 end
 
 -- Convert height from cm to imperial (feet, inches)
-function ix.physical.CmToImperial(cm)
+function ws.physical.CmToImperial(cm)
     local totalInches = cm / 2.54
     local feet = math.floor(totalInches / 12)
     local inches = math.floor(totalInches % 12 + 0.5) -- Round to nearest inch
@@ -162,17 +162,17 @@ function ix.physical.CmToImperial(cm)
 end
 
 -- Convert weight from lbs to kg
-function ix.physical.LbsToKg(lbs)
+function ws.physical.LbsToKg(lbs)
     return math.floor(lbs * 0.453592 + 0.5) -- Round to nearest kg
 end
 
 -- Calculate BMI and return build category
-function ix.physical.CalculateBuild(heightCm, weightLbs)
+function ws.physical.CalculateBuild(heightCm, weightLbs)
     local heightM = heightCm / 100
     local weightKg = weightLbs * 0.453592
     local bmi = weightKg / (heightM * heightM)
 
-    for _, threshold in ipairs(ix.physical.buildThresholds) do
+    for _, threshold in ipairs(ws.physical.buildThresholds) do
         if bmi < threshold.max then
             return threshold.name, bmi
         end
@@ -182,8 +182,8 @@ function ix.physical.CalculateBuild(heightCm, weightLbs)
 end
 
 -- Get age descriptor text
-function ix.physical.GetAgeDescriptor(age)
-    for _, entry in ipairs(ix.physical.ageDescriptors) do
+function ws.physical.GetAgeDescriptor(age)
+    for _, entry in ipairs(ws.physical.ageDescriptors) do
         if age <= entry.max then
             return entry.desc
         end
@@ -192,8 +192,8 @@ function ix.physical.GetAgeDescriptor(age)
 end
 
 -- Get model path from model index
-function ix.physical.GetModelPath(modelIndex)
-    local models = ix.config.Get("factionlessModels") or {}
+function ws.physical.GetModelPath(modelIndex)
+    local models = ws.config.Get("factionlessModels") or {}
     local model = models[modelIndex]
 
     if istable(model) then
@@ -208,7 +208,7 @@ end
 -- ============================================================================
 
 if SERVER then
-    function ix.physical.GenerateDescription(data)
+    function ws.physical.GenerateDescription(data)
         -- Determine article for build
         local buildArticle = (data.build == "average") and "An" or "A"
 
@@ -233,11 +233,11 @@ if SERVER then
         end
 
         -- Convert height to imperial for description
-        local feet, inches = ix.physical.CmToImperial(data.height)
+        local feet, inches = ws.physical.CmToImperial(data.height)
         local heightStr = string.format("%d'%d\"", feet, inches)
 
         -- Get age descriptor
-        local ageDesc = ix.physical.GetAgeDescriptor(data.age)
+        local ageDesc = ws.physical.GetAgeDescriptor(data.age)
 
         -- Determine article for skin tone
         local skinArticle = string.sub(data.skinTone, 1, 1):match("[AEIOUaeiou]") and "an" or "a"
@@ -265,9 +265,9 @@ end
 -- ============================================================================
 
 -- Age (18-128)
-ix.char.RegisterVar("physAge", {
+ws.char.RegisterVar("physAge", {
     field = "phys_age",
-    fieldType = ix.type.number,
+    fieldType = ws.type.number,
     default = 25,
     index = 10,
     category = "description",
@@ -279,7 +279,7 @@ ix.char.RegisterVar("physAge", {
         return math.floor(value)
     end,
     OnDisplay = function(self, container, payload)
-        local panel = container:Add("ixPhysicalSlider")
+        local panel = container:Add("wsPhysicalSlider")
         panel:Dock(TOP)
         panel:SetMin(18)
         panel:SetMax(128)
@@ -298,9 +298,9 @@ ix.char.RegisterVar("physAge", {
 })
 
 -- Height (147-198 cm)
-ix.char.RegisterVar("physHeight", {
+ws.char.RegisterVar("physHeight", {
     field = "phys_height",
-    fieldType = ix.type.number,
+    fieldType = ws.type.number,
     default = 170,
     index = 11,
     category = "description",
@@ -312,7 +312,7 @@ ix.char.RegisterVar("physHeight", {
         return math.floor(value)
     end,
     OnDisplay = function(self, container, payload)
-        local panel = container:Add("ixPhysicalSlider")
+        local panel = container:Add("wsPhysicalSlider")
         panel:Dock(TOP)
         panel:SetMin(147)
         panel:SetMax(198)
@@ -331,9 +331,9 @@ ix.char.RegisterVar("physHeight", {
 })
 
 -- Weight (90-350 lbs)
-ix.char.RegisterVar("physWeight", {
+ws.char.RegisterVar("physWeight", {
     field = "phys_weight",
-    fieldType = ix.type.number,
+    fieldType = ws.type.number,
     default = 160,
     index = 12,
     category = "description",
@@ -345,7 +345,7 @@ ix.char.RegisterVar("physWeight", {
         return math.floor(value)
     end,
     OnDisplay = function(self, container, payload)
-        local panel = container:Add("ixPhysicalSlider")
+        local panel = container:Add("wsPhysicalSlider")
         panel:Dock(TOP)
         panel:SetMin(90)
         panel:SetMax(350)
@@ -364,9 +364,9 @@ ix.char.RegisterVar("physWeight", {
 })
 
 -- Skin Tone (model-dependent)
-ix.char.RegisterVar("physSkinTone", {
+ws.char.RegisterVar("physSkinTone", {
     field = "phys_skin_tone",
-    fieldType = ix.type.string,
+    fieldType = ws.type.string,
     default = "Medium",
     index = 13,
     category = "description",
@@ -377,12 +377,12 @@ ix.char.RegisterVar("physSkinTone", {
         return value
     end,
     OnDisplay = function(self, container, payload)
-        local panel = container:Add("ixPhysicalDropdown")
+        local panel = container:Add("wsPhysicalDropdown")
         panel:Dock(TOP)
 
         -- Get initial options based on current model
-        local modelPath = ix.physical.GetModelPath(payload.model or 1)
-        local options = ix.physical.GetSkinTonesForModel(modelPath)
+        local modelPath = ws.physical.GetModelPath(payload.model or 1)
+        local options = ws.physical.GetSkinTonesForModel(modelPath)
         panel:SetOptions(options)
 
         panel.OnValueChanged = function(this)
@@ -392,8 +392,8 @@ ix.char.RegisterVar("physSkinTone", {
         -- Update options when model changes
         payload:AddHook("model", function(modelIndex)
             if not IsValid(panel) then return end
-            local newModelPath = ix.physical.GetModelPath(modelIndex)
-            local newOptions = ix.physical.GetSkinTonesForModel(newModelPath)
+            local newModelPath = ws.physical.GetModelPath(modelIndex)
+            local newOptions = ws.physical.GetSkinTonesForModel(newModelPath)
             panel:SetOptions(newOptions)
             payload:Set("physSkinTone", panel:GetValue())
         end)
@@ -407,9 +407,9 @@ ix.char.RegisterVar("physSkinTone", {
 })
 
 -- Hair Color
-ix.char.RegisterVar("physHairColor", {
+ws.char.RegisterVar("physHairColor", {
     field = "phys_hair_color",
-    fieldType = ix.type.string,
+    fieldType = ws.type.string,
     default = "Brown",
     index = 14,
     category = "description",
@@ -418,15 +418,15 @@ ix.char.RegisterVar("physHairColor", {
         if payload.physHairLength == "Bald" then
             return value or "Brown"
         end
-        if not value or not table.HasValue(ix.physical.hairColors, value) then
+        if not value or not table.HasValue(ws.physical.hairColors, value) then
             return false, "invalidHairColor"
         end
         return value
     end,
     OnDisplay = function(self, container, payload)
-        local panel = container:Add("ixPhysicalDropdown")
+        local panel = container:Add("wsPhysicalDropdown")
         panel:Dock(TOP)
-        panel:SetOptions(ix.physical.hairColors)
+        panel:SetOptions(ws.physical.hairColors)
         panel:SetValue("Brown")
 
         panel.OnValueChanged = function(this)
@@ -436,7 +436,7 @@ ix.char.RegisterVar("physHairColor", {
         -- Hide when bald
         payload:AddHook("physHairLength", function(hairLength)
             if not IsValid(panel) then return end
-            ix.charCreate.SetFieldVisible(panel, hairLength ~= "Bald")
+            ws.charCreate.SetFieldVisible(panel, hairLength ~= "Bald")
         end)
 
         return panel
@@ -444,18 +444,18 @@ ix.char.RegisterVar("physHairColor", {
     OnPostSetup = function(self, panel, payload)
         if not IsValid(panel) then return end
         -- Check if model is bald-locked
-        local modelPath = ix.physical.GetModelPath(payload.model or 1)
-        if ix.physical.IsBaldModel(modelPath) then
-            ix.charCreate.SetFieldVisible(panel, false)
+        local modelPath = ws.physical.GetModelPath(payload.model or 1)
+        if ws.physical.IsBaldModel(modelPath) then
+            ws.charCreate.SetFieldVisible(panel, false)
         end
         payload:Set("physHairColor", panel:GetValue())
     end
 })
 
 -- Hair Type
-ix.char.RegisterVar("physHairType", {
+ws.char.RegisterVar("physHairType", {
     field = "phys_hair_type",
-    fieldType = ix.type.string,
+    fieldType = ws.type.string,
     default = "Straight",
     index = 15,
     category = "description",
@@ -464,15 +464,15 @@ ix.char.RegisterVar("physHairType", {
         if payload.physHairLength == "Bald" then
             return value or "Straight"
         end
-        if not value or not table.HasValue(ix.physical.hairTypes, value) then
+        if not value or not table.HasValue(ws.physical.hairTypes, value) then
             return false, "invalidHairType"
         end
         return value
     end,
     OnDisplay = function(self, container, payload)
-        local panel = container:Add("ixPhysicalDropdown")
+        local panel = container:Add("wsPhysicalDropdown")
         panel:Dock(TOP)
-        panel:SetOptions(ix.physical.hairTypes)
+        panel:SetOptions(ws.physical.hairTypes)
         panel:SetValue("Straight")
 
         panel.OnValueChanged = function(this)
@@ -482,7 +482,7 @@ ix.char.RegisterVar("physHairType", {
         -- Hide when bald
         payload:AddHook("physHairLength", function(hairLength)
             if not IsValid(panel) then return end
-            ix.charCreate.SetFieldVisible(panel, hairLength ~= "Bald")
+            ws.charCreate.SetFieldVisible(panel, hairLength ~= "Bald")
         end)
 
         return panel
@@ -490,31 +490,31 @@ ix.char.RegisterVar("physHairType", {
     OnPostSetup = function(self, panel, payload)
         if not IsValid(panel) then return end
         -- Check if model is bald-locked
-        local modelPath = ix.physical.GetModelPath(payload.model or 1)
-        if ix.physical.IsBaldModel(modelPath) then
-            ix.charCreate.SetFieldVisible(panel, false)
+        local modelPath = ws.physical.GetModelPath(payload.model or 1)
+        if ws.physical.IsBaldModel(modelPath) then
+            ws.charCreate.SetFieldVisible(panel, false)
         end
         payload:Set("physHairType", panel:GetValue())
     end
 })
 
 -- Hair Length
-ix.char.RegisterVar("physHairLength", {
+ws.char.RegisterVar("physHairLength", {
     field = "phys_hair_length",
-    fieldType = ix.type.string,
+    fieldType = ws.type.string,
     default = "Medium",
     index = 16,
     category = "description",
     OnValidate = function(self, value, payload, client)
-        if not value or not table.HasValue(ix.physical.hairLengths, value) then
+        if not value or not table.HasValue(ws.physical.hairLengths, value) then
             return false, "invalidHairLength"
         end
         return value
     end,
     OnDisplay = function(self, container, payload)
-        local panel = container:Add("ixPhysicalDropdown")
+        local panel = container:Add("wsPhysicalDropdown")
         panel:Dock(TOP)
-        panel:SetOptions(ix.physical.hairLengths)
+        panel:SetOptions(ws.physical.hairLengths)
         panel:SetValue("Medium")
 
         panel.OnValueChanged = function(this)
@@ -524,14 +524,14 @@ ix.char.RegisterVar("physHairLength", {
         -- Lock to bald for bald models
         payload:AddHook("model", function(modelIndex)
             if not IsValid(panel) then return end
-            local modelPath = ix.physical.GetModelPath(modelIndex)
-            if ix.physical.IsBaldModel(modelPath) then
+            local modelPath = ws.physical.GetModelPath(modelIndex)
+            if ws.physical.IsBaldModel(modelPath) then
                 panel:SetOptions({"Bald"})
                 panel:SetEnabled(false)
                 payload:Set("physHairLength", "Bald")
             else
                 local currentValue = panel:GetValue()
-                panel:SetOptions(ix.physical.hairLengths)
+                panel:SetOptions(ws.physical.hairLengths)
                 panel:SetEnabled(true)
                 -- If was "Bald" (from bald model), default to "Medium", otherwise preserve
                 if currentValue == "Bald" then
@@ -547,8 +547,8 @@ ix.char.RegisterVar("physHairLength", {
     OnPostSetup = function(self, panel, payload)
         if not IsValid(panel) then return end
         -- Check if model is bald-locked
-        local modelPath = ix.physical.GetModelPath(payload.model or 1)
-        if ix.physical.IsBaldModel(modelPath) then
+        local modelPath = ws.physical.GetModelPath(payload.model or 1)
+        if ws.physical.IsBaldModel(modelPath) then
             panel:SetOptions({"Bald"})
             panel:SetEnabled(false)
             payload:Set("physHairLength", "Bald")
@@ -559,22 +559,22 @@ ix.char.RegisterVar("physHairLength", {
 })
 
 -- Eye Color
-ix.char.RegisterVar("physEyeColor", {
+ws.char.RegisterVar("physEyeColor", {
     field = "phys_eye_color",
-    fieldType = ix.type.string,
+    fieldType = ws.type.string,
     default = "Brown",
     index = 17,
     category = "description",
     OnValidate = function(self, value, payload, client)
-        if not value or not table.HasValue(ix.physical.eyeColors, value) then
+        if not value or not table.HasValue(ws.physical.eyeColors, value) then
             return false, "invalidEyeColor"
         end
         return value
     end,
     OnDisplay = function(self, container, payload)
-        local panel = container:Add("ixPhysicalDropdown")
+        local panel = container:Add("wsPhysicalDropdown")
         panel:Dock(TOP)
-        panel:SetOptions(ix.physical.eyeColors)
+        panel:SetOptions(ws.physical.eyeColors)
         panel:SetValue("Brown")
 
         panel.OnValueChanged = function(this)
@@ -590,22 +590,22 @@ ix.char.RegisterVar("physEyeColor", {
 })
 
 -- Facial Hair
-ix.char.RegisterVar("physFacialHair", {
+ws.char.RegisterVar("physFacialHair", {
     field = "phys_facial_hair",
-    fieldType = ix.type.string,
+    fieldType = ws.type.string,
     default = "None",
     index = 18,
     category = "description",
     OnValidate = function(self, value, payload, client)
-        if not value or not table.HasValue(ix.physical.facialHairOptions, value) then
+        if not value or not table.HasValue(ws.physical.facialHairOptions, value) then
             return false, "invalidFacialHair"
         end
         return value
     end,
     OnDisplay = function(self, container, payload)
-        local panel = container:Add("ixPhysicalDropdown")
+        local panel = container:Add("wsPhysicalDropdown")
         panel:Dock(TOP)
-        panel:SetOptions(ix.physical.facialHairOptions)
+        panel:SetOptions(ws.physical.facialHairOptions)
         panel:SetValue("None")
 
         panel.OnValueChanged = function(this)
@@ -621,9 +621,9 @@ ix.char.RegisterVar("physFacialHair", {
 })
 
 -- Birth Month (1-12)
-ix.char.RegisterVar("physBirthMonth", {
+ws.char.RegisterVar("physBirthMonth", {
     field = "phys_birth_month",
-    fieldType = ix.type.number,
+    fieldType = ws.type.number,
     default = 1,
     index = 19,
     category = "description",
@@ -635,7 +635,7 @@ ix.char.RegisterVar("physBirthMonth", {
         return math.floor(value)
     end,
     OnDisplay = function(self, container, payload)
-        local panel = container:Add("ixBirthDatePicker")
+        local panel = container:Add("wsBirthDatePicker")
         panel:Dock(TOP)
 
         -- Store reference to update day validation when age changes
@@ -660,9 +660,9 @@ ix.char.RegisterVar("physBirthMonth", {
 })
 
 -- Birth Day (1-31, handled by month's picker)
-ix.char.RegisterVar("physBirthDay", {
+ws.char.RegisterVar("physBirthDay", {
     field = "phys_birth_day",
-    fieldType = ix.type.number,
+    fieldType = ws.type.number,
     default = 1,
     index = 20,
     category = "description",
@@ -671,7 +671,7 @@ ix.char.RegisterVar("physBirthDay", {
         value = tonumber(value)
         local month = tonumber(payload.physBirthMonth) or 1
         local age = tonumber(payload.physAge) or 25
-        local maxDay = ix.birthdata.GetMaxDay(month, age)
+        local maxDay = ws.birthdata.GetMaxDay(month, age)
 
         if not value or value < 1 or value > maxDay then
             return false, "invalidBirthDay"
@@ -681,22 +681,22 @@ ix.char.RegisterVar("physBirthDay", {
 })
 
 -- Birth Location
-ix.char.RegisterVar("physBirthLocation", {
+ws.char.RegisterVar("physBirthLocation", {
     field = "phys_birth_location",
-    fieldType = ix.type.string,
+    fieldType = ws.type.string,
     default = "Unspecified",
     index = 21,
     category = "description",
     OnValidate = function(self, value, payload, client)
-        if not value or not ix.birthdata.IsValidLocation(value) then
+        if not value or not ws.birthdata.IsValidLocation(value) then
             return false, "invalidBirthLocation"
         end
         return value
     end,
     OnDisplay = function(self, container, payload)
-        local panel = container:Add("ixPhysicalDropdown")
+        local panel = container:Add("wsPhysicalDropdown")
         panel:Dock(TOP)
-        panel:SetOptions(ix.birthdata.locations)
+        panel:SetOptions(ws.birthdata.locations)
         panel:SetValue("Unspecified")
 
         panel.OnValueChanged = function(this)
@@ -713,9 +713,9 @@ ix.char.RegisterVar("physBirthLocation", {
 
 -- Override the default description variable to be non-editable
 -- The description will be generated server-side from physical attributes
-ix.char.RegisterVar("description", {
+ws.char.RegisterVar("description", {
     field = "description",
-    fieldType = ix.type.text,
+    fieldType = ws.type.text,
     default = "",
     index = 99, -- Put at end (we don't show it anyway)
     bNoDisplay = true, -- Hide from character creation UI

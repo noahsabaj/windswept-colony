@@ -14,5 +14,5 @@ PLUGIN.name = "Restraint System"
 PLUGIN.author = "Windswept"
 PLUGIN.description = "Physical restraint mechanics: zipties, gagging, dragging, leashing."
 
-ix.util.Include("sv_plugin.lua")
-ix.util.Include("cl_plugin.lua")
+ws.util.Include("sv_plugin.lua")
+ws.util.Include("cl_plugin.lua")

@@ -141,7 +141,7 @@ if SERVER then
     end
 
     function ENT:PickUp(activator)
-        local character, inventory = ix.constants.GetCharacterInventory(activator)
+        local character, inventory = ws.constants.GetCharacterInventory(activator)
         if not character or not inventory then return end
 
         -- Check if inventory has room
@@ -174,8 +174,8 @@ if SERVER then
                 for _, item in pairs(inventory:GetItems()) do
                     if item.uniqueID == "lantern" and item:GetData("equipped") and not item.linkedToWeapon then
                         item.linkedToWeapon = true
-                        weapon.ixItem = item
-                        activator.ixLanternItem = item
+                        weapon.wsItem = item
+                        activator.wsLanternItem = item
                         break
                     end
                 end

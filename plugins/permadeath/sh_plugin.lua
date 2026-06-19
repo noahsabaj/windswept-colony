@@ -11,48 +11,48 @@ PLUGIN.author = "Windswept Team"
 PLUGIN.description = "Knockout and permadeath system with revival mechanics."
 
 -- Configuration defaults
-ix.config.Add("permadeathBaseTime", 300, "Base knockout timer in seconds (5 minutes).", nil, {
+ws.config.Add("permadeathBaseTime", 300, "Base knockout timer in seconds (5 minutes).", nil, {
     data = {min = 30, max = 1800},
     category = "Permadeath"
 })
 
-ix.config.Add("permadeathHeadshotChance", 50, "Percent chance a headshot causes instant permadeath.", nil, {
+ws.config.Add("permadeathHeadshotChance", 50, "Percent chance a headshot causes instant permadeath.", nil, {
     data = {min = 0, max = 100},
     category = "Permadeath"
 })
 
-ix.config.Add("permadeathRevivalTimeMin", 3, "Minimum revival progress time in seconds.", nil, {
+ws.config.Add("permadeathRevivalTimeMin", 3, "Minimum revival progress time in seconds.", nil, {
     data = {min = 1, max = 30},
     category = "Permadeath"
 })
 
-ix.config.Add("permadeathRevivalTimeMax", 10, "Maximum revival progress time in seconds.", nil, {
+ws.config.Add("permadeathRevivalTimeMax", 10, "Maximum revival progress time in seconds.", nil, {
     data = {min = 1, max = 60},
     category = "Permadeath"
 })
 
-ix.config.Add("permadeathPassiveHealRate", 1, "HP gained per minute from passive healing.", nil, {
+ws.config.Add("permadeathPassiveHealRate", 1, "HP gained per minute from passive healing.", nil, {
     data = {min = 0, max = 10},
     category = "Permadeath"
 })
 
-ix.config.Add("permadeathPassiveHealCap", 80, "Maximum health percentage from passive healing.", nil, {
+ws.config.Add("permadeathPassiveHealCap", 80, "Maximum health percentage from passive healing.", nil, {
     data = {min = 0, max = 100},
     category = "Permadeath"
 })
 
 -- Network strings (server will register these)
 if SERVER then
-    util.AddNetworkString("ixKnockoutStart")
-    util.AddNetworkString("ixKnockoutTimerSync")
-    util.AddNetworkString("ixKnockoutEnd")
-    util.AddNetworkString("ixKnockoutGiveUp")
-    util.AddNetworkString("ixKnockoutLoot")    -- E tap: search/loot body
-    util.AddNetworkString("ixKnockoutRevive")  -- E hold: attempt revival
-    util.AddNetworkString("ixRevivalProgress")
-    util.AddNetworkString("ixSuicideExecute")  -- Suicide with gun
-    util.AddNetworkString("ixPermadeathScreen")  -- Server → Client: show memorial
-    util.AddNetworkString("ixPermadeathReady")   -- Client → Server: player acknowledged
+    util.AddNetworkString("wsKnockoutStart")
+    util.AddNetworkString("wsKnockoutTimerSync")
+    util.AddNetworkString("wsKnockoutEnd")
+    util.AddNetworkString("wsKnockoutGiveUp")
+    util.AddNetworkString("wsKnockoutLoot")    -- E tap: search/loot body
+    util.AddNetworkString("wsKnockoutRevive")  -- E hold: attempt revival
+    util.AddNetworkString("wsRevivalProgress")
+    util.AddNetworkString("wsSuicideExecute")  -- Suicide with gun
+    util.AddNetworkString("wsPermadeathScreen")  -- Server → Client: show memorial
+    util.AddNetworkString("wsPermadeathReady")   -- Client → Server: player acknowledged
 end
 
 -- Hold E duration to trigger revival (in seconds)
@@ -63,14 +63,14 @@ PLUGIN.reviveHoldTime = 1.5
 -- Calculate knockout duration based on knockout count
 -- Each knockout halves the timer: 300 -> 150 -> 75 -> 37.5 -> 18.75...
 function PLUGIN:GetKnockoutDuration(knockoutCount)
-    local base = ix.config.Get("permadeathBaseTime", 300)
+    local base = ws.config.Get("permadeathBaseTime", 300)
     knockoutCount = math.max(1, knockoutCount or 1)
     return base / math.pow(2, knockoutCount - 1)
 end
 
 -- Check if the last hit was a headshot (stored from ScalePlayerDamage)
 function PLUGIN:IsHeadshot(client)
-    return client.ixLastHitGroup == HITGROUP_HEAD
+    return client.wsLastHitGroup == HITGROUP_HEAD
 end
 
 -- Probabilistic squared calculation for revival chance
@@ -107,5 +107,5 @@ function PLUGIN:FormatTime(seconds)
 end
 
 -- Include server and client files
-ix.util.Include("sv_plugin.lua")
-ix.util.Include("cl_plugin.lua")
+ws.util.Include("sv_plugin.lua")
+ws.util.Include("cl_plugin.lua")

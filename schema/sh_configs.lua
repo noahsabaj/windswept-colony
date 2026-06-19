@@ -2,6 +2,6 @@
     Windswept Colony RP - Configuration
 ]]--
 
-ix.currency.symbol = "$"
-ix.currency.singular = "dollar"
-ix.currency.plural = "dollars"
+ws.currency.symbol = "$"
+ws.currency.singular = "dollar"
+ws.currency.plural = "dollars"

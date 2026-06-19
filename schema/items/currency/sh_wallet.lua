@@ -33,7 +33,7 @@ function ITEM:GetDescription()
     -- Show contents value
     local invID = self:GetData("id")
     if invID then
-        local inv = ix.item.inventories[invID]
+        local inv = ws.item.inventories[invID]
         if inv then
             local total = 0
             for _, invItem in pairs(inv:GetItems()) do
@@ -63,7 +63,7 @@ end
 -- Custom combine: allows cash, coins, and personal_id (not a single type)
 ITEM.functions.combine = {
     OnRun = function(item, data)
-        local targetItem = ix.item.instances[data[1]]
+        local targetItem = ws.item.instances[data[1]]
         if not targetItem then return false end
 
         -- Only allow cash, coins, and personal_id
@@ -96,7 +96,7 @@ ITEM.functions.combine = {
     OnCanRun = function(item, data)
         local index = item:GetData("id", "")
         if index then
-            local inventory = ix.item.inventories[index]
+            local inventory = ws.item.inventories[index]
             if inventory then
                 return true
             end
@@ -163,13 +163,13 @@ ITEM.functions["Move Money Into"] = {
         local client = item.player
         if not client then return false end
 
-        local character, mainInv = ix.constants.GetCharacterInventory(client)
+        local character, mainInv = ws.constants.GetCharacterInventory(client)
         if not character or not mainInv then return false end
 
         local walletInvID = item:GetData("id")
         if not walletInvID then return false end
 
-        local walletInv = ix.item.inventories[walletInvID]
+        local walletInv = ws.item.inventories[walletInvID]
         if not walletInv then return false end
 
         local designation = item:GetData("designation", "both")
@@ -241,13 +241,13 @@ ITEM.functions["Empty Wallet"] = {
         local client = item.player
         if not client then return false end
 
-        local character, mainInv = ix.constants.GetCharacterInventory(client)
+        local character, mainInv = ws.constants.GetCharacterInventory(client)
         if not character or not mainInv then return false end
 
         local walletInvID = item:GetData("id")
         if not walletInvID then return false end
 
-        local walletInv = ix.item.inventories[walletInvID]
+        local walletInv = ws.item.inventories[walletInvID]
         if not walletInv then return false end
 
         local itemsToMove = {}
@@ -285,7 +285,7 @@ ITEM.functions["Empty Wallet"] = {
                             if compatible then
                                 local otherInvID = otherItem:GetData("id")
                                 if otherInvID then
-                                    local otherInv = ix.item.inventories[otherInvID]
+                                    local otherInv = ws.item.inventories[otherInvID]
                                     if otherInv then
                                         local ox, oy = otherInv:FindEmptySlot(walletItem.width, walletItem.height)
                                         if ox and oy then
@@ -336,7 +336,7 @@ ITEM.functions.Give = {
     end,
     OnClick = function(item)
         local client = LocalPlayer()
-        local target = ix.util.GetLookAtPlayer(client, 100)
+        local target = ws.util.GetLookAtPlayer(client, 100)
 
         if not IsValid(target) then
             client:NotifyLocalized("noTargetInFront")
@@ -347,7 +347,7 @@ ITEM.functions.Give = {
         local invID = item:GetData("id")
         if not invID then return false end
 
-        local inv = ix.item.inventories[invID]
+        local inv = ws.item.inventories[invID]
         if not inv then return false end
 
         local totalCents = 0
@@ -373,9 +373,11 @@ ITEM.functions.Give = {
                 local amount = tonumber(text)
                 if not amount or amount <= 0 then return end
 
-                local cents = math.floor(amount * 100)
+                -- Round (not floor) to avoid binary-float truncation, e.g.
+                -- 4.10 * 100 = 409.9999994 which floors to 409 cents.
+                local cents = math.floor(amount * 100 + 0.5)
 
-                net.Start("ixWalletGive")
+                net.Start("wsWalletGive")
                     net.WriteUInt(item:GetID(), 32)
                     net.WriteUInt(cents, 32)
                     net.WriteEntity(target)
@@ -399,7 +401,7 @@ ITEM.functions.Give = {
 -- WALLET RESTRICTION (custom - allows cash, coins, personal_id + designation)
 -- ============================================================================
 
-hook.Add("CanTransferItem", "ixWalletRestriction", function(transferItem, curInv, inventory)
+hook.Add("CanTransferItem", "wsWalletRestriction", function(transferItem, curInv, inventory)
     if inventory and inventory.vars and inventory.vars.isWallet then
         -- Only allow cash, coins, and personal_id
         if transferItem.uniqueID ~= "cash" and transferItem.uniqueID ~= "coins" and transferItem.uniqueID ~= "personal_id" then
@@ -410,7 +412,7 @@ hook.Add("CanTransferItem", "ixWalletRestriction", function(transferItem, curInv
         if transferItem.isCurrency then
             -- Find the wallet item that owns this inventory
             local walletItem = nil
-            for _, item in pairs(ix.item.instances) do
+            for _, item in pairs(ws.item.instances) do
                 if item.uniqueID == "wallet" and item:GetData("id") == inventory:GetID() then
                     walletItem = item
                     break

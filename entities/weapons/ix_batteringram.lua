@@ -73,33 +73,33 @@ function SWEP:PrimaryAttack()
 	end
 
 	-- Only work on our managed Windswept doors
-	if not entity.ixIsWindsweptDoor then
+	if not entity.wsIsWindsweptDoor then
 		self:EmitSound("physics/metal/metal_solid_impact_hard1.wav", 80, 100)
 		owner:Notify("This door cannot be breached.")
 		return
 	end
 
 	-- Check if door is already blasted
-	if entity.ixDummy and IsValid(entity.ixDummy) then
+	if entity.wsDummy and IsValid(entity.wsDummy) then
 		owner:Notify("This door is already breached.")
 		return
 	end
 
 	-- Initialize door breach data if not already set
 	-- Hit counter persists until door is REPAIRED or DESTROYED - no time-based reset
-	if not entity.ixBatteringRamRequired then
+	if not entity.wsBatteringRamRequired then
 		-- Roll required hits (1-6) - this is set once and persists
-		entity.ixBatteringRamRequired = math.random(1, 6)
-		entity.ixBatteringRamHits = 0
+		entity.wsBatteringRamRequired = math.random(1, 6)
+		entity.wsBatteringRamHits = 0
 	end
 
 	-- Increment hit counter
-	entity.ixBatteringRamHits = (entity.ixBatteringRamHits or 0) + 1
+	entity.wsBatteringRamHits = (entity.wsBatteringRamHits or 0) + 1
 
 	-- Check if door should be breached
-	if entity.ixBatteringRamHits >= entity.ixBatteringRamRequired then
+	if entity.wsBatteringRamHits >= entity.wsBatteringRamRequired then
 		-- BREACH! Get door material for appropriate sounds
-		local config = ix.doors.GetTypeConfig(entity)
+		local config = ws.doors.GetTypeConfig(entity)
 		local isWood = config.material == "wood"
 
 		-- Destruction sounds based on material
@@ -116,17 +116,17 @@ function SWEP:PrimaryAttack()
 		direction.z = 0.3 -- Slight upward angle for dramatic effect
 
 		-- Use our custom breach function - PERMANENTLY DESTROYS the door
-		ix.doors.BreachDoor(entity, direction * 450)
+		ws.doors.BreachDoor(entity, direction * 450)
 
 		-- Reset door tracking
-		entity.ixBatteringRamRequired = nil
-		entity.ixBatteringRamHits = nil
-		entity.ixBatteringRamLastHit = nil
+		entity.wsBatteringRamRequired = nil
+		entity.wsBatteringRamHits = nil
+		entity.wsBatteringRamLastHit = nil
 
 		-- Log the breach
 		local character = owner:GetCharacter()
 		if character then
-			ix.log.Add(owner, "battering_ram_breach", entity:GetClass(), entity:EntIndex())
+			ws.log.Add(owner, "battering_ram_breach", entity:GetClass(), entity:EntIndex())
 		end
 	else
 		-- Hit sound
@@ -148,6 +148,6 @@ end
 
 if CLIENT then
 	function SWEP:DrawWorldModel()
-		ix.constants.DrawWorldModelBone(self, {5, 3, -2}, {{"Forward", 90}, {"Up", 180}})
+		ws.constants.DrawWorldModelBone(self, {5, 3, -2}, {{"Forward", 90}, {"Up", 180}})
 	end
 end

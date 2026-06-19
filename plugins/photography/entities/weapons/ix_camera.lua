@@ -115,7 +115,7 @@ function SWEP:Think()
 
         if shouldAim ~= self:GetAiming() then
             self:SetAiming(shouldAim)
-            net.Start("ixCameraSetAiming")
+            net.Start("wsCameraSetAiming")
                 net.WriteBool(shouldAim)
             net.SendToServer()
         end
@@ -130,7 +130,7 @@ function SWEP:Think()
                 -- LMB just pressed while aiming
                 if not self.nextPhotoTime or self.nextPhotoTime <= CurTime() then
                     self.nextPhotoTime = CurTime() + 1
-                    net.Start("ixCameraRequestPhoto")
+                    net.Start("wsCameraRequestPhoto")
                     net.SendToServer()
                 end
             end
@@ -148,7 +148,7 @@ function SWEP:Think()
                 -- Middle mouse just pressed
                 if not self.nextFlashToggle or self.nextFlashToggle <= CurTime() then
                     self.nextFlashToggle = CurTime() + 0.3
-                    net.Start("ixCameraToggleFlash")
+                    net.Start("wsCameraToggleFlash")
                     net.SendToServer()
                 end
             end
@@ -160,7 +160,7 @@ function SWEP:Think()
 
         -- Suppress weapon select UI while aiming
         if self:GetAiming() then
-            local wepselect = ix.plugin.Get("wepselect")
+            local wepselect = ws.plugin.Get("wepselect")
             if wepselect then
                 wepselect.alpha = 0
                 wepselect.alphaDelta = 0
@@ -180,7 +180,7 @@ end
 
 -- Handle zoom through global CreateMove hook (SWEP:CreateMove doesn't exist in GMod)
 if CLIENT then
-    hook.Add("CreateMove", "ixCameraZoom", function(cmd)
+    hook.Add("CreateMove", "wsCameraZoom", function(cmd)
         local ply = LocalPlayer()
         if not IsValid(ply) then return end
 
@@ -198,7 +198,7 @@ if CLIENT then
         weapon:SetCurrentFOV(newFOV)
 
         -- Sync to server
-        net.Start("ixCameraSetZoom")
+        net.Start("wsCameraSetZoom")
             net.WriteFloat(newFOV)
         net.SendToServer()
     end)
@@ -245,7 +245,7 @@ if CLIENT then
     end
 
     -- Also set up on InitializedPlugins for fresh server start
-    hook.Add("InitializedPlugins", "ixCameraSetupScrollBlock", function()
+    hook.Add("InitializedPlugins", "wsCameraSetupScrollBlock", function()
         SetupCameraScrollBlock()
     end)
 end
@@ -282,7 +282,7 @@ if CLIENT then
             return nil
         end
 
-        local character, inventory = ix.constants.GetCharacterInventory(owner)
+        local character, inventory = ws.constants.GetCharacterInventory(owner)
         if not character or not inventory then
             self._cameraItemCache = nil
             self._cameraItemCacheTime = now
@@ -381,18 +381,18 @@ if CLIENT then
 
         local flashText = self:GetFlashEnabled() and "FLASH: ON" or "FLASH: OFF"
         local zoomPercent = math.Round(100 - ((self:GetCurrentFOV() - self.MinFOV) / (self.MaxFOV - self.MinFOV)) * 100)
-        local flashColor = self:GetFlashEnabled() and Color(255, 255, 100) or ix.constants.COLOR_UI_NEUTRAL
+        local flashColor = self:GetFlashEnabled() and Color(255, 255, 100) or ws.constants.COLOR_UI_NEUTRAL
         local infoText = string.format("[%s | Zoom: %d%%]", flashText, zoomPercent)
 
         if hasBatterySystem then
             local batteryColor = batteryCharge >= 20 and Color(100, 255, 100) or Color(255, 100, 100)
-            draw.SimpleText(string.format("⚡ %dup", batteryCharge), "ixMediumFont", squareX + 20, infoY, batteryColor, TEXT_ALIGN_LEFT)
+            draw.SimpleText(string.format("⚡ %dup", batteryCharge), "wsMediumFont", squareX + 20, infoY, batteryColor, TEXT_ALIGN_LEFT)
             
             -- Show tools in center
-            draw.SimpleText(infoText, "ixMediumFont", cx, infoY, flashColor, TEXT_ALIGN_CENTER)
+            draw.SimpleText(infoText, "wsMediumFont", cx, infoY, flashColor, TEXT_ALIGN_CENTER)
         else
             -- No battery, shift tools to left
-            draw.SimpleText(infoText, "ixMediumFont", squareX + 20, infoY, flashColor, TEXT_ALIGN_LEFT)
+            draw.SimpleText(infoText, "wsMediumFont", squareX + 20, infoY, flashColor, TEXT_ALIGN_LEFT)
         end
 
         -- Film indicator (right)
@@ -403,7 +403,7 @@ if CLIENT then
         end
 
         local filmColor = filmShots > 0 and Color(100, 200, 255) or Color(255, 100, 100)
-        draw.SimpleText(string.format("%d/10", filmShots), "ixMediumFont", squareX + squareSize - 20, infoY, filmColor, TEXT_ALIGN_RIGHT)
+        draw.SimpleText(string.format("%d/10", filmShots), "wsMediumFont", squareX + squareSize - 20, infoY, filmColor, TEXT_ALIGN_RIGHT)
     end
 
     -- Hide default crosshair when aiming
@@ -415,7 +415,7 @@ if CLIENT then
     -- CLIENT: Photo Capture
     -- ========================================================================
 
-    net.Receive("ixCameraApprovePhoto", function()
+    net.Receive("wsCameraApprovePhoto", function()
         local weapon = LocalPlayer():GetActiveWeapon()
         if not IsValid(weapon) or weapon:GetClass() ~= "ix_camera" then return end
 
@@ -424,7 +424,7 @@ if CLIENT then
     end)
 
     -- Render target for photo capture (768x768, created once and reused)
-    local photoRT = GetRenderTarget("ixCameraPhoto", 768, 768)
+    local photoRT = GetRenderTarget("wsCameraPhoto", 768, 768)
 
     function SWEP:CapturePhoto()
         local owner = self:GetOwner()
@@ -446,8 +446,8 @@ if CLIENT then
             math.tan(math.rad(hFOV / 2)) * (squareSize / scrW)
         ))
 
-        hook.Add("PostRender", "ixCameraCapture", function()
-            hook.Remove("PostRender", "ixCameraCapture")
+        hook.Add("PostRender", "wsCameraCapture", function()
+            hook.Remove("PostRender", "wsCameraCapture")
 
             if not IsValid(self) or not IsValid(owner) then return end
 
@@ -483,7 +483,7 @@ if CLIENT then
                     return
                 end
 
-                net.Start("ixCameraPhotoData")
+                net.Start("wsCameraPhotoData")
                     net.WriteUInt(#data, 32)
                     net.WriteData(data, #data)
                 net.SendToServer()
@@ -494,7 +494,7 @@ if CLIENT then
     end
 
     -- Flash effect received from server
-    net.Receive("ixCameraFlashEffect", function()
+    net.Receive("wsCameraFlashEffect", function()
         local pos = net.ReadVector()
 
         -- Create screen flash effect for local player if nearby
@@ -518,7 +518,7 @@ if CLIENT then
     end)
 
     -- Flash toggle feedback
-    net.Receive("ixCameraFlashToggled", function()
+    net.Receive("wsCameraFlashToggled", function()
         local enabled = net.ReadBool()
         local weapon = LocalPlayer():GetActiveWeapon()
         if IsValid(weapon) and weapon:GetClass() == "ix_camera" then
@@ -544,12 +544,12 @@ if SERVER then
     local ProcessCompletePhoto
 
     -- Handle photo request
-    net.Receive("ixCameraRequestPhoto", function(len, client)
+    net.Receive("wsCameraRequestPhoto", function(len, client)
         local weapon = client:GetActiveWeapon()
         if not IsValid(weapon) or weapon:GetClass() ~= "ix_camera" then return end
         if not weapon:GetAiming() then return end
 
-        local item = weapon.ixItem
+        local item = weapon.wsItem
         if not item then return end
 
         -- Check film
@@ -561,9 +561,13 @@ if SERVER then
 
         -- Call hook to see if any other plugins block this photo (e.g. Battery bridge)
         -- Passing 'false' as 3rd arg means "just check, don't drain"
-        if hook.Run("ixCameraCanTakePhoto", client, item, false) == false then
+        if hook.Run("wsCameraCanTakePhoto", client, item, false) == false then
             return
         end
+
+        -- Issue a one-shot, short-lived approval. wsCameraPhotoData requires it, so
+        -- a client can't upload an arbitrary photo we never asked for.
+        client.wsCameraApproval = CurTime()
 
         -- Resources OK - check if flash needed
         if weapon:GetFlashEnabled() then
@@ -583,7 +587,7 @@ if SERVER then
             local nearby = ents.FindInSphere(client:GetPos(), 500)
             for _, ent in ipairs(nearby) do
                 if ent:IsPlayer() then
-                    net.Start("ixCameraFlashEffect")
+                    net.Start("wsCameraFlashEffect")
                         net.WriteVector(client:GetPos())
                     net.Send(ent)
                 end
@@ -592,21 +596,25 @@ if SERVER then
             -- Brief delay for light to illuminate scene, then capture
             timer.Simple(0.05, function()
                 if IsValid(client) then
-                    net.Start("ixCameraApprovePhoto")
+                    net.Start("wsCameraApprovePhoto")
                     net.Send(client)
                 end
             end)
         else
             -- No flash - capture immediately
-            net.Start("ixCameraApprovePhoto")
+            net.Start("wsCameraApprovePhoto")
             net.Send(client)
         end
     end)
 
     -- Handle photo data from client
     -- Raw JPEG binary with adaptive quality, fits in single message (<64KB)
-    net.Receive("ixCameraPhotoData", function(len, client)
+    net.Receive("wsCameraPhotoData", function(len, client)
         local dataLen = net.ReadUInt(32)
+
+        -- Bound the declared size before reading (defends against an absurd dataLen)
+        if dataLen <= 0 or dataLen > ws.photo.MAX_PHOTO_BYTES then return end
+
         local imageData = net.ReadData(dataLen)
 
         if not imageData or #imageData == 0 then
@@ -621,8 +629,31 @@ if SERVER then
         local weapon = client:GetActiveWeapon()
         if not IsValid(weapon) or weapon:GetClass() ~= "ix_camera" then return end
 
-        local item = weapon.ixItem
+        local item = weapon.wsItem
         if not item then return end
+
+        -- Require a recent one-shot approval issued by wsCameraRequestPhoto, so a
+        -- client can't push an arbitrary photo by calling this directly.
+        if not client.wsCameraApproval or CurTime() - client.wsCameraApproval > 5 then
+            return
+        end
+        client.wsCameraApproval = nil
+
+        local capChar = client:GetCharacter()
+        if not capChar then return end
+
+        -- Enforce configurable anti-spam caps BEFORE consuming film/battery.
+        local diskCapMB = ws.config.Get("maxPhotoDiskMB", 512)
+        if diskCapMB > 0 and (ws.photo.GetDiskUsage() + #imageData) > diskCapMB * 1024 * 1024 then
+            client:NotifyLocalized("cameraStorageFull")
+            return
+        end
+
+        local photoCap = ws.config.Get("maxPhotosPerChar", 100)
+        if photoCap > 0 and ws.photo.CountCharacterPhotos(capChar) >= photoCap then
+            client:NotifyLocalized("cameraTooManyPhotos")
+            return
+        end
 
         local film = item:GetData("film", nil)
         if not film or film.shots <= 0 then
@@ -631,7 +662,7 @@ if SERVER then
 
         -- Hook verification (re-run draining/blocking logic)
         -- Passing 'true' as 3rd arg means "really drain"
-        if hook.Run("ixCameraCanTakePhoto", client, item, true) == false then 
+        if hook.Run("wsCameraCanTakePhoto", client, item, true) == false then 
             return
         end
 
@@ -644,25 +675,19 @@ if SERVER then
             item:SetData("film", film)
         end
 
-        -- Flash was already fired before capture (in ixCameraRequestPhoto)
+        -- Flash was already fired before capture (in wsCameraRequestPhoto)
         -- so the scene is illuminated in the photo
 
         -- Create photo item
-        local character, inventory = ix.constants.GetCharacterInventory(client)
+        local character, inventory = ws.constants.GetCharacterInventory(client)
         if not character or not inventory then return end
 
         -- Generate unique photo ID and save image to file
         -- This prevents inventory sync overflow (storing ~25KB per photo in item data would crash)
         local photoID = os.time() .. "_" .. math.random(10000, 99999)
-        local photoDir = "ix_photos"
 
-        -- Ensure directory exists
-        if not file.IsDir(photoDir, "DATA") then
-            file.CreateDir(photoDir)
-        end
-
-        -- Save raw JPEG binary to file
-        file.Write(photoDir .. "/" .. photoID .. ".dat", imageData)
+        -- Save raw JPEG binary to file (centralized so disk usage stays tracked)
+        ws.photo.WritePhotoFile(photoID, imageData)
 
         -- Item only stores the ID reference, not the actual image data
         local photoData = {
@@ -681,7 +706,7 @@ if SERVER then
         else
             -- Drop on ground
             local dropPos = client:GetPos() + Vector(0, 0, 16)
-            ix.item.Spawn("photo", dropPos, nil, nil, photoData)
+            ws.item.Spawn("photo", dropPos, nil, nil, photoData)
             client:NotifyLocalized("cameraInventoryFull")
         end
 
@@ -690,18 +715,24 @@ if SERVER then
     end
 
     -- Handle aiming state
-    net.Receive("ixCameraSetAiming", function(len, client)
+    net.Receive("wsCameraSetAiming", function(len, client)
         local weapon = client:GetActiveWeapon()
         if not IsValid(weapon) or weapon:GetClass() ~= "ix_camera" then return end
+        -- Light rate-limit: normal play only sends on state change; this caps a
+        -- spamming/modified client without affecting legitimate use.
+        if weapon.nextAimNet and weapon.nextAimNet > CurTime() then return end
+        weapon.nextAimNet = CurTime() + 0.05
 
         local aiming = net.ReadBool()
         weapon:SetAiming(aiming)
     end)
 
     -- Handle zoom
-    net.Receive("ixCameraSetZoom", function(len, client)
+    net.Receive("wsCameraSetZoom", function(len, client)
         local weapon = client:GetActiveWeapon()
         if not IsValid(weapon) or weapon:GetClass() ~= "ix_camera" then return end
+        if weapon.nextZoomNet and weapon.nextZoomNet > CurTime() then return end
+        weapon.nextZoomNet = CurTime() + 0.05
 
         local fov = net.ReadFloat()
         fov = math.Clamp(fov, weapon.MinFOV, weapon.MaxFOV)
@@ -709,14 +740,14 @@ if SERVER then
     end)
 
     -- Handle flash toggle
-    net.Receive("ixCameraToggleFlash", function(len, client)
+    net.Receive("wsCameraToggleFlash", function(len, client)
         local weapon = client:GetActiveWeapon()
         if not IsValid(weapon) or weapon:GetClass() ~= "ix_camera" then return end
 
         local enabled = not weapon:GetFlashEnabled()
         weapon:SetFlashEnabled(enabled)
 
-        net.Start("ixCameraFlashToggled")
+        net.Start("wsCameraFlashToggled")
             net.WriteBool(enabled)
         net.Send(client)
     end)
@@ -726,6 +757,6 @@ end
 -- HOOKS
 -- ============================================================================
 
-ix.weapon.RegisterCleanupHooks("ix_camera", "ixCamera", function(weapon)
+ws.weapon.RegisterCleanupHooks("ix_camera", "wsCamera", function(weapon)
     weapon:SetAiming(false)
 end)

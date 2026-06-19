@@ -48,18 +48,18 @@ function ENT:IsBeingRevived()
 end
 
 -- Add to holdable classes for hands dragging
-hook.Add("InitPostEntity", "ixKnockedHoldable", function()
-    if ix and ix.allowedHoldableClasses then
-        ix.allowedHoldableClasses["ix_knocked"] = true
+hook.Add("InitPostEntity", "wsKnockedHoldable", function()
+    if ix and ws.allowedHoldableClasses then
+        ws.allowedHoldableClasses["ix_knocked"] = true
     end
 end)
 
 -- Also add on entity creation in case InitPostEntity already fired
-hook.Add("OnEntityCreated", "ixKnockedHoldableCheck", function(ent)
+hook.Add("OnEntityCreated", "wsKnockedHoldableCheck", function(ent)
     if ent:GetClass() == "ix_knocked" then
         timer.Simple(0, function()
-            if ix and ix.allowedHoldableClasses then
-                ix.allowedHoldableClasses["ix_knocked"] = true
+            if ix and ws.allowedHoldableClasses then
+                ws.allowedHoldableClasses["ix_knocked"] = true
             end
         end)
     end

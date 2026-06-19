@@ -22,7 +22,7 @@ SWEP.Drop = false
 -- Canonical value defined in schema/sh_constants.lua as DRAIN_FLASHLIGHT
 SWEP.DrainRate = 100 / 1200
 
--- Network string registered in schema/sv_netstrings.lua as ixFlashlightSetLight
+-- Network string registered in schema/sv_netstrings.lua as wsFlashlightSetLight
 
 -- ============================================================================
 -- SETUP DATA TABLES
@@ -85,7 +85,7 @@ function SWEP:SetLight(value)
         self:EmitSound("shaky_flashlight_toggle")
 
         -- Send request to server
-        net.Start("ixFlashlightSetLight")
+        net.Start("wsFlashlightSetLight")
         net.WriteBool(value)
         net.SendToServer()
 
@@ -103,7 +103,7 @@ function SWEP:SetLight(value)
         -- SERVER handles the decision
         if value then
             -- Check battery before allowing turn-on
-            local item = self.ixItem
+            local item = self.wsItem
             if not item then
                 self:GetOwner():NotifyLocalized("flashlightNoBattery")
                 return
@@ -132,7 +132,7 @@ end
 -- ============================================================================
 
 if SERVER then
-    net.Receive("ixFlashlightSetLight", function(len, ply)
+    net.Receive("wsFlashlightSetLight", function(len, ply)
         local weapon = ply:GetWeapon("ix_flashlight")
         if not IsValid(weapon) then return end
         if weapon.ratelimit and weapon.ratelimit > CurTime() then return end
@@ -161,7 +161,7 @@ function SWEP:Think()
     self.drainAccumulator = self.drainAccumulator - 1
 
     -- Drain battery
-    local item = self.ixItem
+    local item = self.wsItem
     if not item then
         self:SetLight(false)
         return
@@ -182,11 +182,11 @@ function SWEP:Think()
 
         -- Auto-eject depleted battery if enabled
         local owner = self:GetOwner()
-        if ix.option.Get(owner, "batteryAutoEject", true) then
+        if ws.option.Get(owner, "batteryAutoEject", true) then
             item:AutoEjectDepleted(owner)
         end
         -- Auto-load new battery from inventory if enabled
-        if ix.option.Get(owner, "batteryAutoLoad", true) then
+        if ws.option.Get(owner, "batteryAutoLoad", true) then
             item:AutoLoadFromInventory(owner)
         end
     else
@@ -198,6 +198,6 @@ end
 -- HOOKS - Turn Off Light on Death/Knockout
 -- ============================================================================
 
-ix.weapon.RegisterCleanupHooks("ix_flashlight", "ixFlashlight", function(weapon)
+ws.weapon.RegisterCleanupHooks("ix_flashlight", "wsFlashlight", function(weapon)
     if weapon.SetLight then weapon:SetLight(false) end
 end)

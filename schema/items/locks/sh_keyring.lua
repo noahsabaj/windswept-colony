@@ -83,7 +83,7 @@ if CLIENT then
         local isEquipped = self:GetData("equipped")
 
         if isEquipped then
-            ix.constants.DrawEquippedIndicator(w, h)
+            ws.constants.DrawEquippedIndicator(w, h)
         end
 
         local keys = self:GetKeys()
@@ -91,7 +91,7 @@ if CLIENT then
 
         if count > 0 then
             local text = tostring(count)
-            surface.SetFont("ixSmallFont")
+            surface.SetFont("wsSmallFont")
             local textW, textH = surface.GetTextSize(text)
 
             surface.SetDrawColor(80, 80, 120, 200)
@@ -107,13 +107,13 @@ if CLIENT then
         local keys = self:GetKeys()
 
         local bgColor = #keys >= 18 and Color(150, 100, 50) or (#keys > 0 and Color(50, 80, 100) or Color(100, 100, 100))
-        ix.constants.AddTooltipRow(tooltip, "keys", string.format("Keys: %d / 20", #keys), bgColor)
+        ws.constants.AddTooltipRow(tooltip, "keys", string.format("Keys: %d / 20", #keys), bgColor)
 
         if self:GetData("equipped") then
             local currentKey = self:GetCurrentKey()
             if currentKey then
                 local keyName = currentKey:GetData("keyName", "") ~= "" and currentKey:GetData("keyName") or currentKey:GetData("keying", "Unknown")
-                ix.constants.AddTooltipRow(tooltip, "current", "Selected: " .. keyName, Color(60, 100, 60))
+                ws.constants.AddTooltipRow(tooltip, "current", "Selected: " .. keyName, Color(60, 100, 60))
             end
         end
     end
@@ -128,8 +128,8 @@ ITEM.functions.View = {
     name = "Manage Keys",
     tip = "Add or remove keys from the ring.",
     icon = "icon16/folder.png",
-    OnClick = ix.constants.OpenContainerPanel,
-    OnCanRun = ix.constants.CanOpenContainerPanel
+    OnClick = ws.constants.OpenContainerPanel,
+    OnCanRun = ws.constants.CanOpenContainerPanel
 }
 
 -- Equip keyring
@@ -140,8 +140,8 @@ ITEM.functions.Equip = {
     OnRun = function(item)
         local client = item.player
 
-        if client.ixKeyringItem and client.ixKeyringItem ~= item then
-            local oldItem = client.ixKeyringItem
+        if client.wsKeyringItem and client.wsKeyringItem ~= item then
+            local oldItem = client.wsKeyringItem
             oldItem:SetData("equipped", nil)
         end
 
@@ -149,12 +149,12 @@ ITEM.functions.Equip = {
             client:StripWeapon("ix_keyring")
         end
 
-        client.ixKeyringItem = item
+        client.wsKeyringItem = item
         item:SetData("equipped", true)
 
         local weapon = client:Give("ix_keyring")
         if IsValid(weapon) then
-            weapon.ixItem = item
+            weapon.wsItem = item
             client:SelectWeapon("ix_keyring")
         end
 
@@ -182,7 +182,7 @@ ITEM.functions.Unequip = {
             client:StripWeapon("ix_keyring")
         end
 
-        client.ixKeyringItem = nil
+        client.wsKeyringItem = nil
         item:SetData("equipped", nil)
 
         client:EmitSound("physics/metal/metal_solid_impact_soft2.wav", 50, 90)
@@ -205,7 +205,7 @@ function ITEM:OnDropExtra()
             if client:HasWeapon("ix_keyring") then
                 client:StripWeapon("ix_keyring")
             end
-            client.ixKeyringItem = nil
+            client.wsKeyringItem = nil
         end
         self:SetData("equipped", nil)
     end
@@ -228,7 +228,7 @@ function ITEM:OnTransferExtra(curInv, inventory)
             if oldOwner:HasWeapon("ix_keyring") then
                 oldOwner:StripWeapon("ix_keyring")
             end
-            oldOwner.ixKeyringItem = nil
+            oldOwner.wsKeyringItem = nil
         end
         self:SetData("equipped", nil)
     end
@@ -241,8 +241,8 @@ function ITEM:OnLoadout()
 
         local weapon = client:Give("ix_keyring", true)
         if IsValid(weapon) then
-            weapon.ixItem = self
-            client.ixKeyringItem = self
+            weapon.wsItem = self
+            client.wsKeyringItem = self
         end
     end
 end

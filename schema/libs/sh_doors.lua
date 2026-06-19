@@ -14,11 +14,11 @@
     - Native physics behavior
 ]]--
 
-ix.doors = ix.doors or {}
-ix.doors.frames = ix.doors.frames or {}
+ws.doors = ws.doors or {}
+ws.doors.frames = ws.doors.frames or {}
 
 -- Door type configurations (for health/damage, not models)
-ix.doors.typeConfig = {
+ws.doors.typeConfig = {
     wood = {
         maxHealth = 100,
         ramResistance = 1.0,
@@ -40,7 +40,7 @@ ix.doors.typeConfig = {
 }
 
 -- Model path patterns to detect door types
-ix.doors.modelPatterns = {
+ws.doors.modelPatterns = {
     wood = {
         "door01",
         "door02",
@@ -67,10 +67,10 @@ ix.doors.modelPatterns = {
 -- ============================================================================
 
 -- Detect door type from model path
-function ix.doors.DetectTypeFromModel(model)
+function ws.doors.DetectTypeFromModel(model)
     model = string.lower(model or "")
 
-    for doorType, patterns in pairs(ix.doors.modelPatterns) do
+    for doorType, patterns in pairs(ws.doors.modelPatterns) do
         for _, pattern in ipairs(patterns) do
             if string.find(model, pattern) then
                 return doorType
@@ -82,14 +82,14 @@ function ix.doors.DetectTypeFromModel(model)
 end
 
 -- Check if an entity is a valid door
-function ix.doors.IsDoor(ent)
+function ws.doors.IsDoor(ent)
     if not IsValid(ent) then return false end
     return ent:IsDoor()
 end
 
 -- Check if a door is fully closed (not open or in motion)
 -- prop_door_rotating uses m_eDoorState: 0=closed, 1=opening, 2=open, 3=closing
-function ix.doors.IsDoorClosed(door)
+function ws.doors.IsDoorClosed(door)
     if not IsValid(door) then return false end
 
     local doorState = door:GetInternalVariable("m_eDoorState")
@@ -97,13 +97,13 @@ function ix.doors.IsDoorClosed(door)
 end
 
 -- Check if a door is open or ajar (not fully closed)
-function ix.doors.IsDoorOpen(door)
-    return not ix.doors.IsDoorClosed(door)
+function ws.doors.IsDoorOpen(door)
+    return not ws.doors.IsDoorClosed(door)
 end
 
 -- Trace from a player's eyes to find a Windswept-managed door within maxDist
 -- Used by key, keyring, lock, lockpick, lockbreaker SWEPs
-function ix.doors.GetTargetDoor(owner, maxDist)
+function ws.doors.GetTargetDoor(owner, maxDist)
     if not IsValid(owner) then return nil end
 
     local tr = util.TraceLine({
@@ -113,7 +113,7 @@ function ix.doors.GetTargetDoor(owner, maxDist)
     })
 
     local ent = tr.Entity
-    if IsValid(ent) and ent.ixIsWindsweptDoor then
+    if IsValid(ent) and ent.wsIsWindsweptDoor then
         return ent
     end
 
@@ -126,7 +126,7 @@ end
 
 if SERVER then
     -- Capture all visual properties from an entity
-    function ix.doors.CaptureVisualData(ent)
+    function ws.doors.CaptureVisualData(ent)
         local data = {
             model = ent:GetModel() or "",
             skin = ent:GetSkin() or 0,
@@ -169,7 +169,7 @@ if SERVER then
     end
 
     -- Capture door-specific keyvalues from a prop_door_rotating
-    function ix.doors.CaptureDoorKeyvalues(ent)
+    function ws.doors.CaptureDoorKeyvalues(ent)
         local keyvalues = {}
 
         -- Get all keyvalues from the entity
@@ -241,7 +241,7 @@ if SERVER then
     end
 
     -- Apply visual data to an entity
-    function ix.doors.ApplyVisualData(ent, visualData)
+    function ws.doors.ApplyVisualData(ent, visualData)
         if not IsValid(ent) or not visualData then return end
 
         -- Apply skin
@@ -280,12 +280,12 @@ if SERVER then
     end
 
     -- Detect all map doors and create frame data
-    function ix.doors.DetectFrames()
-        ix.doors.frames = {}
+    function ws.doors.DetectFrames()
+        ws.doors.frames = {}
         local skippedBrush = 0
 
         for _, ent in ipairs(ents.GetAll()) do
-            if ix.doors.IsDoor(ent) then
+            if ws.doors.IsDoor(ent) then
                 local mapID = ent:MapCreationID()
                 if mapID and mapID > 0 then
                     local model = ent:GetModel() or ""
@@ -298,15 +298,15 @@ if SERVER then
                         continue
                     end
 
-                    local defaultType = ix.doors.DetectTypeFromModel(model)
+                    local defaultType = ws.doors.DetectTypeFromModel(model)
 
                     -- Capture all visual properties from the map door
-                    local visualData = ix.doors.CaptureVisualData(ent)
+                    local visualData = ws.doors.CaptureVisualData(ent)
 
                     -- Capture door-specific keyvalues (hardware, sounds, etc.)
-                    local keyvalues = ix.doors.CaptureDoorKeyvalues(ent)
+                    local keyvalues = ws.doors.CaptureDoorKeyvalues(ent)
 
-                    ix.doors.frames[mapID] = {
+                    ws.doors.frames[mapID] = {
                         pos = ent:GetPos(),
                         ang = ent:GetAngles(),
                         originalModel = model,
@@ -325,8 +325,8 @@ if SERVER then
     end
 
     -- Hide all map doors (make them invisible and non-solid)
-    function ix.doors.HideMapDoors()
-        for mapID, frameData in pairs(ix.doors.frames) do
+    function ws.doors.HideMapDoors()
+        for mapID, frameData in pairs(ws.doors.frames) do
             local mapDoor = frameData.mapEntity
 
             if IsValid(mapDoor) then
@@ -340,13 +340,13 @@ if SERVER then
     end
 
     -- Sync frame data to a client
-    function ix.doors.SyncToPlayer(ply)
-        local count = table.Count(ix.doors.frames)
+    function ws.doors.SyncToPlayer(ply)
+        local count = table.Count(ws.doors.frames)
         if count == 0 then return end
 
-        net.Start("ixDoorsSync")
+        net.Start("wsDoorsSync")
             net.WriteUInt(count, 16)
-            for mapID, frameData in pairs(ix.doors.frames) do
+            for mapID, frameData in pairs(ws.doors.frames) do
                 net.WriteUInt(mapID, 32)
                 net.WriteVector(frameData.pos)
                 net.WriteAngle(frameData.ang)
@@ -357,13 +357,13 @@ if SERVER then
     end
 
     -- Sync frame data to all clients
-    function ix.doors.SyncToAll()
-        local count = table.Count(ix.doors.frames)
+    function ws.doors.SyncToAll()
+        local count = table.Count(ws.doors.frames)
         if count == 0 then return end
 
-        net.Start("ixDoorsSync")
+        net.Start("wsDoorsSync")
             net.WriteUInt(count, 16)
-            for mapID, frameData in pairs(ix.doors.frames) do
+            for mapID, frameData in pairs(ws.doors.frames) do
                 net.WriteUInt(mapID, 32)
                 net.WriteVector(frameData.pos)
                 net.WriteAngle(frameData.ang)
@@ -374,18 +374,18 @@ if SERVER then
     end
 
     -- Sync when player joins
-    hook.Add("PlayerInitialSpawn", "ixDoorsSyncOnJoin", function(ply)
+    hook.Add("PlayerInitialSpawn", "wsDoorsSyncOnJoin", function(ply)
         -- Delay to ensure everything is loaded
         timer.Simple(3, function()
             if IsValid(ply) then
-                ix.doors.SyncToPlayer(ply)
+                ws.doors.SyncToPlayer(ply)
             end
         end)
     end)
 
     -- Spawn a prop_door_rotating at a frame using the original model
-    function ix.doors.SpawnDoor(mapID, doorData)
-        local frameData = ix.doors.frames[mapID]
+    function ws.doors.SpawnDoor(mapID, doorData)
+        local frameData = ws.doors.frames[mapID]
         if not frameData then return nil end
         if frameData.disabled then return nil end
         if frameData.hasDoor then return nil end
@@ -410,7 +410,7 @@ if SERVER then
 
         -- Apply all visual properties from the original map door (skin, color, bodygroups, etc.)
         if frameData.visualData then
-            ix.doors.ApplyVisualData(door, frameData.visualData)
+            ws.doors.ApplyVisualData(door, frameData.visualData)
         end
 
         -- Initialize physics as static
@@ -421,29 +421,30 @@ if SERVER then
         end
 
         -- Store custom data on the entity
-        door.ixFrameID = tostring(mapID)
-        door.ixDoorType = frameData.defaultType
-        door.ixIsWindsweptDoor = true  -- Mark as our managed door
+        door.wsFrameID = tostring(mapID)
+        door.wsDoorType = frameData.defaultType
+        door.wsIsWindsweptDoor = true  -- Mark as our managed door
 
-        -- Apply saved data or defaults
+        -- Apply saved data or defaults. Resolve the type config once with a wood
+        -- fallback so an unexpected/stale defaultType can't nil-index here.
+        local config = ws.doors.typeConfig[frameData.defaultType] or ws.doors.typeConfig.wood
         if doorData then
-            door.ixHealth = doorData.health or ix.doors.typeConfig[frameData.defaultType].maxHealth
-            door.ixMaxHealth = doorData.maxHealth or ix.doors.typeConfig[frameData.defaultType].maxHealth
-            door.ixLockData = doorData.lockData
-            if doorData.locked and door.ixLockData then
+            door.wsHealth = doorData.health or config.maxHealth
+            door.wsMaxHealth = doorData.maxHealth or config.maxHealth
+            door.wsLockData = doorData.lockData
+            if doorData.locked and door.wsLockData then
                 door:Fire("lock")
             end
             -- Restore battering ram damage (persists until repaired)
-            door.ixBatteringRamRequired = doorData.ramRequired
-            door.ixBatteringRamHits = doorData.ramHits
+            door.wsBatteringRamRequired = doorData.ramRequired
+            door.wsBatteringRamHits = doorData.ramHits
         else
             -- Default: full health, no lock, no damage
-            local config = ix.doors.typeConfig[frameData.defaultType]
-            door.ixHealth = config.maxHealth
-            door.ixMaxHealth = config.maxHealth
-            door.ixLockData = nil
-            door.ixBatteringRamRequired = nil
-            door.ixBatteringRamHits = nil
+            door.wsHealth = config.maxHealth
+            door.wsMaxHealth = config.maxHealth
+            door.wsLockData = nil
+            door.wsBatteringRamRequired = nil
+            door.wsBatteringRamHits = nil
         end
 
         -- Update frame
@@ -451,37 +452,37 @@ if SERVER then
         frameData.doorEntity = door
 
         -- Sync to clients
-        ix.doors.SyncToAll()
+        ws.doors.SyncToAll()
 
         return door
     end
 
     -- Get door's type config
-    function ix.doors.GetTypeConfig(door)
-        if not IsValid(door) then return ix.doors.typeConfig.wood end
-        local doorType = door.ixDoorType or "wood"
-        return ix.doors.typeConfig[doorType] or ix.doors.typeConfig.wood
+    function ws.doors.GetTypeConfig(door)
+        if not IsValid(door) then return ws.doors.typeConfig.wood end
+        local doorType = door.wsDoorType or "wood"
+        return ws.doors.typeConfig[doorType] or ws.doors.typeConfig.wood
     end
 
     -- Check if a door has a lock installed
-    function ix.doors.HasLock(door)
+    function ws.doors.HasLock(door)
         if not IsValid(door) then return false end
-        return door.ixLockData ~= nil
+        return door.wsLockData ~= nil
     end
 
     -- Get lock keyings from a door
-    function ix.doors.GetLockKeyings(door)
-        if not IsValid(door) or not door.ixLockData then return {} end
-        return door.ixLockData.keyings or {}
+    function ws.doors.GetLockKeyings(door)
+        if not IsValid(door) or not door.wsLockData then return {} end
+        return door.wsLockData.keyings or {}
     end
 
     -- Check if a keying matches the door's lock
-    function ix.doors.CheckKeying(door, keying)
-        if not IsValid(door) or not door.ixLockData then return false end
+    function ws.doors.CheckKeying(door, keying)
+        if not IsValid(door) or not door.wsLockData then return false end
         if not keying or keying == "" then return false end
 
         keying = string.upper(keying)
-        for _, lockKeying in ipairs(door.ixLockData.keyings or {}) do
+        for _, lockKeying in ipairs(door.wsLockData.keyings or {}) do
             if string.upper(lockKeying) == keying then
                 return true
             end
@@ -490,41 +491,41 @@ if SERVER then
     end
 
     -- Install a lock on a door (syncs to partner for double doors)
-    function ix.doors.InstallLock(door, lockData, bIgnorePartner)
+    function ws.doors.InstallLock(door, lockData, bIgnorePartner)
         if not IsValid(door) then return false end
-        door.ixLockData = lockData
+        door.wsLockData = lockData
 
         -- Sync to partner door (double doors share the same lock)
         local partner = door:GetDoorPartner()
         if IsValid(partner) and not bIgnorePartner then
-            ix.doors.InstallLock(partner, table.Copy(lockData), true)
+            ws.doors.InstallLock(partner, table.Copy(lockData), true)
         end
 
-        ix.doors.Save()
+        ws.doors.Save()
         return true
     end
 
     -- Remove lock from a door (syncs to partner for double doors)
-    function ix.doors.RemoveLock(door, bIgnorePartner)
+    function ws.doors.RemoveLock(door, bIgnorePartner)
         if not IsValid(door) then return nil end
-        local lockData = door.ixLockData
-        door.ixLockData = nil
+        local lockData = door.wsLockData
+        door.wsLockData = nil
         door:Fire("unlock")
 
         -- Sync to partner door
         local partner = door:GetDoorPartner()
         if IsValid(partner) and not bIgnorePartner then
-            ix.doors.RemoveLock(partner, true)
+            ws.doors.RemoveLock(partner, true)
         end
 
-        ix.doors.Save()
+        ws.doors.Save()
         return lockData
     end
 
     -- Lock a door (syncs to partner for double doors)
-    function ix.doors.LockDoor(door, bIgnorePartner)
+    function ws.doors.LockDoor(door, bIgnorePartner)
         if not IsValid(door) then return false end
-        if not door.ixLockData then return false end
+        if not door.wsLockData then return false end
         if door:IsLocked() then return true end  -- Already locked
 
         door:Fire("lock")
@@ -532,16 +533,16 @@ if SERVER then
         -- Sync to partner door
         local partner = door:GetDoorPartner()
         if IsValid(partner) and not bIgnorePartner then
-            ix.doors.LockDoor(partner, true)
+            ws.doors.LockDoor(partner, true)
         end
 
         return true
     end
 
     -- Unlock a door (syncs to partner for double doors)
-    function ix.doors.UnlockDoor(door, bIgnorePartner)
+    function ws.doors.UnlockDoor(door, bIgnorePartner)
         if not IsValid(door) then return false end
-        if not door.ixLockData then return false end
+        if not door.wsLockData then return false end
         if not door:IsLocked() then return true end  -- Already unlocked
 
         door:Fire("unlock")
@@ -549,48 +550,48 @@ if SERVER then
         -- Sync to partner door
         local partner = door:GetDoorPartner()
         if IsValid(partner) and not bIgnorePartner then
-            ix.doors.UnlockDoor(partner, true)
+            ws.doors.UnlockDoor(partner, true)
         end
 
         return true
     end
 
     -- Damage a door's lock (syncs to partner for double doors)
-    function ix.doors.DamageLock(door, amount, bIgnorePartner)
-        if not IsValid(door) or not door.ixLockData then return false end
+    function ws.doors.DamageLock(door, amount, bIgnorePartner)
+        if not IsValid(door) or not door.wsLockData then return false end
 
-        door.ixLockData.durability = (door.ixLockData.durability or 100) - amount
+        door.wsLockData.durability = (door.wsLockData.durability or 100) - amount
 
         -- Sync damage to partner door
         local partner = door:GetDoorPartner()
-        if IsValid(partner) and partner.ixLockData and not bIgnorePartner then
-            partner.ixLockData.durability = door.ixLockData.durability
+        if IsValid(partner) and partner.wsLockData and not bIgnorePartner then
+            partner.wsLockData.durability = door.wsLockData.durability
         end
 
-        if door.ixLockData.durability <= 0 then
+        if door.wsLockData.durability <= 0 then
             -- Lock broken - permanently unlocked on both doors
             door:Fire("unlock")
             door:EmitSound("physics/metal/metal_box_break1.wav", 70)
 
             if IsValid(partner) and not bIgnorePartner then
-                partner.ixLockData = nil
+                partner.wsLockData = nil
                 partner:Fire("unlock")
             end
 
-            door.ixLockData = nil
-            ix.doors.Save()
+            door.wsLockData = nil
+            ws.doors.Save()
             return true  -- Lock destroyed
         end
 
-        ix.doors.Save()
+        ws.doors.Save()
         return false
     end
 
     -- Damage a door
-    function ix.doors.DamageDoor(door, damage, attacker, inflictor)
+    function ws.doors.DamageDoor(door, damage, attacker, inflictor)
         if not IsValid(door) then return end
 
-        local config = ix.doors.GetTypeConfig(door)
+        local config = ws.doors.GetTypeConfig(door)
 
         -- Check if fist damage (and if allowed)
         local isFist = IsValid(inflictor) and inflictor:GetClass() == "ix_hands"
@@ -612,7 +613,7 @@ if SERVER then
         end
 
         -- Apply damage
-        door.ixHealth = (door.ixHealth or config.maxHealth) - damage
+        door.wsHealth = (door.wsHealth or config.maxHealth) - damage
 
         -- Damage sound
         if config.material == "wood" then
@@ -622,18 +623,18 @@ if SERVER then
         end
 
         -- Check for destruction
-        if door.ixHealth <= 0 then
-            ix.doors.DestroyDoor(door, attacker)
+        if door.wsHealth <= 0 then
+            ws.doors.DestroyDoor(door, attacker)
         else
-            ix.doors.Save()
+            ws.doors.Save()
         end
     end
 
     -- Destroy a door
-    function ix.doors.DestroyDoor(door, attacker)
+    function ws.doors.DestroyDoor(door, attacker)
         if not IsValid(door) then return end
 
-        local config = ix.doors.GetTypeConfig(door)
+        local config = ws.doors.GetTypeConfig(door)
 
         -- Play destruction sound
         if config.material == "wood" then
@@ -649,12 +650,12 @@ if SERVER then
         util.Effect("propspawn", effectData)
 
         -- Clear frame reference
-        local frameID = door.ixFrameID
+        local frameID = door.wsFrameID
         if frameID then
             local mapID = tonumber(frameID)
-            if mapID and ix.doors.frames[mapID] then
-                ix.doors.frames[mapID].hasDoor = false
-                ix.doors.frames[mapID].doorEntity = nil
+            if mapID and ws.doors.frames[mapID] then
+                ws.doors.frames[mapID].hasDoor = false
+                ws.doors.frames[mapID].doorEntity = nil
             end
         end
 
@@ -662,8 +663,8 @@ if SERVER then
         door:Remove()
 
         -- Sync and save
-        ix.doors.SyncToAll()
-        ix.doors.Save()
+        ws.doors.SyncToAll()
+        ws.doors.Save()
     end
 
     -- ============================================================================
@@ -671,7 +672,7 @@ if SERVER then
     -- ============================================================================
 
     -- Gib models for debris
-    ix.doors.gibs = {
+    ws.doors.gibs = {
         wood = {
             "models/gibs/wood_gib01a.mdl",
             "models/gibs/wood_gib01b.mdl",
@@ -689,8 +690,8 @@ if SERVER then
     }
 
     -- Spawn debris gibs flying in a direction
-    function ix.doors.SpawnDebris(pos, velocity, material, count)
-        local gibModels = ix.doors.gibs[material] or ix.doors.gibs.wood
+    function ws.doors.SpawnDebris(pos, velocity, material, count)
+        local gibModels = ws.doors.gibs[material] or ws.doors.gibs.wood
         count = count or 6
 
         for i = 1, count do
@@ -733,7 +734,7 @@ if SERVER then
     end
 
     -- Spawn dust/debris particle effect
-    function ix.doors.SpawnBreachEffect(pos, material)
+    function ws.doors.SpawnBreachEffect(pos, material)
         -- Dust cloud effect
         local effectData = EffectData()
         effectData:SetOrigin(pos)
@@ -756,7 +757,7 @@ if SERVER then
     -- Breach a door with explosive force (battering ram)
     -- PERMANENTLY DESTROYS the door - creates debris, effects, and fading dummy debris
     -- Door frame is left empty until a new door is installed
-    function ix.doors.BreachDoor(door, velocity, bIgnorePartner)
+    function ws.doors.BreachDoor(door, velocity, bIgnorePartner)
         if not IsValid(door) then return end
         if not door:IsDoor() then return end
 
@@ -765,7 +766,7 @@ if SERVER then
         -- Handle partner door (double doors breach together)
         local partner = door:GetDoorPartner()
         if IsValid(partner) and not bIgnorePartner then
-            ix.doors.BreachDoor(partner, velocity, true)
+            ws.doors.BreachDoor(partner, velocity, true)
         end
 
         -- Get door properties before destruction
@@ -775,15 +776,15 @@ if SERVER then
         local color = door:GetColor()
         local doorMaterial = door:GetMaterial()
         local skin = door:GetSkin() or 0
-        local config = ix.doors.GetTypeConfig(door)
+        local config = ws.doors.GetTypeConfig(door)
         local matType = config.material or "wood"
-        local frameID = door.ixFrameID
+        local frameID = door.wsFrameID
 
         -- Spawn debris gibs
-        ix.doors.SpawnDebris(pos + Vector(0, 0, 40), velocity, matType, math.random(5, 8))
+        ws.doors.SpawnDebris(pos + Vector(0, 0, 40), velocity, matType, math.random(5, 8))
 
         -- Spawn particle effects
-        ix.doors.SpawnBreachEffect(pos + Vector(0, 0, 40), matType)
+        ws.doors.SpawnBreachEffect(pos + Vector(0, 0, 40), matType)
 
         -- Create damaged dummy prop (debris flying off - NOT the actual door)
         local dummy = ents.Create("prop_physics")
@@ -839,9 +840,9 @@ if SERVER then
         -- Clear frame reference - door is DESTROYED, frame is now empty
         if frameID then
             local mapID = tonumber(frameID)
-            if mapID and ix.doors.frames[mapID] then
-                ix.doors.frames[mapID].hasDoor = false
-                ix.doors.frames[mapID].doorEntity = nil
+            if mapID and ws.doors.frames[mapID] then
+                ws.doors.frames[mapID].hasDoor = false
+                ws.doors.frames[mapID].doorEntity = nil
             end
         end
 
@@ -849,37 +850,37 @@ if SERVER then
         door:Remove()
 
         -- Sync and save - frame is now empty
-        ix.doors.SyncToAll()
-        ix.doors.Save()
+        ws.doors.SyncToAll()
+        ws.doors.Save()
 
         return dummy
     end
 
     -- Repair a door to full health (also resets battering ram hit counter)
-    function ix.doors.RepairDoor(door)
+    function ws.doors.RepairDoor(door)
         if not IsValid(door) then return false end
-        local config = ix.doors.GetTypeConfig(door)
-        door.ixHealth = config.maxHealth
+        local config = ws.doors.GetTypeConfig(door)
+        door.wsHealth = config.maxHealth
 
         -- Reset battering ram damage - door is fully repaired
-        door.ixBatteringRamRequired = nil
-        door.ixBatteringRamHits = nil
+        door.wsBatteringRamRequired = nil
+        door.wsBatteringRamHits = nil
 
-        ix.doors.Save()
+        ws.doors.Save()
         return true
     end
 
     -- Repair a lock to full durability
-    function ix.doors.RepairLock(door)
-        if not IsValid(door) or not door.ixLockData then return false end
-        door.ixLockData.durability = 100
-        ix.doors.Save()
+    function ws.doors.RepairLock(door)
+        if not IsValid(door) or not door.wsLockData then return false end
+        door.wsLockData.durability = 100
+        ws.doors.Save()
         return true
     end
 
     -- Remove a door from a frame
-    function ix.doors.RemoveDoor(mapID)
-        local frameData = ix.doors.frames[mapID]
+    function ws.doors.RemoveDoor(mapID)
+        local frameData = ws.doors.frames[mapID]
         if not frameData then return false end
 
         if IsValid(frameData.doorEntity) then
@@ -890,7 +891,7 @@ if SERVER then
         frameData.doorEntity = nil
 
         -- Sync to clients
-        ix.doors.SyncToAll()
+        ws.doors.SyncToAll()
 
         return true
     end
@@ -901,19 +902,19 @@ if SERVER then
 
     local SAVE_PATH = "helix/doors/"
 
-    function ix.doors.GetSavePath()
+    function ws.doors.GetSavePath()
         local mapName = game.GetMap()
         return SAVE_PATH .. mapName .. ".json"
     end
 
-    function ix.doors.Save()
+    function ws.doors.Save()
         local data = {
             frames = {},
             doors = {}
         }
 
         -- Save frame settings
-        for mapID, frameData in pairs(ix.doors.frames) do
+        for mapID, frameData in pairs(ws.doors.frames) do
             data.frames[tostring(mapID)] = {
                 disabled = frameData.disabled
             }
@@ -922,13 +923,13 @@ if SERVER then
             if frameData.hasDoor and IsValid(frameData.doorEntity) then
                 local door = frameData.doorEntity
                 data.doors[tostring(mapID)] = {
-                    health = door.ixHealth,
-                    maxHealth = door.ixMaxHealth,
-                    lockData = door.ixLockData,
+                    health = door.wsHealth,
+                    maxHealth = door.wsMaxHealth,
+                    lockData = door.wsLockData,
                     locked = door:IsLocked(),
                     -- Battering ram damage persists until repaired
-                    ramRequired = door.ixBatteringRamRequired,
-                    ramHits = door.ixBatteringRamHits
+                    ramRequired = door.wsBatteringRamRequired,
+                    ramHits = door.wsBatteringRamHits
                 }
             end
         end
@@ -938,16 +939,16 @@ if SERVER then
 
         -- Save to file
         local json = util.TableToJSON(data, true)
-        file.Write(ix.doors.GetSavePath(), json)
+        file.Write(ws.doors.GetSavePath(), json)
 
     end
 
-    function ix.doors.Load()
-        local path = ix.doors.GetSavePath()
+    function ws.doors.Load()
+        local path = ws.doors.GetSavePath()
 
         if not file.Exists(path, "DATA") then
             -- First run: bootstrap all frames with default doors
-            ix.doors.BootstrapDefaultDoors()
+            ws.doors.BootstrapDefaultDoors()
             return
         end
 
@@ -961,8 +962,8 @@ if SERVER then
         if data.frames then
             for mapIDStr, frameSettings in pairs(data.frames) do
                 local mapID = tonumber(mapIDStr)
-                if mapID and ix.doors.frames[mapID] then
-                    ix.doors.frames[mapID].disabled = frameSettings.disabled or false
+                if mapID and ws.doors.frames[mapID] then
+                    ws.doors.frames[mapID].disabled = frameSettings.disabled or false
                 end
             end
         end
@@ -971,8 +972,8 @@ if SERVER then
         if data.doors then
             for mapIDStr, doorData in pairs(data.doors) do
                 local mapID = tonumber(mapIDStr)
-                if mapID and ix.doors.frames[mapID] and not ix.doors.frames[mapID].hasDoor then
-                    ix.doors.SpawnDoor(mapID, doorData)
+                if mapID and ws.doors.frames[mapID] and not ws.doors.frames[mapID].hasDoor then
+                    ws.doors.SpawnDoor(mapID, doorData)
                 end
             end
         end
@@ -980,11 +981,11 @@ if SERVER then
     end
 
     -- Bootstrap: spawn default doors for all frames on first run
-    function ix.doors.BootstrapDefaultDoors()
+    function ws.doors.BootstrapDefaultDoors()
         local count = 0
-        for mapID, frameData in pairs(ix.doors.frames) do
+        for mapID, frameData in pairs(ws.doors.frames) do
             if not frameData.disabled and not frameData.hasDoor then
-                local door = ix.doors.SpawnDoor(mapID, nil)  -- nil = use default type
+                local door = ws.doors.SpawnDoor(mapID, nil)  -- nil = use default type
                 if IsValid(door) then
                     count = count + 1
                 end
@@ -992,25 +993,25 @@ if SERVER then
         end
 
         -- Save the initial state so next load uses persistence
-        ix.doors.Save()
+        ws.doors.Save()
     end
 
     -- ============================================================================
     -- DOUBLE DOOR PARTNER LINKING
     -- ============================================================================
 
-    -- Link double doors via ixPartner
+    -- Link double doors via wsPartner
     -- Uses two methods:
     -- 1. targetname/slavename keyvalues (if mapper set them up)
     -- 2. Proximity detection (doors within 50 units with similar facing angles)
-    function ix.doors.LinkPartners()
+    function ws.doors.LinkPartners()
         local linkedCount = 0
         local linkedByKeyvalue = 0
         local linkedByProximity = 0
 
         -- First pass: Try keyvalue-based linking (targetname/slavename)
         local byTargetname = {}
-        for mapID, frameData in pairs(ix.doors.frames) do
+        for mapID, frameData in pairs(ws.doors.frames) do
             if frameData.hasDoor and IsValid(frameData.doorEntity) then
                 local door = frameData.doorEntity
                 local targetname = frameData.keyvalues and frameData.keyvalues.targetname
@@ -1020,15 +1021,15 @@ if SERVER then
             end
         end
 
-        for mapID, frameData in pairs(ix.doors.frames) do
+        for mapID, frameData in pairs(ws.doors.frames) do
             if frameData.hasDoor and IsValid(frameData.doorEntity) then
                 local door = frameData.doorEntity
                 local slavename = frameData.keyvalues and frameData.keyvalues.slavename
                 if slavename and slavename ~= "" then
                     local partner = byTargetname[slavename]
-                    if IsValid(partner) and partner ~= door and not door.ixPartner then
-                        door.ixPartner = partner
-                        partner.ixPartner = door
+                    if IsValid(partner) and partner ~= door and not door.wsPartner then
+                        door.wsPartner = partner
+                        partner.wsPartner = door
                         linkedCount = linkedCount + 1
                         linkedByKeyvalue = linkedByKeyvalue + 1
                     end
@@ -1043,7 +1044,7 @@ if SERVER then
         local PROXIMITY_THRESHOLD = 100 * 100  -- DistToSqr comparison
 
         local allDoors = {}
-        for mapID, frameData in pairs(ix.doors.frames) do
+        for mapID, frameData in pairs(ws.doors.frames) do
             if frameData.hasDoor and IsValid(frameData.doorEntity) then
                 local door = frameData.doorEntity
                 table.insert(allDoors, {
@@ -1058,7 +1059,7 @@ if SERVER then
             local door1 = data1.door
 
             -- Skip if already linked
-            if door1.ixPartner then continue end
+            if door1.wsPartner then continue end
 
             for j, data2 in ipairs(allDoors) do
                 if i == j then continue end
@@ -1066,7 +1067,7 @@ if SERVER then
                 local door2 = data2.door
 
                 -- Skip if already linked
-                if door2.ixPartner then continue end
+                if door2.wsPartner then continue end
 
                 -- Check same model
                 if data2.model ~= data1.model then continue end
@@ -1076,8 +1077,8 @@ if SERVER then
                 if distSqr > PROXIMITY_THRESHOLD then continue end
 
                 -- These are double doors!
-                door1.ixPartner = door2
-                door2.ixPartner = door1
+                door1.wsPartner = door2
+                door2.wsPartner = door1
                 linkedCount = linkedCount + 1
                 linkedByProximity = linkedByProximity + 1
                 break  -- Move to next door1
@@ -1089,39 +1090,39 @@ if SERVER then
     -- INITIALIZATION
     -- ============================================================================
 
-    hook.Add("InitPostEntity", "ixDoorsInit", function()
+    hook.Add("InitPostEntity", "wsDoorsInit", function()
         -- Wait a tick for all entities to spawn
         timer.Simple(0.1, function()
-            ix.doors.DetectFrames()
-            ix.doors.HideMapDoors()
-            ix.doors.Load()
+            ws.doors.DetectFrames()
+            ws.doors.HideMapDoors()
+            ws.doors.Load()
 
             -- Link double door partners (required for BlastDoor and lock sync)
-            ix.doors.LinkPartners()
+            ws.doors.LinkPartners()
 
             -- Sync to all connected players
             timer.Simple(1, function()
-                ix.doors.SyncToAll()
+                ws.doors.SyncToAll()
             end)
         end)
     end)
 
     -- Save on map cleanup
-    hook.Add("ShutDown", "ixDoorsSave", function()
-        ix.doors.Save()
-        timer.Remove("ixDoorsAutosave")
+    hook.Add("ShutDown", "wsDoorsSave", function()
+        ws.doors.Save()
+        timer.Remove("wsDoorsAutosave")
     end)
 
     -- Periodic autosave
-    timer.Create("ixDoorsAutosave", 300, 0, function()
-        ix.doors.Save()
+    timer.Create("wsDoorsAutosave", 300, 0, function()
+        ws.doors.Save()
     end)
 
     -- ============================================================================
     -- ADMIN COMMANDS
     -- ============================================================================
 
-    ix.command.Add("DoorDisableFrame", {
+    ws.command.Add("DoorDisableFrame", {
         description = "Disable a door frame (prevents door installation).",
         adminOnly = true,
         OnRun = function(self, client)
@@ -1132,7 +1133,7 @@ if SERVER then
             local nearestID = nil
             local nearestDist = 128
 
-            for mapID, frameData in pairs(ix.doors.frames) do
+            for mapID, frameData in pairs(ws.doors.frames) do
                 local dist = pos:Distance(frameData.pos)
                 if dist < nearestDist then
                     nearestDist = dist
@@ -1144,19 +1145,19 @@ if SERVER then
                 return "@doorNoFrameNearby"
             end
 
-            ix.doors.frames[nearestID].disabled = true
+            ws.doors.frames[nearestID].disabled = true
 
             -- Remove door if present
-            if ix.doors.frames[nearestID].hasDoor then
-                ix.doors.RemoveDoor(nearestID)
+            if ws.doors.frames[nearestID].hasDoor then
+                ws.doors.RemoveDoor(nearestID)
             end
 
-            ix.doors.Save()
+            ws.doors.Save()
             return "@doorFrameDisabled"
         end
     })
 
-    ix.command.Add("DoorEnableFrame", {
+    ws.command.Add("DoorEnableFrame", {
         description = "Enable a previously disabled door frame.",
         adminOnly = true,
         OnRun = function(self, client)
@@ -1166,7 +1167,7 @@ if SERVER then
             local nearestID = nil
             local nearestDist = 128
 
-            for mapID, frameData in pairs(ix.doors.frames) do
+            for mapID, frameData in pairs(ws.doors.frames) do
                 local dist = pos:Distance(frameData.pos)
                 if dist < nearestDist then
                     nearestDist = dist
@@ -1178,28 +1179,28 @@ if SERVER then
                 return "@doorNoFrameNearby"
             end
 
-            ix.doors.frames[nearestID].disabled = false
-            ix.doors.Save()
+            ws.doors.frames[nearestID].disabled = false
+            ws.doors.Save()
             return "@doorFrameEnabled"
         end
     })
 
-    ix.command.Add("DoorResetAll", {
+    ws.command.Add("DoorResetAll", {
         description = "Reset all doors to default state (admin only).",
         adminOnly = true,
         superAdminOnly = true,
         OnRun = function(self, client)
             -- Remove all custom doors
-            for mapID, frameData in pairs(ix.doors.frames) do
+            for mapID, frameData in pairs(ws.doors.frames) do
                 if frameData.hasDoor then
-                    ix.doors.RemoveDoor(mapID)
+                    ws.doors.RemoveDoor(mapID)
                 end
                 frameData.disabled = false
             end
 
             -- Delete save file
-            if file.Exists(ix.doors.GetSavePath(), "DATA") then
-                file.Delete(ix.doors.GetSavePath())
+            if file.Exists(ws.doors.GetSavePath(), "DATA") then
+                file.Delete(ws.doors.GetSavePath())
             end
 
             return "@doorAllReset"
@@ -1212,15 +1213,15 @@ end
 -- ============================================================================
 
 if CLIENT then
-    ix.doors.clientFrames = ix.doors.clientFrames or {}
+    ws.doors.clientFrames = ws.doors.clientFrames or {}
 
     local FRAME_PULSE_DISTANCE = 240
     local framePulseTime = 0
 
     -- Receive frame data from server
-    net.Receive("ixDoorsSync", function()
+    net.Receive("wsDoorsSync", function()
         local count = net.ReadUInt(16)
-        ix.doors.clientFrames = {}
+        ws.doors.clientFrames = {}
 
         for i = 1, count do
             local mapID = net.ReadUInt(32)
@@ -1229,7 +1230,7 @@ if CLIENT then
             local hasDoor = net.ReadBool()
             local disabled = net.ReadBool()
 
-            ix.doors.clientFrames[mapID] = {
+            ws.doors.clientFrames[mapID] = {
                 pos = pos,
                 ang = ang,
                 hasDoor = hasDoor,
@@ -1239,7 +1240,7 @@ if CLIENT then
     end)
 
     -- Draw pulsating indicators for empty frames when holding a door
-    hook.Add("PostDrawTranslucentRenderables", "ixDoorsFramePulse", function(_, bSkybox)
+    hook.Add("PostDrawTranslucentRenderables", "wsDoorsFramePulse", function(_, bSkybox)
         if bSkybox then return end
 
         local ply = LocalPlayer()
@@ -1253,7 +1254,7 @@ if CLIENT then
         local pulse = math.sin(framePulseTime) * 0.5 + 0.5
 
         -- Draw pulsating effect for empty frames
-        for mapID, frameData in pairs(ix.doors.clientFrames) do
+        for mapID, frameData in pairs(ws.doors.clientFrames) do
             if not frameData.hasDoor and not frameData.disabled then
                 local dist = ply:GetPos():Distance(frameData.pos)
                 if dist < FRAME_PULSE_DISTANCE then

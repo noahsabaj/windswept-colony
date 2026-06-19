@@ -5,26 +5,26 @@
     Used in character creation and Personal ID display.
 ]]--
 
-ix.birthdata = ix.birthdata or {}
+ws.birthdata = ws.birthdata or {}
 
 -- The current in-game year
-ix.birthdata.CURRENT_YEAR = 2200
+ws.birthdata.CURRENT_YEAR = 2200
 
 -- Month names
-ix.birthdata.months = {
+ws.birthdata.months = {
     "January", "February", "March", "April",
     "May", "June", "July", "August",
     "September", "October", "November", "December"
 }
 
 -- Days in each month (non-leap year)
-ix.birthdata.daysInMonth = {
+ws.birthdata.daysInMonth = {
     31, 28, 31, 30, 31, 30,
     31, 31, 30, 31, 30, 31
 }
 
 -- Birth location options
-ix.birthdata.locations = {
+ws.birthdata.locations = {
     "North America, Earth",
     "South America, Earth",
     "Europe, Earth",
@@ -43,20 +43,20 @@ ix.birthdata.locations = {
 }
 
 -- Check if a year is a leap year
-function ix.birthdata.IsLeapYear(year)
+function ws.birthdata.IsLeapYear(year)
     return (year % 4 == 0 and year % 100 ~= 0) or (year % 400 == 0)
 end
 
 -- Get the maximum days for a given month and birth year
-function ix.birthdata.GetMaxDay(month, age)
+function ws.birthdata.GetMaxDay(month, age)
     month = tonumber(month) or 1
     age = tonumber(age) or 25
 
-    local birthYear = ix.birthdata.CURRENT_YEAR - age
-    local maxDays = ix.birthdata.daysInMonth[month] or 31
+    local birthYear = ws.birthdata.CURRENT_YEAR - age
+    local maxDays = ws.birthdata.daysInMonth[month] or 31
 
     -- February leap year check
-    if month == 2 and ix.birthdata.IsLeapYear(birthYear) then
+    if month == 2 and ws.birthdata.IsLeapYear(birthYear) then
         maxDays = 29
     end
 
@@ -64,36 +64,36 @@ function ix.birthdata.GetMaxDay(month, age)
 end
 
 -- Calculate birth year from age
-function ix.birthdata.GetBirthYear(age)
-    return ix.birthdata.CURRENT_YEAR - (tonumber(age) or 25)
+function ws.birthdata.GetBirthYear(age)
+    return ws.birthdata.CURRENT_YEAR - (tonumber(age) or 25)
 end
 
 -- Format a birth date for display
-function ix.birthdata.FormatDate(month, day, age)
+function ws.birthdata.FormatDate(month, day, age)
     month = tonumber(month) or 1
     day = tonumber(day) or 1
     age = tonumber(age) or 25
 
-    local monthName = ix.birthdata.months[month] or "January"
-    local year = ix.birthdata.GetBirthYear(age)
+    local monthName = ws.birthdata.months[month] or "January"
+    local year = ws.birthdata.GetBirthYear(age)
 
     return string.format("%s %d, %d", monthName, day, year)
 end
 
 -- Validate a day value for a given month and age
-function ix.birthdata.ValidateDay(month, day, age)
-    local maxDay = ix.birthdata.GetMaxDay(month, age)
+function ws.birthdata.ValidateDay(month, day, age)
+    local maxDay = ws.birthdata.GetMaxDay(month, age)
     return math.Clamp(tonumber(day) or 1, 1, maxDay)
 end
 
 -- Get month name from number
-function ix.birthdata.GetMonthName(month)
-    return ix.birthdata.months[tonumber(month) or 1] or "January"
+function ws.birthdata.GetMonthName(month)
+    return ws.birthdata.months[tonumber(month) or 1] or "January"
 end
 
 -- Check if a location is valid
-function ix.birthdata.IsValidLocation(location)
-    for _, loc in ipairs(ix.birthdata.locations) do
+function ws.birthdata.IsValidLocation(location)
+    for _, loc in ipairs(ws.birthdata.locations) do
         if loc == location then
             return true
         end
@@ -102,8 +102,8 @@ function ix.birthdata.IsValidLocation(location)
 end
 
 -- Get current in-game date (real month/day, year 2200)
-function ix.birthdata.GetCurrentDate()
+function ws.birthdata.GetCurrentDate()
     local realDate = os.date("*t")
-    local monthName = ix.birthdata.months[realDate.month]
-    return string.format("%s %d, %d", monthName, realDate.day, ix.birthdata.CURRENT_YEAR)
+    local monthName = ws.birthdata.months[realDate.month]
+    return string.format("%s %d, %d", monthName, realDate.day, ws.birthdata.CURRENT_YEAR)
 end

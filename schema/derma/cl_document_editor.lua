@@ -49,7 +49,7 @@ function PANEL:Init()
     self.newLabel:Dock(TOP)
     self.newLabel:DockMargin(10, 5, 10, 0)
     self.newLabel:SetText("Write new content:")
-    self.newLabel:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
+    self.newLabel:SetTextColor(ws.constants.COLOR_UI_NEUTRAL)
 
     -- New content text entry
     self.content = vgui.Create("DTextEntry", self)
@@ -72,7 +72,7 @@ function PANEL:Init()
     self.resourceCounter:Dock(TOP)
     self.resourceCounter:DockMargin(10, 5, 10, 0)
     self.resourceCounter:SetText("Ink: 1000 remaining")
-    self.resourceCounter:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
+    self.resourceCounter:SetTextColor(ws.constants.COLOR_UI_NEUTRAL)
 
     -- Signature status
     self.sigStatus = vgui.Create("DLabel", bottomPanel)
@@ -82,7 +82,7 @@ function PANEL:Init()
     self.sigStatus:SetTextColor(Color(150, 200, 150))
 
     -- Button panel
-    local btnPanel, btns = ix.constants.CreateButtonBar(bottomPanel, {
+    local btnPanel, btns = ws.constants.CreateButtonBar(bottomPanel, {
         {"Add Signature", 100, LEFT, function() self:OpenSignaturePad() end},
         {"Use Saved", 90, LEFT, function() self:UseSavedSignature() end},
         {"Cancel", 80, RIGHT, function() self:Remove() end},
@@ -101,6 +101,13 @@ function PANEL:Init()
 end
 
 function PANEL:SetPaper(paperItem)
+    -- Guard against a stale/removed item (e.g. dropped or transferred between the
+    -- click and the panel build). Helix items aren't entities, so check the table.
+    if not paperItem or not paperItem.GetID or not ws.item.instances[paperItem:GetID()] then
+        self:Remove()
+        return
+    end
+
     self.paperItem = paperItem
 
     -- Check for existing content
@@ -112,9 +119,9 @@ function PANEL:SetPaper(paperItem)
 
         -- Request existing content from server
         -- Store reference for callback
-        ix.gui.documentEditor = self
+        ws.gui.documentEditor = self
 
-        net.Start("ixDocumentRead")
+        net.Start("wsDocumentRead")
             net.WriteUInt(paperItem:GetID(), 32)
             net.WriteBool(true)  -- For editor
         net.SendToServer()
@@ -171,7 +178,7 @@ function PANEL:UpdateResourceCounter()
     elseif remaining < self.maxResource * 0.1 then
         self.resourceCounter:SetTextColor(Color(255, 200, 100))
     else
-        self.resourceCounter:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
+        self.resourceCounter:SetTextColor(ws.constants.COLOR_UI_NEUTRAL)
     end
 end
 
@@ -180,7 +187,7 @@ function PANEL:OpenSignaturePad()
         self.sigPad:Remove()
     end
 
-    self.sigPad = vgui.Create("ixSignaturePad")
+    self.sigPad = vgui.Create("wsSignaturePad")
     self.sigPad:SetStrokeColor(self.strokeColor)
     self.sigPad.OnConfirm = function(strokes)
         self:ApplySignature(strokes)
@@ -210,6 +217,13 @@ function PANEL:ApplySignature(strokes)
 end
 
 function PANEL:SaveDocument()
+    -- Guard against the paper item having been removed while the editor was open
+    -- (server re-validates too, but this avoids a client-side nil error).
+    if not self.paperItem or not self.paperItem.GetID or not ws.item.instances[self.paperItem:GetID()] then
+        self:Remove()
+        return
+    end
+
     local content = self.content:GetValue()
 
     -- Check if there's anything to save
@@ -229,7 +243,7 @@ function PANEL:SaveDocument()
     end
 
     -- Send to server (include tool item ID for resource consumption)
-    net.Start("ixDocumentWrite")
+    net.Start("wsDocumentWrite")
         net.WriteUInt(self.paperItem:GetID(), 32)
         net.WriteUInt(self.toolItem and self.toolItem:GetID() or 0, 32)  -- Tool item ID
         net.WriteString(content)
@@ -247,18 +261,18 @@ function PANEL:OnRemove()
         self.sigPad:Remove()
     end
 
-    if ix.gui.documentEditor == self then
-        ix.gui.documentEditor = nil
+    if ws.gui.documentEditor == self then
+        ws.gui.documentEditor = nil
     end
 end
 
-vgui.Register("ixDocumentEditor", PANEL, "DFrame")
+vgui.Register("wsDocumentEditor", PANEL, "DFrame")
 
 -- ============================================================================
 -- NETWORK RECEIVER FOR EDITOR CONTENT
 -- ============================================================================
 
-net.Receive("ixDocumentData", function()
+net.Receive("wsDocumentData", function()
     local forEditor = net.ReadBool()
     local jsonData = net.ReadString()
     local data = util.JSONToTable(jsonData)
@@ -267,12 +281,12 @@ net.Receive("ixDocumentData", function()
 
     if forEditor then
         -- Update editor with existing content
-        if IsValid(ix.gui.documentEditor) then
-            ix.gui.documentEditor:SetExistingContent(data.content or "")
+        if IsValid(ws.gui.documentEditor) then
+            ws.gui.documentEditor:SetExistingContent(data.content or "")
         end
     else
         -- Open viewer
-        local viewer = vgui.Create("ixDocumentViewer")
+        local viewer = vgui.Create("wsDocumentViewer")
         viewer:SetDocument(data)
     end
 end)

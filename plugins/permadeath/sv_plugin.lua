@@ -12,35 +12,35 @@ PLUGIN.knockedEntities = PLUGIN.knockedEntities or {}
 -- LOG TYPE REGISTRATION (must happen before any logging calls)
 -- ============================================================================
 
-ix.log.AddType("knockout", function(client, knockoutCount, duration)
+ws.log.AddType("knockout", function(client, knockoutCount, duration)
     return string.format("%s was knocked out (knockout #%d, %s remaining)",
         client:Name(), knockoutCount, duration)
 end, FLAG_WARNING)
 
-ix.log.AddType("revival", function(client, revivedName, health)
+ws.log.AddType("revival", function(client, revivedName, health)
     return string.format("%s revived %s with %d HP",
         client:Name(), revivedName, health)
 end, FLAG_SUCCESS)
 
-ix.log.AddType("permadeath", function(client, charName, reason)
+ws.log.AddType("permadeath", function(client, charName, reason)
     return string.format("%s's character '%s' died permanently (%s)",
         client:Name(), charName, reason)
 end, FLAG_DANGER)
 
-ix.log.AddType("knockout_giveup", function(client)
+ws.log.AddType("knockout_giveup", function(client)
     return string.format("%s gave up while knocked out", client:Name())
 end, FLAG_WARNING)
 
-ix.log.AddType("defibKnockout", function(client, victimName)
+ws.log.AddType("defibKnockout", function(client, victimName)
     return string.format("%s shocked %s with a defibrillator, knocking them out",
         client:Name(), victimName)
 end, FLAG_WARNING)
 
-ix.log.AddType("suicide", function(client, charName)
+ws.log.AddType("suicide", function(client, charName)
     return string.format("%s's character '%s' took their own life", client:Name(), charName)
 end, FLAG_DANGER)
 
-ix.log.AddType("cremation", function(client, charName)
+ws.log.AddType("cremation", function(client, charName)
     return string.format("Body of '%s' was cremated", charName)
 end, FLAG_WARNING)
 
@@ -51,15 +51,15 @@ end, FLAG_WARNING)
 -- Track hit groups for headshot detection
 -- ScalePlayerDamage is called before damage is applied and gives us the hit group
 function PLUGIN:ScalePlayerDamage(client, hitGroup, dmgInfo)
-    client.ixLastHitGroup = hitGroup
+    client.wsLastHitGroup = hitGroup
 end
 
 -- Intercept lethal damage and convert to knockout
 -- EntityTakeDamage allows us to modify/cancel damage before it's applied
 function PLUGIN:EntityTakeDamage(entity, dmgInfo)
     -- Forward damage from prop_ragdoll to its linked ix_knocked entity
-    if entity:GetClass() == "prop_ragdoll" and IsValid(entity.ixKnockedEntity) then
-        entity.ixKnockedEntity:OnTakeDamage(dmgInfo)
+    if entity:GetClass() == "prop_ragdoll" and IsValid(entity.wsKnockedEntity) then
+        entity.wsKnockedEntity:OnTakeDamage(dmgInfo)
         return
     end
 
@@ -71,11 +71,11 @@ function PLUGIN:EntityTakeDamage(entity, dmgInfo)
     if not character then return end
 
     -- If player is already knocked out, ignore (damage goes to entity instead)
-    if IsValid(client.ixKnockedEntity) then return end
+    if IsValid(client.wsKnockedEntity) then return end
 
     -- Prevent race condition: if we're already processing lethal damage for this player
     -- (e.g., multiple bullets in same frame), ignore subsequent damage
-    if client.ixProcessingLethalDamage then return end
+    if client.wsProcessingLethalDamage then return end
 
     -- Check if this damage would be lethal
     local currentHealth = client:Health()
@@ -89,14 +89,14 @@ function PLUGIN:EntityTakeDamage(entity, dmgInfo)
     -- This would be lethal - intercept it
 
     -- Set flag to prevent race conditions with multiple damage events
-    client.ixProcessingLethalDamage = true
+    client.wsProcessingLethalDamage = true
 
     -- Scale damage to 0 to prevent death
     dmgInfo:ScaleDamage(0)
 
     -- Check for headshot - configurable chance of instant permadeath
     if self:IsHeadshot(client) then
-        local headshotChance = ix.config.Get("permadeathHeadshotChance", 50) / 100
+        local headshotChance = ws.config.Get("permadeathHeadshotChance", 50) / 100
         if math.random() < headshotChance then
             -- Lost the coin flip - instant permadeath
             -- Create the knocked entity first so there's a body to leave behind
@@ -109,19 +109,19 @@ function PLUGIN:EntityTakeDamage(entity, dmgInfo)
             end
 
             self:ApplyPermadeath(client, character, "headshot_execution")
-            client.ixProcessingLethalDamage = nil
+            client.wsProcessingLethalDamage = nil
             return
         end
     end
 
     -- Create knockout state instead of death
     self:CreateKnockout(client, character, dmgInfo)
-    client.ixProcessingLethalDamage = nil
+    client.wsProcessingLethalDamage = nil
 end
 
 -- Block normal respawn for knocked players
 function PLUGIN:PlayerDeathThink(client)
-    if IsValid(client.ixKnockedEntity) then
+    if IsValid(client.wsKnockedEntity) then
         return true  -- Block respawn
     end
 
@@ -134,7 +134,7 @@ end
 -- Prevent Helix from creating competing ragdolls when player has knockout entity
 -- Helix's DoPlayerDeath checks this hook before calling client:CreateRagdoll()
 function PLUGIN:ShouldSpawnClientRagdoll(client)
-    if IsValid(client.ixKnockedEntity) then
+    if IsValid(client.wsKnockedEntity) then
         return false
     end
 end
@@ -217,18 +217,18 @@ function PLUGIN:CreateKnockedEntity(client, character, pos, ang, duration)
     entity:CreateRagdoll(client:GetModel(), client:GetSkin(), bodygroups, submaterials)
 
     -- Store references
-    client.ixKnockedEntity = entity
-    entity.ixOwner = client
-    entity.ixSteamID64 = client:SteamID64()
-    self.knockedEntities[entity.ixSteamID64] = entity
+    client.wsKnockedEntity = entity
+    entity.wsOwner = client
+    entity.wsSteamID64 = client:SteamID64()
+    self.knockedEntities[entity.wsSteamID64] = entity
 
     -- Transfer cremation progress from alive player (if any)
-    if client.ixCremationProgress and client.ixCremationProgress > 0 then
-        entity:SetBurnProgress(client.ixCremationProgress)
-        entity.ixLastBurnThink = CurTime()
+    if client.wsCremationProgress and client.wsCremationProgress > 0 then
+        entity:SetBurnProgress(client.wsCremationProgress)
+        entity.wsLastBurnThink = CurTime()
         -- Clear from player
-        client.ixCremationProgress = nil
-        client.ixLastFireThink = nil
+        client.wsCremationProgress = nil
+        client.wsLastFireThink = nil
     end
 
     return entity
@@ -247,7 +247,7 @@ end
 
 -- Send knockout notification to client
 function PLUGIN:SendKnockoutStart(client, duration, knockoutCount)
-    net.Start("ixKnockoutStart")
+    net.Start("wsKnockoutStart")
         net.WriteFloat(duration)
         net.WriteUInt(knockoutCount, 8)
     net.Send(client)
@@ -262,7 +262,7 @@ function PLUGIN:ValidateKnockedInteraction(client, entity)
 
     -- Check distance to ragdoll (the visible/draggable body), not ix_knocked entity
     -- The ix_knocked entity stays at the original knockout position, but the ragdoll can be dragged
-    local checkPos = IsValid(entity.ixRagdoll) and entity.ixRagdoll:GetPos() or entity:GetPos()
+    local checkPos = IsValid(entity.wsRagdoll) and entity.wsRagdoll:GetPos() or entity:GetPos()
     if client:GetPos():Distance(checkPos) > 96 then
         return nil
     end
@@ -299,8 +299,8 @@ function PLUGIN:CreateKnockout(client, character, dmgInfo)
         local class = activeWeapon:GetClass()
         local protected = {["ix_hands"] = true, ["ix_handsup"] = true}
 
-        if not protected[class] and activeWeapon.ixItem then
-            local item = activeWeapon.ixItem
+        if not protected[class] and activeWeapon.wsItem then
+            local item = activeWeapon.wsItem
             -- Clear equipped state before dropping
             item:SetData("equipped", nil)
             item:Transfer(nil, nil, nil, client, client:GetPos() + Vector(0, 0, 10))
@@ -311,7 +311,7 @@ function PLUGIN:CreateKnockout(client, character, dmgInfo)
     self:SendKnockoutStart(client, duration, knockoutCount)
 
     -- Log the knockout
-    ix.log.Add(client, "knockout", knockoutCount, self:FormatTime(duration))
+    ws.log.Add(client, "knockout", knockoutCount, self:FormatTime(duration))
 end
 
 -- ============================================================================
@@ -330,7 +330,7 @@ function PLUGIN:AttemptRevival(reviver, knockedEntity)
     end
 
     -- Check if owner is online (can't revive disconnected players)
-    if not IsValid(knockedEntity.ixOwner) then
+    if not IsValid(knockedEntity.wsOwner) then
         reviver:NotifyLocalized("knockedPlayerDisconnected")
         return false
     end
@@ -346,7 +346,7 @@ function PLUGIN:AttemptRevival(reviver, knockedEntity)
     knockedEntity:SetCurrentReviver(reviver)
 
     -- Track revival attempt time to prevent Use() from triggering loot during/after CPR
-    knockedEntity.ixLastReviveAttempt = CurTime()
+    knockedEntity.wsLastReviveAttempt = CurTime()
 
     -- Random progress duration (3-10 seconds by default)
     -- This is equipmentless CPR-style revival (no defib)
@@ -357,7 +357,7 @@ function PLUGIN:AttemptRevival(reviver, knockedEntity)
 
     -- IMPORTANT: Pass the ragdoll to DoStaredAction, not the ix_knocked entity
     -- The ix_knocked entity is invisible and hidden - player is looking at the ragdoll
-    local stareTarget = IsValid(knockedEntity.ixRagdoll) and knockedEntity.ixRagdoll or knockedEntity
+    local stareTarget = IsValid(knockedEntity.wsRagdoll) and knockedEntity.wsRagdoll or knockedEntity
 
     -- Use DoStaredAction for progress-based revival (must look at target)
     -- Signature: DoStaredAction(entity, callback, time, onCancel, distance)
@@ -378,7 +378,7 @@ function PLUGIN:CompleteRevivalAttempt(reviver, knockedEntity, hasDefib, defibIt
     knockedEntity:SetCurrentReviver(NULL)
 
     -- Update revival attempt timestamp to prevent immediate loot after CPR
-    knockedEntity.ixLastReviveAttempt = CurTime()
+    knockedEntity.wsLastReviveAttempt = CurTime()
 
     -- Calculate success using probabilistic squared
     -- hasDefib is false for hold-E revival (CPR-style, low chance)
@@ -394,7 +394,7 @@ function PLUGIN:CompleteRevivalAttempt(reviver, knockedEntity, hasDefib, defibIt
 end
 
 function PLUGIN:RevivePlayer(knockedEntity, reviver, usedDefib, defibItem)
-    local owner = knockedEntity.ixOwner
+    local owner = knockedEntity.wsOwner
     local charID = knockedEntity:GetCharacterID()
 
     -- Find the character
@@ -402,7 +402,7 @@ function PLUGIN:RevivePlayer(knockedEntity, reviver, usedDefib, defibItem)
     if IsValid(owner) then
         character = owner:GetCharacter()
     else
-        character = ix.char.loaded[charID]
+        character = ws.char.loaded[charID]
     end
 
     if not character then
@@ -420,8 +420,8 @@ function PLUGIN:RevivePlayer(knockedEntity, reviver, usedDefib, defibItem)
     -- If player is online, restore them
     if IsValid(owner) then
         -- Move player to ragdoll position (where the body actually is after potential dragging)
-        local revivePos = IsValid(knockedEntity.ixRagdoll) and knockedEntity.ixRagdoll:GetPos() or knockedEntity:GetPos()
-        local reviveAng = IsValid(knockedEntity.ixRagdoll) and knockedEntity.ixRagdoll:GetAngles() or knockedEntity:GetAngles()
+        local revivePos = IsValid(knockedEntity.wsRagdoll) and knockedEntity.wsRagdoll:GetPos() or knockedEntity:GetPos()
+        local reviveAng = IsValid(knockedEntity.wsRagdoll) and knockedEntity.wsRagdoll:GetAngles() or knockedEntity:GetAngles()
         owner:SetPos(revivePos)
         owner:SetEyeAngles(reviveAng)
 
@@ -450,25 +450,25 @@ function PLUGIN:RevivePlayer(knockedEntity, reviver, usedDefib, defibItem)
         owner:SelectWeapon("ix_hands")
 
         -- Notify the revived player
-        net.Start("ixKnockoutEnd")
+        net.Start("wsKnockoutEnd")
             net.WriteBool(true)  -- Revived successfully
             net.WriteUInt(revivalHealth, 8)
         net.Send(owner)
 
         -- Clear knockout entity reference
-        owner.ixKnockedEntity = nil
+        owner.wsKnockedEntity = nil
 
         -- Handle cremation state on revival
         if not self:IsPlayerOnFire(owner) then
             -- Not on fire after revival = reset cremation (body heals)
-            owner.ixCremationProgress = nil
-            owner.ixLastFireThink = nil
+            owner.wsCremationProgress = nil
+            owner.wsLastFireThink = nil
         else
             -- Still on fire after revival - transfer progress back from entity
             local burnProgress = knockedEntity:GetBurnProgress()
             if burnProgress and burnProgress > 0 then
-                owner.ixCremationProgress = burnProgress
-                owner.ixLastFireThink = CurTime()
+                owner.wsCremationProgress = burnProgress
+                owner.wsLastFireThink = CurTime()
             end
         end
     end
@@ -482,13 +482,13 @@ function PLUGIN:RevivePlayer(knockedEntity, reviver, usedDefib, defibItem)
     reviver:NotifyLocalized("revivalSuccess")
 
     -- Remove the knockout entity
-    if knockedEntity.ixSteamID64 then
-        self.knockedEntities[knockedEntity.ixSteamID64] = nil
+    if knockedEntity.wsSteamID64 then
+        self.knockedEntities[knockedEntity.wsSteamID64] = nil
     end
     knockedEntity:Remove()
 
     -- Log the revival
-    ix.log.Add(reviver, "revival", character:GetName(), revivalHealth)
+    ws.log.Add(reviver, "revival", character:GetName(), revivalHealth)
 end
 
 -- ============================================================================
@@ -501,9 +501,9 @@ function PLUGIN:DeleteCharacter(client, character)
     local steamID = client:SteamID64()
 
     -- Remove from player's character list
-    for k, v in ipairs(client.ixCharList or {}) do
+    for k, v in ipairs(client.wsCharList or {}) do
         if v == id then
-            table.remove(client.ixCharList, k)
+            table.remove(client.wsCharList, k)
             break
         end
     end
@@ -512,10 +512,10 @@ function PLUGIN:DeleteCharacter(client, character)
     hook.Run("PreCharacterDeleted", client, character)
 
     -- Remove from loaded characters
-    ix.char.loaded[id] = nil
+    ws.char.loaded[id] = nil
 
     -- Notify all clients about the deletion
-    net.Start("ixCharacterDelete")
+    net.Start("wsCharacterDelete")
         net.WriteUInt(id, 32)
     net.Broadcast()
 
@@ -537,10 +537,10 @@ end
 -- Delete a character when the player is offline (database only)
 function PLUGIN:DeleteCharacterOffline(charID)
     -- Remove from loaded characters if still there
-    ix.char.loaded[charID] = nil
+    ws.char.loaded[charID] = nil
 
     -- Notify all clients about the deletion
-    net.Start("ixCharacterDelete")
+    net.Start("wsCharacterDelete")
         net.WriteUInt(charID, 32)
     net.Broadcast()
 
@@ -575,25 +575,25 @@ function PLUGIN:ApplyPermadeath(client, character, reason)
     character:SetData("knockoutExpires", nil)
 
     -- If there's a knockout entity, mark it as permadead (stays for looting)
-    if IsValid(client) and IsValid(client.ixKnockedEntity) then
-        local knockedEntity = client.ixKnockedEntity
-        if knockedEntity.ixSteamID64 then
-            self.knockedEntities[knockedEntity.ixSteamID64] = nil
+    if IsValid(client) and IsValid(client.wsKnockedEntity) then
+        local knockedEntity = client.wsKnockedEntity
+        if knockedEntity.wsSteamID64 then
+            self.knockedEntities[knockedEntity.wsSteamID64] = nil
         end
         knockedEntity:SetPermadead(true)
-        knockedEntity.ixOwner = nil
-        client.ixKnockedEntity = nil
+        knockedEntity.wsOwner = nil
+        client.wsKnockedEntity = nil
     end
 
     -- Log permadeath
-    ix.log.Add(client, "permadeath", character:GetName(), reason)
+    ws.log.Add(client, "permadeath", character:GetName(), reason)
 
     if IsValid(client) then
         -- Bots don't get memorial screens - just kick them from the server
         if client:IsBot() then
             -- Delete the bot's character
             local charID = character:GetID()
-            ix.char.loaded[charID] = nil
+            ws.char.loaded[charID] = nil
 
             -- Kick the bot from the server
             client:Kick("Permadeath")
@@ -632,7 +632,7 @@ function PLUGIN:ApplyPermadeath(client, character, reason)
         self:DeleteCharacter(client, character)
 
         -- Send memorial screen data
-        net.Start("ixPermadeathScreen")
+        net.Start("wsPermadeathScreen")
             net.WriteString(charName)
             net.WriteString(model)
             net.WriteUInt(skin, 8)
@@ -642,24 +642,42 @@ function PLUGIN:ApplyPermadeath(client, character, reason)
             net.WriteUInt(age, 8)
         net.Send(client)
 
+        -- Mark the player as awaiting memorial acknowledgment. Only this real
+        -- memorial flow sets the guard, so a client cannot fire wsPermadeathReady
+        -- on its own to escape a knockout/combat (see FinishMemorial).
+        client.wsAwaitingMemorial = true
+
         -- Start 60s timeout timer (in case client never responds)
-        local steamID = client:SteamID64()
-        timer.Create("ixPermadeathTimeout_" .. steamID, 60, 1, function()
-            if IsValid(client) then
-                client:Freeze(false)
-                client:KillSilent()
-
-                -- Tell client to open character menu
-                net.Start("ixCharacterKick")
-                    net.WriteBool(true)  -- isCurrentChar = true
-                net.Send(client)
-
-                -- Clear the character netvar and spawn
-                client:SetNetVar("char", nil)
-                client:Spawn()
-            end
+        timer.Create("wsPermadeathTimeout_" .. client:SteamID64(), 60, 1, function()
+            self:FinishMemorial(client)
         end)
     end
+end
+
+-- Finish the memorial flow: kick the player to the character menu and respawn.
+-- Shared by the wsPermadeathReady handler and the 60s timeout fallback so both
+-- behave identically. The wsAwaitingMemorial guard ensures this only runs for a
+-- player the server actually placed in the memorial state.
+function PLUGIN:FinishMemorial(client)
+    if not IsValid(client) then return end
+    if not client.wsAwaitingMemorial then return end
+    client.wsAwaitingMemorial = nil
+
+    -- Cancel the timeout timer (harmless no-op when the timeout itself is firing)
+    timer.Remove("wsPermadeathTimeout_" .. client:SteamID64())
+
+    -- Properly kick to character menu (replicating Helix's character:Kick() logic)
+    client:Freeze(false)
+    client:KillSilent()
+
+    -- Tell client to open character menu
+    net.Start("wsCharacterKick")
+        net.WriteBool(true)  -- isCurrentChar = true
+    net.Send(client)
+
+    -- Clear the character netvar and spawn
+    client:SetNetVar("char", nil)
+    client:Spawn()
 end
 
 -- Called when knockout timer expires
@@ -676,24 +694,24 @@ function PLUGIN:OnKnockoutExpired(knockedEntity)
     knockedEntity:SetPermadead(true)
 
     local charID = knockedEntity:GetCharacterID()
-    local character = ix.char.loaded[charID]
+    local character = ws.char.loaded[charID]
 
     -- Clean up tracking table
-    if knockedEntity.ixSteamID64 then
-        self.knockedEntities[knockedEntity.ixSteamID64] = nil
+    if knockedEntity.wsSteamID64 then
+        self.knockedEntities[knockedEntity.wsSteamID64] = nil
     end
 
     if not character then
         return
     end
 
-    local owner = knockedEntity.ixOwner
+    local owner = knockedEntity.wsOwner
 
     if IsValid(owner) then
         self:ApplyPermadeath(owner, character, "timer_expired")
     else
         -- Player offline - apply permadeath and delete character
-        knockedEntity.ixOwner = nil
+        knockedEntity.wsOwner = nil
 
         -- Delete the character from database
         self:DeleteCharacterOffline(charID)
@@ -706,8 +724,8 @@ end
 
 function PLUGIN:PlayerHasDefibReady(client)
     -- Check if player has a defibrillator equipped/ready with batteries
-    if client.ixDefibReady and client.ixDefibItem then
-        local item = client.ixDefibItem
+    if client.wsDefibReady and client.wsDefibItem then
+        local item = client.wsDefibItem
         local batteries = item:GetData("batteries", {})
         for _, charge in ipairs(batteries) do
             if charge > 0 then return true, item end
@@ -728,10 +746,10 @@ function PLUGIN:ConsumeDefibCharge(item, client)
         end
     end
 
-    local character, inventory = ix.constants.GetCharacterInventory(client)
+    local character, inventory = ws.constants.GetCharacterInventory(client)
 
     -- Auto-eject: remove non-full batteries if enabled (0up and partial)
-    if inventory and ix.option.Get(client, "batteryAutoEject", true) then
+    if inventory and ws.option.Get(client, "batteryAutoEject", true) then
         for i = #batteries, 1, -1 do
             if batteries[i] < 100 then  -- Eject anything that's not full
                 if inventory:FindEmptySlot(1, 1) then
@@ -744,7 +762,7 @@ function PLUGIN:ConsumeDefibCharge(item, client)
     end
 
     -- Auto-load: fill empty slots with 100up batteries
-    if inventory and ix.option.Get(client, "batteryAutoLoad", true) then
+    if inventory and ws.option.Get(client, "batteryAutoLoad", true) then
         while #batteries < 4 do
             local fullBattery = item:FindFullBatteryInInventory(inventory)
             if fullBattery then
@@ -785,6 +803,9 @@ end
 
 -- Check if character was knocked out and timer expired while offline
 function PLUGIN:PlayerLoadedCharacter(client, character, lastChar)
+    -- Defensive: a player who reached a character is no longer awaiting memorial.
+    client.wsAwaitingMemorial = nil
+
     local knockoutExpires = character:GetData("knockoutExpires")
 
     if knockoutExpires then
@@ -825,14 +846,14 @@ function PLUGIN:RestoreKnockoutState(client, character, remainingTime)
 
     if IsValid(existingEntity) then
         -- Reconnect to existing entity
-        client.ixKnockedEntity = existingEntity
-        existingEntity.ixOwner = client
+        client.wsKnockedEntity = existingEntity
+        existingEntity.wsOwner = client
         existingEntity:SetOwningPlayer(client)
 
         -- Ensure SteamID64 is stored (may be missing from older entities)
-        if not existingEntity.ixSteamID64 then
-            existingEntity.ixSteamID64 = client:SteamID64()
-            self.knockedEntities[existingEntity.ixSteamID64] = existingEntity
+        if not existingEntity.wsSteamID64 then
+            existingEntity.wsSteamID64 = client:SteamID64()
+            self.knockedEntities[existingEntity.wsSteamID64] = existingEntity
         end
 
         -- Ensure character name is stored (may be missing from older entities)
@@ -841,7 +862,7 @@ function PLUGIN:RestoreKnockoutState(client, character, remainingTime)
         end
 
         -- Ensure ragdoll exists (may have been removed)
-        if not IsValid(existingEntity.ixRagdoll) then
+        if not IsValid(existingEntity.wsRagdoll) then
             local bodygroups = self:CollectBodygroups(client)
             local submaterials = self:CollectSubMaterials(client)
             existingEntity:CreateRagdoll(client:GetModel(), client:GetSkin(), bodygroups, submaterials)
@@ -857,20 +878,20 @@ function PLUGIN:RestoreKnockoutState(client, character, remainingTime)
         self:CreateKnockedEntity(client, character, pos, ang, remainingTime)
     end
 
-    self:HideKnockedPlayer(client, client.ixKnockedEntity)
+    self:HideKnockedPlayer(client, client.wsKnockedEntity)
     self:SendKnockoutStart(client, remainingTime, character:GetData("knockoutCount") or 1)
 end
 
 -- Handle player disconnect while knocked
 function PLUGIN:PlayerDisconnected(client)
     -- Clean up memorial timeout timer
-    timer.Remove("ixPermadeathTimeout_" .. client:SteamID64())
+    timer.Remove("wsPermadeathTimeout_" .. client:SteamID64())
 
-    local entity = client.ixKnockedEntity
+    local entity = client.wsKnockedEntity
 
     if IsValid(entity) then
         -- Clear owner reference but keep entity alive
-        entity.ixOwner = nil
+        entity.wsOwner = nil
         entity:SetOwningPlayer(NULL)
         -- Timer continues via entity Think
     end
@@ -882,9 +903,9 @@ end
 
 function PLUGIN:InitializedPlugins()
     -- Start passive healing timer
-    timer.Create("ixPassiveHealing", 60, 0, function()
-        local healRate = ix.config.Get("permadeathPassiveHealRate", 1)
-        local healCap = ix.config.Get("permadeathPassiveHealCap", 80) / 100
+    timer.Create("wsPassiveHealing", 60, 0, function()
+        local healRate = ws.config.Get("permadeathPassiveHealRate", 1)
+        local healCap = ws.config.Get("permadeathPassiveHealCap", 80) / 100
 
         for _, client in player.Iterator() do
             if not IsValid(client) then continue end
@@ -892,7 +913,7 @@ function PLUGIN:InitializedPlugins()
             local character = client:GetCharacter()
             if not character then continue end
             if not client:Alive() then continue end
-            if IsValid(client.ixKnockedEntity) then continue end
+            if IsValid(client.wsKnockedEntity) then continue end
 
             local maxHealth = client:GetMaxHealth()
             local capHealth = math.floor(maxHealth * healCap)
@@ -906,32 +927,32 @@ function PLUGIN:InitializedPlugins()
     end)
 
     -- Alive player cremation tracking (1.5s interval - cremation is not time-critical)
-    timer.Create("ixAliveFireTracking", 1.5, 0, function()
+    timer.Create("wsAliveFireTracking", 1.5, 0, function()
         for _, client in player.Iterator() do
             if not IsValid(client) then continue end
             if not client:Alive() then continue end
-            if IsValid(client.ixKnockedEntity) then continue end -- They're knocked, entity handles it
+            if IsValid(client.wsKnockedEntity) then continue end -- They're knocked, entity handles it
 
             local isOnFire = self:IsPlayerOnFire(client)
 
             if isOnFire then
                 -- Initialize or continue tracking
-                if not client.ixCremationProgress then
-                    client.ixCremationProgress = 0
+                if not client.wsCremationProgress then
+                    client.wsCremationProgress = 0
                 end
-                if not client.ixLastFireThink then
-                    client.ixLastFireThink = CurTime()
+                if not client.wsLastFireThink then
+                    client.wsLastFireThink = CurTime()
                 end
 
                 -- Accumulate burn time
-                local delta = CurTime() - client.ixLastFireThink
-                client.ixCremationProgress = client.ixCremationProgress + delta
-                client.ixLastFireThink = CurTime()
+                local delta = CurTime() - client.wsLastFireThink
+                client.wsCremationProgress = client.wsCremationProgress + delta
+                client.wsLastFireThink = CurTime()
             else
                 -- Fire extinguished while alive = RESET (body heals)
-                if client.ixCremationProgress and client.ixCremationProgress > 0 then
-                    client.ixCremationProgress = 0
-                    client.ixLastFireThink = nil
+                if client.wsCremationProgress and client.wsCremationProgress > 0 then
+                    client.wsCremationProgress = 0
+                    client.wsLastFireThink = nil
                 end
             end
         end
@@ -942,13 +963,13 @@ end
 -- GIVE UP HANDLER
 -- ============================================================================
 
-net.Receive("ixKnockoutGiveUp", function(len, client)
+net.Receive("wsKnockoutGiveUp", function(len, client)
     -- Validate player is actually knocked out
     if not IsValid(client) then return end
 
-    if not IsValid(client.ixKnockedEntity) then return end
+    if not IsValid(client.wsKnockedEntity) then return end
 
-    local entity = client.ixKnockedEntity
+    local entity = client.wsKnockedEntity
     if entity:GetPermadead() then return end
 
     -- Get current remaining time
@@ -960,12 +981,12 @@ net.Receive("ixKnockoutGiveUp", function(len, client)
         entity:SetTimerDuration(10)
 
         -- Sync to client
-        net.Start("ixKnockoutTimerSync")
+        net.Start("wsKnockoutTimerSync")
             net.WriteFloat(10)
         net.Send(client)
 
         -- Log the give up
-        ix.log.Add(client, "knockout_giveup")
+        ws.log.Add(client, "knockout_giveup")
     end
 end)
 
@@ -974,10 +995,10 @@ end)
 -- ============================================================================
 
 -- E tap: Search/loot body (works on both knocked and dead)
-net.Receive("ixKnockoutLoot", function(len, client)
+net.Receive("wsKnockoutLoot", function(len, client)
     if not IsValid(client) then return end
 
-    local plugin = ix.plugin.Get("permadeath")
+    local plugin = ws.plugin.Get("permadeath")
     if not plugin then return end
 
     local entity = plugin:ValidateKnockedInteraction(client, net.ReadEntity())
@@ -993,10 +1014,10 @@ net.Receive("ixKnockoutLoot", function(len, client)
 end)
 
 -- E hold: Attempt revival (only works on knocked, not dead)
-net.Receive("ixKnockoutRevive", function(len, client)
+net.Receive("wsKnockoutRevive", function(len, client)
     if not IsValid(client) then return end
 
-    local plugin = ix.plugin.Get("permadeath")
+    local plugin = ws.plugin.Get("permadeath")
     if not plugin then return end
 
     local entity = plugin:ValidateKnockedInteraction(client, net.ReadEntity())
@@ -1015,33 +1036,22 @@ end)
 -- ============================================================================
 
 -- Client acknowledged memorial screen
-net.Receive("ixPermadeathReady", function(len, client)
+net.Receive("wsPermadeathReady", function(len, client)
     if not IsValid(client) then return end
 
-    local steamID = client:SteamID64()
-
-    -- Cancel the timeout timer
-    timer.Remove("ixPermadeathTimeout_" .. steamID)
-
-    -- Properly kick to character menu (replicating Helix's character:Kick() logic)
-    client:Freeze(false)
-    client:KillSilent()
-
-    -- Tell client to open character menu
-    net.Start("ixCharacterKick")
-        net.WriteBool(true)  -- isCurrentChar = true
-    net.Send(client)
-
-    -- Clear the character netvar and spawn
-    client:SetNetVar("char", nil)
-    client:Spawn()
+    -- FinishMemorial enforces (and clears) the wsAwaitingMemorial guard, so a
+    -- client sending this without actually being on the memorial screen is ignored.
+    local plugin = ws.plugin.Get("permadeath")
+    if plugin then
+        plugin:FinishMemorial(client)
+    end
 end)
 
 -- ============================================================================
 -- SUICIDE EXECUTION
 -- ============================================================================
 
-net.Receive("ixSuicideExecute", function(len, client)
+net.Receive("wsSuicideExecute", function(len, client)
     if not IsValid(client) then return end
 
     local character = client:GetCharacter()
@@ -1062,10 +1072,10 @@ net.Receive("ixSuicideExecute", function(len, client)
     client:EmitSound("weapons/357/357_fire2.wav", 100, 100)
 
     -- Log suicide
-    ix.log.Add(client, "suicide", character:GetName())
+    ws.log.Add(client, "suicide", character:GetName())
 
     -- Apply instant permadeath (bypass knockout)
-    local plugin = ix.plugin.Get("permadeath")
+    local plugin = ws.plugin.Get("permadeath")
     if plugin then
         plugin:ApplyPermadeath(client, character, "suicide")
     end

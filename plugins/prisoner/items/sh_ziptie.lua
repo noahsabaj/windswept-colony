@@ -42,8 +42,8 @@ ITEM.functions.Equip = {
         local client = item.player
 
         -- Check if already has a zip tie equipped
-        if client.ixZipTieItem and client.ixZipTieItem ~= item then
-            local oldItem = client.ixZipTieItem
+        if client.wsZipTieItem and client.wsZipTieItem ~= item then
+            local oldItem = client.wsZipTieItem
             oldItem:SetData("equipped", nil)
         end
 
@@ -55,11 +55,11 @@ ITEM.functions.Equip = {
         -- Give the SWEP
         local weapon = client:Give("ix_ziptie")
         if IsValid(weapon) then
-            weapon.ixItem = item
+            weapon.wsItem = item
             client:SelectWeapon("ix_ziptie")
         end
 
-        client.ixZipTieItem = item
+        client.wsZipTieItem = item
         item:SetData("equipped", true)
 
         return false
@@ -86,7 +86,7 @@ ITEM.functions.Unequip = {
             client:StripWeapon("ix_ziptie")
         end
 
-        client.ixZipTieItem = nil
+        client.wsZipTieItem = nil
         item:SetData("equipped", nil)
 
         return false
@@ -108,7 +108,7 @@ function ITEM.postHooks.drop(item, result)
             if client:HasWeapon("ix_ziptie") then
                 client:StripWeapon("ix_ziptie")
             end
-            client.ixZipTieItem = nil
+            client.wsZipTieItem = nil
         end
         item:SetData("equipped", nil)
     end
@@ -122,7 +122,7 @@ function ITEM:OnTransferred(oldInventory, newInventory)
             if oldOwner:HasWeapon("ix_ziptie") then
                 oldOwner:StripWeapon("ix_ziptie")
             end
-            oldOwner.ixZipTieItem = nil
+            oldOwner.wsZipTieItem = nil
         end
         self:SetData("equipped", nil)
     end
@@ -144,8 +144,8 @@ function ITEM:OnLoadout()
 
         local weapon = client:Give("ix_ziptie", true)
         if IsValid(weapon) then
-            weapon.ixItem = self
-            client.ixZipTieItem = self
+            weapon.wsItem = self
+            client.wsZipTieItem = self
         end
     end
 end

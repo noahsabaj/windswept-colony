@@ -25,7 +25,7 @@ function ENT:Initialize()
         self.pendingChannels = nil
     elseif not self:GetCh1Freq() or self:GetCh1Freq() == "" then
         -- Initialize default channel data if not set
-        self:SetChannelData(ix.radio.GetDefaultChannels())
+        self:SetChannelData(ws.radio.GetDefaultChannels())
     end
 
     self:SetMicOn(false)
@@ -48,7 +48,7 @@ function ENT:Use(activator, caller)
     end
 
     local holdTime = CurTime() - self.holdEStart[activator]
-    local pickupTime = ix.config.Get("itemPickupTime", 0.5)
+    local pickupTime = ws.config.Get("itemPickupTime", 0.5)
 
     -- Check if held long enough for pickup
     if holdTime >= pickupTime then
@@ -71,7 +71,7 @@ function ENT:Think()
         -- Check if player released E
         if not ply:KeyDown(IN_USE) then
             local holdTime = CurTime() - startTime
-            local pickupTime = ix.config.Get("itemPickupTime", 0.5)
+            local pickupTime = ws.config.Get("itemPickupTime", 0.5)
 
             -- Short press (released before pickup time) = open UI
             if holdTime < pickupTime and not self.uiOpenedThisPress[ply] then
@@ -83,13 +83,13 @@ function ENT:Think()
                     -- Open UI for this player
                     self:SetUser(ply)
 
-                    net.Start("ixStationaryRadioOpen")
+                    net.Start("wsStationaryRadioOpen")
                     net.WriteEntity(self)
                     net.Send(ply)
 
                     -- Start distance check timer
                     local entRef = self
-                    local timerName = "ixStationaryRadio_" .. ply:SteamID64()
+                    local timerName = "wsStationaryRadio_" .. ply:SteamID64()
                     timer.Create(timerName, 0.5, 0, function()
                         if not IsValid(ply) or not IsValid(entRef) then
                             timer.Remove(timerName)
@@ -114,7 +114,7 @@ end
 function ENT:PickupByPlayer(client)
     if not IsValid(client) then return end
 
-    local character, inventory = ix.constants.GetCharacterInventory(client)
+    local character, inventory = ws.constants.GetCharacterInventory(client)
     if not character or not inventory then return end
 
     -- Check if there's room in inventory
@@ -157,7 +157,7 @@ function ENT:CloseForUser(client, reason)
     end
 
     -- Stop distance timer
-    timer.Remove("ixStationaryRadio_" .. client:SteamID64())
+    timer.Remove("wsStationaryRadio_" .. client:SteamID64())
 
     -- Notify client if reason provided
     if reason then
@@ -193,12 +193,12 @@ function ENT:OnRemove()
 
     local user = self:GetUser()
     if IsValid(user) then
-        timer.Remove("ixStationaryRadio_" .. user:SteamID64())
+        timer.Remove("wsStationaryRadio_" .. user:SteamID64())
     end
 end
 
 -- Network receivers
-net.Receive("ixStationaryRadioClose", function(len, client)
+net.Receive("wsStationaryRadioClose", function(len, client)
     local ent = net.ReadEntity()
 
     if not IsValid(ent) or ent:GetClass() ~= "ix_stationary_radio" then return end
@@ -207,7 +207,7 @@ net.Receive("ixStationaryRadioClose", function(len, client)
     ent:CloseForUser(client)
 end)
 
-net.Receive("ixStationaryRadioConfig", function(len, client)
+net.Receive("wsStationaryRadioConfig", function(len, client)
     local ent = net.ReadEntity()
     local channel = net.ReadUInt(3) -- 1-4
     local field = net.ReadString()
@@ -216,7 +216,7 @@ net.Receive("ixStationaryRadioConfig", function(len, client)
     if field == "freq" then
         value = net.ReadString()
         -- Validate frequency
-        if not ix.radio.ValidateFrequency(value) then return end
+        if not ws.radio.ValidateFrequency(value) then return end
     elseif field == "tx" or field == "rx" then
         value = net.ReadBool()
     elseif field == "vol" then
@@ -248,7 +248,7 @@ net.Receive("ixStationaryRadioConfig", function(len, client)
     end
 end)
 
-net.Receive("ixStationaryRadioMic", function(len, client)
+net.Receive("wsStationaryRadioMic", function(len, client)
     local ent = net.ReadEntity()
     local micOn = net.ReadBool()
 
@@ -264,7 +264,7 @@ net.Receive("ixStationaryRadioMic", function(len, client)
     end
 end)
 
-net.Receive("ixStationaryRadioTransmit", function(len, client)
+net.Receive("wsStationaryRadioTransmit", function(len, client)
     local ent = net.ReadEntity()
     local message = net.ReadString()
 
@@ -291,7 +291,7 @@ net.Receive("ixStationaryRadioTransmit", function(len, client)
     -- Transmit on each TX frequency
     for freq, _ in pairs(txFreqs) do
         character:SetData("frequency", freq)
-        ix.chat.Send(client, "radio", message)
+        ws.chat.Send(client, "radio", message)
     end
 
     -- Restore original frequency
@@ -299,7 +299,7 @@ net.Receive("ixStationaryRadioTransmit", function(len, client)
 end)
 
 -- Clean up when player dies while using console
-hook.Add("PlayerDeath", "ixStationaryRadioPlayerDeath", function(victim)
+hook.Add("PlayerDeath", "wsStationaryRadioPlayerDeath", function(victim)
     for _, ent in ipairs(ents.FindByClass("ix_stationary_radio")) do
         if ent:GetUser() == victim then
             ent:CloseForUser(victim)
@@ -308,7 +308,7 @@ hook.Add("PlayerDeath", "ixStationaryRadioPlayerDeath", function(victim)
 end)
 
 -- Clean up when player disconnects while using console
-hook.Add("PlayerDisconnected", "ixStationaryRadioPlayerDisconnect", function(client)
+hook.Add("PlayerDisconnected", "wsStationaryRadioPlayerDisconnect", function(client)
     for _, ent in ipairs(ents.FindByClass("ix_stationary_radio")) do
         if ent:GetUser() == client then
             ent:SetUser(nil)

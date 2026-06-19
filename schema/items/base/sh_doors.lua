@@ -65,7 +65,7 @@ function ITEM:GetConditionText()
     elseif percent >= 26 then text = "Moderate Damage"
     else text = "Severe Damage" end
 
-    return text, ix.constants.GetChargeColor(percent, 76, 51, 26)
+    return text, ws.constants.GetChargeColor(percent, 76, 51, 26)
 end
 
 -- Override description to show health
@@ -96,7 +96,7 @@ if CLIENT then
 
         -- Draw equipped indicator (green dot)
         if isEquipped then
-            ix.constants.DrawEquippedIndicator(w, h)
+            ws.constants.DrawEquippedIndicator(w, h)
         end
 
         -- Draw health bar at bottom
@@ -104,7 +104,7 @@ if CLIENT then
         surface.DrawRect(4, h - 12, w - 8, 8)
 
         local healthWidth = ((w - 8) / 100) * healthPercent
-        surface.SetDrawColor(ix.constants.GetChargeColor(healthPercent, 76, 51, 26))
+        surface.SetDrawColor(ws.constants.GetChargeColor(healthPercent, 76, 51, 26))
         surface.DrawRect(4, h - 12, healthWidth, 8)
 
         -- Draw lock indicator if has lock
@@ -119,16 +119,16 @@ if CLIENT then
         local condition, condColor = self:GetConditionText()
 
         -- Health row
-        ix.constants.AddTooltipRow(tooltip, "health", "Health: " .. health .. "/" .. self.maxHealth, condColor)
+        ws.constants.AddTooltipRow(tooltip, "health", "Health: " .. health .. "/" .. self.maxHealth, condColor)
 
         -- Condition row
-        ix.constants.AddTooltipRow(tooltip, "condition", "Condition: " .. condition, Color(60, 60, 60))
+        ws.constants.AddTooltipRow(tooltip, "condition", "Condition: " .. condition, Color(60, 60, 60))
 
         -- Lock info
         if self:HasLock() then
             local lockData = self:GetLockData()
             local lockName = lockData.name ~= "" and lockData.name or "Unnamed Lock"
-            ix.constants.AddTooltipRow(tooltip, "lock", "Lock: " .. lockName .. " (" .. math.floor(lockData.durability or 100) .. "% dur.)", Color(80, 80, 120))
+            ws.constants.AddTooltipRow(tooltip, "lock", "Lock: " .. lockName .. " (" .. math.floor(lockData.durability or 100) .. "% dur.)", Color(80, 80, 120))
         end
     end
 end
@@ -146,8 +146,8 @@ ITEM.functions.Equip = {
         local client = item.player
 
         -- Unequip any existing door from this player
-        if client.ixDoorItem and client.ixDoorItem ~= item then
-            local oldItem = client.ixDoorItem
+        if client.wsDoorItem and client.wsDoorItem ~= item then
+            local oldItem = client.wsDoorItem
             oldItem:SetData("equipped", nil)
         end
 
@@ -157,13 +157,13 @@ ITEM.functions.Equip = {
         end
 
         -- Set these BEFORE Give() so hooks see them
-        client.ixDoorItem = item
+        client.wsDoorItem = item
         item:SetData("equipped", true)
 
         -- Give the SWEP
         local weapon = client:Give("ix_door")
         if IsValid(weapon) then
-            weapon.ixItem = item
+            weapon.wsItem = item
             client:SelectWeapon("ix_door")
         end
 
@@ -190,7 +190,7 @@ ITEM.functions.Unequip = {
             client:StripWeapon("ix_door")
         end
 
-        client.ixDoorItem = nil
+        client.wsDoorItem = nil
         item:SetData("equipped", nil)
 
         client:EmitSound("physics/wood/wood_plank_impact_soft2.wav", 50)
@@ -213,7 +213,7 @@ function ITEM.postHooks.drop(item, result)
             if client:HasWeapon("ix_door") then
                 client:StripWeapon("ix_door")
             end
-            client.ixDoorItem = nil
+            client.wsDoorItem = nil
         end
         item:SetData("equipped", nil)
     end
@@ -226,7 +226,7 @@ function ITEM:OnTransferred(oldInventory, newInventory)
             if oldOwner:HasWeapon("ix_door") then
                 oldOwner:StripWeapon("ix_door")
             end
-            oldOwner.ixDoorItem = nil
+            oldOwner.wsDoorItem = nil
         end
         self:SetData("equipped", nil)
     end
@@ -250,8 +250,8 @@ function ITEM:OnLoadout()
 
         local weapon = client:Give("ix_door", true)
         if IsValid(weapon) then
-            weapon.ixItem = self
-            client.ixDoorItem = self
+            weapon.wsItem = self
+            client.wsDoorItem = self
         end
     end
 end

@@ -17,7 +17,7 @@ function ENT:Draw()
         ang:RotateAroundAxis(ang:Forward(), 90)
 
         cam.Start3D2D(pos, ang, 0.1)
-            draw.SimpleText("IN USE", "ixMediumFont", 0, 0, Color(255, 200, 50, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+            draw.SimpleText("IN USE", "wsMediumFont", 0, 0, Color(255, 200, 50, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
         cam.End3D2D()
     end
 end
@@ -32,7 +32,7 @@ local locksmithHintCache = {
 }
 local LOCKSMITH_HINT_INTERVAL = 0.1  -- Check every 0.1 seconds
 
-hook.Add("HUDPaint", "ixLocksmithHint", function()
+hook.Add("HUDPaint", "wsLocksmithHint", function()
     local now = CurTime()
 
     -- Throttle eye trace check
@@ -63,29 +63,29 @@ hook.Add("HUDPaint", "ixLocksmithHint", function()
     -- Draw cached result
     if locksmithHintCache.ent and locksmithHintCache.text1 then
         local scrW, scrH = ScrW(), ScrH()
-        draw.SimpleText(locksmithHintCache.text1, "ixSmallFont", scrW / 2, scrH * 0.6, Color(255, 255, 255, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+        draw.SimpleText(locksmithHintCache.text1, "wsSmallFont", scrW / 2, scrH * 0.6, Color(255, 255, 255, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
         if locksmithHintCache.text2 then
-            draw.SimpleText(locksmithHintCache.text2, "ixSmallFont", scrW / 2, scrH * 0.6 + 20, Color(200, 200, 200, 150), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+            draw.SimpleText(locksmithHintCache.text2, "wsSmallFont", scrW / 2, scrH * 0.6 + 20, Color(200, 200, 200, 150), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
         end
     end
 end)
 
 -- Open locksmith UI when server tells us to
-net.Receive("ixLocksmithOpen", function()
+net.Receive("wsLocksmithOpen", function()
     local ent = net.ReadEntity()
     if not IsValid(ent) then return end
 
     -- Open the locksmith UI
-    if IsValid(ix.gui.locksmith) then
-        ix.gui.locksmith:Remove()
+    if IsValid(ws.gui.locksmith) then
+        ws.gui.locksmith:Remove()
     end
 
-    ix.gui.locksmith = vgui.Create("ixLocksmithMenu")
-    ix.gui.locksmith:SetStation(ent)
+    ws.gui.locksmith = vgui.Create("wsLocksmithMenu")
+    ws.gui.locksmith:SetStation(ent)
 end)
 
 -- Handle results from server
-net.Receive("ixLocksmithResult", function()
+net.Receive("wsLocksmithResult", function()
     local resultType = net.ReadString()
 
     if resultType == "viewKeyings" then

@@ -27,7 +27,7 @@ ITEM.base = "base_equippable"
 
 -- Equippable configuration
 ITEM.equipWeaponClass = "ix_key"
-ITEM.equipPlayerKey = "ixKeyItem"
+ITEM.equipPlayerKey = "wsKeyItem"
 ITEM.equipNotifyKey = "keyEquipped"
 ITEM.equipSound = "physics/metal/metal_solid_impact_soft2.wav"
 ITEM.equipSoundVolume = 0.5
@@ -95,7 +95,7 @@ if CLIENT then
     function ITEM:PaintOver(item, w, h)
         -- Draw equipped indicator (green dot)
         if item:GetData("equipped") then
-            ix.constants.DrawEquippedIndicator(w, h)
+            ws.constants.DrawEquippedIndicator(w, h)
         end
 
         -- Draw color indicator strip at bottom
@@ -109,12 +109,12 @@ if CLIENT then
     function ITEM:PopulateTooltip(tooltip)
         local keying = self:GetKeying()
         if keying and keying ~= "" then
-            ix.constants.AddTooltipRow(tooltip, "keying", "Keying: " .. keying, Color(80, 80, 120))
+            ws.constants.AddTooltipRow(tooltip, "keying", "Keying: " .. keying, Color(80, 80, 120))
         end
 
         local keyName = self:GetKeyName()
         if keyName and keyName ~= "" then
-            ix.constants.AddTooltipRow(tooltip, "keyName", "Label: " .. keyName, Color(60, 100, 60))
+            ws.constants.AddTooltipRow(tooltip, "keyName", "Label: " .. keyName, Color(60, 100, 60))
         end
     end
 end

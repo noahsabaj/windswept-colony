@@ -77,7 +77,7 @@ if CLIENT then
 end
 
 -- Override player animation when hands are up
-hook.Add("CalcMainActivity", "ixHandsUpAnimation", function(ply, velocity)
+hook.Add("CalcMainActivity", "wsHandsUpAnimation", function(ply, velocity)
     if ply:GetNetVar("handsUp") then
         -- Try to use the cower sequence directly (hands up defensive pose)
         local seq = ply:LookupSequence("seq_cower") or ply:LookupSequence("cower")

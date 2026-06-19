@@ -2,20 +2,20 @@
     Windswept Colony RP - Centralized Constants
 
     All magic numbers and repeated values in one place.
-    Import with: local C = ix.constants (after this file loads)
+    Import with: local C = ws.constants (after this file loads)
 
-    NOTE: Helix already defines ix.currency.MAX_STACK (100), ix.currency.CENTS_PER_DOLLAR (100),
-    ix.currency.CASH_ITEM ("cash"), ix.currency.COINS_ITEM ("coins")
+    NOTE: Helix already defines ws.currency.MAX_STACK (100), ws.currency.CENTS_PER_DOLLAR (100),
+    ws.currency.CASH_ITEM ("cash"), ws.currency.COINS_ITEM ("coins")
 ]]--
 
-ix.constants = ix.constants or {}
-local C = ix.constants
+ws.constants = ws.constants or {}
+local C = ws.constants
 
 -- =============================================================================
 -- UI COLORS
 -- =============================================================================
 -- Anti-metagaming: All UI uses neutral gray regardless of faction
--- See CLAUDE.md "UI is colorblind" design principle
+-- See DESIGN.md, Colony RP pillar 2 (Anti-metagaming / fog-of-war)
 
 C.COLOR_UI_NEUTRAL = Color(200, 200, 200)       -- Standard text/UI color
 C.COLOR_UI_NEUTRAL_ALPHA = Color(200, 200, 200, 200)  -- With transparency
@@ -31,14 +31,12 @@ C.COLOR_PROGRESS_FG = Color(200, 200, 200, 255) -- Progress bar foreground
 
 C.RANGE_INTERACTION = 100 * 100      -- 10000 - Standard player-to-player (giving items, money)
 C.RANGE_INTERACTION_CLOSE = 96 * 96  -- 9216 - Close range (prisoner drag, ziptie)
-C.RANGE_DOCUMENT_VIEW = 256 * 256    -- 65536 - Viewing documents (prison card)
 C.RANGE_SOUND_FAR = 1000 * 1000      -- 1000000 - Far sound audibility
 C.RANGE_EAVESDROP_BASE = 400         -- Base eavesdrop range (scaled by volume * amplitude)
 
 -- Linear distances (for reference/documentation)
 C.DISTANCE_INTERACTION = 100         -- units
 C.DISTANCE_INTERACTION_CLOSE = 96    -- units
-C.DISTANCE_DOCUMENT_VIEW = 256       -- units
 
 -- =============================================================================
 -- BATTERY SYSTEM
@@ -57,7 +55,7 @@ C.DRAIN_LANTERN = 100 / 600          -- ~0.167 up/sec
 -- =============================================================================
 -- ITEM STACK LIMITS
 -- =============================================================================
--- Currency uses ix.currency.MAX_STACK (100) from Helix
+-- Currency uses ws.currency.MAX_STACK (100) from Helix
 
 C.STACK_KEY_BLANKS = 10
 C.STACK_LOCK_BLANKS = 5
@@ -230,11 +228,11 @@ if CLIENT then
         surface.DrawOutlinedRect(x, y, barW, barH, 2)
 
         -- Label
-        draw.SimpleText(label, "ixSmallFont", w / 2, y - 20, labelColor or color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
+        draw.SimpleText(label, "wsSmallFont", w / 2, y - 20, labelColor or color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
 
         -- Cancel hint (optional)
         if cancelText then
-            draw.SimpleText(cancelText, "ixSmallFont", w / 2, y + barH + 10, Color(150, 150, 150), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+            draw.SimpleText(cancelText, "wsSmallFont", w / 2, y + barH + 10, Color(150, 150, 150), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
         end
     end
 
@@ -243,14 +241,14 @@ if CLIENT then
         local index = item:GetData("id", "")
         if not index then return false end
 
-        local panel = ix.gui["inv"..index]
-        local inventory = ix.item.inventories[index]
-        local parent = IsValid(ix.gui.menuInventoryContainer) and ix.gui.menuInventoryContainer or ix.gui.openedStorage
+        local panel = ws.gui["inv"..index]
+        local inventory = ws.item.inventories[index]
+        local parent = IsValid(ws.gui.menuInventoryContainer) and ws.gui.menuInventoryContainer or ws.gui.openedStorage
 
         if IsValid(panel) then panel:Remove() end
 
         if inventory and inventory.slots then
-            panel = vgui.Create("ixInventory", IsValid(parent) and parent or nil)
+            panel = vgui.Create("wsInventory", IsValid(parent) and parent or nil)
             panel:SetInventory(inventory)
             panel:ShowCloseButton(true)
 
@@ -258,21 +256,21 @@ if CLIENT then
             if item.viewSuffix then title = title .. item.viewSuffix end
             panel:SetTitle(title)
 
-            if parent ~= ix.gui.menuInventoryContainer then
+            if parent ~= ws.gui.menuInventoryContainer then
                 panel:Center()
-                if parent == ix.gui.openedStorage then panel:MakePopup() end
+                if parent == ws.gui.openedStorage then panel:MakePopup() end
             else
                 panel:MoveToFront()
             end
 
-            ix.gui["inv"..index] = panel
+            ws.gui["inv"..index] = panel
         end
 
         return false
     end
 
     function C.CanOpenContainerPanel(item)
-        return not IsValid(item.entity) and item:GetData("id") and not IsValid(ix.gui["inv" .. item:GetData("id", "")])
+        return not IsValid(item.entity) and item:GetData("id") and not IsValid(ws.gui["inv" .. item:GetData("id", "")])
     end
 
     -- =========================================================================
@@ -298,7 +296,7 @@ if CLIENT then
         header.Paint = function(pnl, w, h)
             draw.RoundedBoxEx(4, 0, 0, w, h, COLOR_HEADER_BG, true, true, false, false)
 
-            surface.SetFont("ixMediumFont")
+            surface.SetFont("wsMediumFont")
             local tw, th = surface.GetTextSize(pnl.text)
             surface.SetTextColor(255, 255, 255, 255)
             surface.SetTextPos(12, (h - th) / 2)
@@ -310,7 +308,7 @@ if CLIENT then
         closeBtn:Dock(RIGHT)
         closeBtn:DockMargin(0, 6, 6, 6)
         closeBtn:SetText("\xC3\x97")  -- multiplication sign (x)
-        closeBtn:SetFont("ixMediumFont")
+        closeBtn:SetFont("wsMediumFont")
         closeBtn:SetTextColor(C.COLOR_UI_NEUTRAL)
         closeBtn.Paint = function(btn, w, h)
             if btn:IsHovered() then
@@ -421,7 +419,7 @@ end
 -- Returns the item if found and valid, nil otherwise
 if SERVER then
     function C.VerifyItemOwnership(client, itemID, expectedUniqueID)
-        local item = ix.item.instances[itemID]
+        local item = ws.item.instances[itemID]
         if not item then return nil end
 
         if expectedUniqueID and item.uniqueID ~= expectedUniqueID then
@@ -435,6 +433,39 @@ if SERVER then
             if invItem:GetID() == itemID then
                 return item
             end
+        end
+
+        return nil
+    end
+
+    -- Verify that a client can ACCESS an item: it must be in the character's main
+    -- inventory or in a bag inventory owned by that character. Use this (instead of
+    -- VerifyItemOwnership) for items that can legitimately live inside owned
+    -- containers (e.g. papers inside envelopes/folders). Returns the item or nil.
+    function C.VerifyItemAccessible(client, itemID, expectedUniqueID)
+        local item = ws.item.instances[itemID]
+        if not item then return nil end
+
+        if expectedUniqueID and item.uniqueID ~= expectedUniqueID then
+            return nil
+        end
+
+        local character = client:GetCharacter()
+        if not character then return nil end
+
+        local mainInv = character:GetInventory()
+        local inv = ws.item.inventories[item.invID]
+        if not inv or not mainInv then return nil end
+
+        -- Item directly in the character's main inventory
+        if inv:GetID() == mainInv:GetID() then
+            return item
+        end
+
+        -- Item inside a bag inventory owned by this character (bags cannot nest,
+        -- so a single ownership check is sufficient)
+        if inv.owner and inv.owner == character:GetID() then
+            return item
         end
 
         return nil

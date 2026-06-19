@@ -24,8 +24,8 @@ end
 -- Create the ragdoll visual for this knocked entity
 function ENT:CreateRagdoll(model, skin, bodygroups, submaterials)
     -- Remove existing ragdoll if any
-    if IsValid(self.ixRagdoll) then
-        self.ixRagdoll:Remove()
+    if IsValid(self.wsRagdoll) then
+        self.wsRagdoll:Remove()
     end
 
     -- Create prop_ragdoll for proper ragdoll physics
@@ -58,8 +58,8 @@ function ENT:CreateRagdoll(model, skin, bodygroups, submaterials)
     end
 
     -- Link ragdoll to this entity (server-side)
-    ragdoll.ixKnockedEntity = self
-    self.ixRagdoll = ragdoll
+    ragdoll.wsKnockedEntity = self
+    self.wsRagdoll = ragdoll
 
     -- Store reference for closure
     local knockedEntity = self
@@ -77,7 +77,7 @@ function ENT:CreateRagdoll(model, skin, bodygroups, submaterials)
         end
 
         -- Network the link to clients using Helix's SetNetVar
-        ragdoll:SetNetVar("ixKnockedEntity", knockedEntity)
+        ragdoll:SetNetVar("wsKnockedEntity", knockedEntity)
     end)
 
     -- Make ragdoll useable and forward Use to our entity
@@ -108,7 +108,7 @@ end
 
 -- Check if ragdoll is on fire (uses windswept_fire API with GMod native fallback)
 function ENT:IsRagdollOnFire()
-    local ragdoll = self.ixRagdoll
+    local ragdoll = self.wsRagdoll
     if not IsValid(ragdoll) then return false end
 
     -- Prefer ws_fire API if available
@@ -138,12 +138,12 @@ end
 
 -- Re-ignite the ragdoll (body is fuel - fire sustains until cremation complete)
 function ENT:ReigniteRagdoll()
-    local ragdoll = self.ixRagdoll
+    local ragdoll = self.wsRagdoll
     if not IsValid(ragdoll) then return end
 
     -- Reset burn think time to prevent gap accumulation
     -- (in case re-ignition doesn't immediately stick, e.g., body in water)
-    self.ixLastBurnThink = CurTime()
+    self.wsLastBurnThink = CurTime()
 
     -- Prefer ws_fire API if available (better particles and performance)
     if ws_fire and ws_fire.constants then
@@ -170,7 +170,7 @@ end
 -- Call periodically to prevent fire from dying down
 -- Uses windswept_fire API with GMod native fallback
 function ENT:SustainFire()
-    local ragdoll = self.ixRagdoll
+    local ragdoll = self.wsRagdoll
     if not IsValid(ragdoll) then return end
 
     local curTime = CurTime()
@@ -179,10 +179,10 @@ function ENT:SustainFire()
     local sustainInterval = (ws_fire and ws_fire.constants) and ws_fire.constants.CREMATION_SUSTAIN_INTERVAL or 2
 
     -- Sustain periodically to keep fire consistently burning
-    if self.ixNextFireSustain and curTime < self.ixNextFireSustain then
+    if self.wsNextFireSustain and curTime < self.wsNextFireSustain then
         return
     end
-    self.ixNextFireSustain = curTime + sustainInterval
+    self.wsNextFireSustain = curTime + sustainInterval
 
     -- Get target values from constants
     local targetLife = (ws_fire and ws_fire.constants) and ws_fire.constants.CREMATION_FIRE_LIFE or 10
@@ -220,22 +220,22 @@ end
 -- Handle cremation progress tracking
 function ENT:HandleCremation()
     -- Safety: If ragdoll was removed externally, abort cremation
-    if not IsValid(self.ixRagdoll) then
-        self.ixBurnStartTime = nil
-        self.ixLastBurnThink = nil
+    if not IsValid(self.wsRagdoll) then
+        self.wsBurnStartTime = nil
+        self.wsLastBurnThink = nil
         return
     end
 
     local curTime = CurTime()
 
     -- Initialize burn tracking
-    if not self.ixBurnStartTime then
-        self.ixBurnStartTime = curTime
+    if not self.wsBurnStartTime then
+        self.wsBurnStartTime = curTime
     end
 
     -- Calculate burn progress
-    local burnProgress = self:GetBurnProgress() + (curTime - (self.ixLastBurnThink or curTime))
-    self.ixLastBurnThink = curTime
+    local burnProgress = self:GetBurnProgress() + (curTime - (self.wsLastBurnThink or curTime))
+    self.wsLastBurnThink = curTime
 
     -- Update networked progress (for client-side darkening)
     self:SetBurnProgress(burnProgress)
@@ -244,12 +244,12 @@ function ENT:HandleCremation()
     self:SustainFire()
 
     -- Play burning sounds periodically
-    if not self.ixNextBurnSound or curTime >= self.ixNextBurnSound then
-        local ragdoll = self.ixRagdoll
+    if not self.wsNextBurnSound or curTime >= self.wsNextBurnSound then
+        local ragdoll = self.wsRagdoll
         if IsValid(ragdoll) then
             sound.Play("ambient/fire/mtov_flame2.wav", ragdoll:GetPos(), 60, math.random(90, 110), 0.7)
         end
-        self.ixNextBurnSound = curTime + math.random(4, 6)
+        self.wsNextBurnSound = curTime + math.random(4, 6)
     end
 
     -- Check if cremation complete
@@ -261,16 +261,16 @@ end
 -- Handle cremation completion
 function ENT:CompleteCremation()
     local charName = self:GetCharacterName() or "Unknown"
-    local pos = IsValid(self.ixRagdoll) and self.ixRagdoll:GetPos() or self:GetPos()
+    local pos = IsValid(self.wsRagdoll) and self.wsRagdoll:GetPos() or self:GetPos()
 
     -- Log cremation
-    ix.log.Add(nil, "cremation", charName)
+    ws.log.Add(nil, "cremation", charName)
 
     -- Destroy inventory (items burn with body)
     local invID = self:GetInventoryID()
     if invID and invID > 0 then
         -- Remove from memory
-        ix.item.inventories[invID] = nil
+        ws.item.inventories[invID] = nil
 
         -- Delete items from database
         local itemQuery = mysql:Delete("ix_items")
@@ -287,7 +287,7 @@ function ENT:CompleteCremation()
     self:SetInventoryID(0)
 
     -- Spawn Human Remains item
-    ix.item.Spawn("human_remains", pos, function(item, entity)
+    ws.item.Spawn("human_remains", pos, function(item, entity)
         if item then
             -- Store original character name as data (but not displayed - fog of war)
             item:SetData("originalCharacter", charName)
@@ -317,7 +317,7 @@ end
 function ENT:SetPermadead(value)
     self.dt.Permadead = value
     if value then
-        self.ixPermadeadTime = CurTime()
+        self.wsPermadeadTime = CurTime()
     end
 end
 
@@ -353,9 +353,9 @@ function ENT:Think()
     if isOnFire then
         self:HandleCremation()
         -- Fire also halves knockout timer periodically
-        if not self.ixLastFireDamage or CurTime() - self.ixLastFireDamage >= 2 then
+        if not self.wsLastFireDamage or CurTime() - self.wsLastFireDamage >= 2 then
             self:HalveTimer()
-            self.ixLastFireDamage = CurTime()
+            self.wsLastFireDamage = CurTime()
         end
     elseif burnProgress > 0 then
         -- Cremation started but fire went out - body is fuel, reignite!
@@ -367,7 +367,7 @@ function ENT:Think()
     -- Check knockout timer expiration (for knocked but not dead bodies)
     local remaining = self:GetRemainingTime()
     if remaining <= 0 then
-        local plugin = ix.plugin.Get("permadeath")
+        local plugin = ws.plugin.Get("permadeath")
         if plugin then
             plugin:OnKnockoutExpired(self)
         end
@@ -390,7 +390,7 @@ function ENT:HalveTimer()
     -- Sync to knocked player
     local owner = self:GetOwningPlayer()
     if IsValid(owner) then
-        net.Start("ixKnockoutTimerSync")
+        net.Start("wsKnockoutTimerSync")
             net.WriteFloat(newDuration)
         net.Send(owner)
     end
@@ -404,18 +404,18 @@ function ENT:OnTakeDamage(dmgInfo)
     if self:GetPermadead() then return end
 
     local attacker = dmgInfo:GetAttacker()
-    local plugin = ix.plugin.Get("permadeath")
+    local plugin = ws.plugin.Get("permadeath")
     if not plugin then return end
 
     -- Determine if headshot via damage position relative to ragdoll head bone
     local isHeadshot = false
     local damagePos = dmgInfo:GetDamagePosition()
 
-    if damagePos and damagePos ~= Vector(0, 0, 0) and IsValid(self.ixRagdoll) then
+    if damagePos and damagePos ~= Vector(0, 0, 0) and IsValid(self.wsRagdoll) then
         -- Get the actual head bone position from the ragdoll
-        local headBone = self.ixRagdoll:LookupBone("ValveBiped.Bip01_Head1")
+        local headBone = self.wsRagdoll:LookupBone("ValveBiped.Bip01_Head1")
         if headBone then
-            local headPos = self.ixRagdoll:GetBonePosition(headBone)
+            local headPos = self.wsRagdoll:GetBonePosition(headBone)
             if headPos then
                 local distToHead = damagePos:Distance(headPos)
                 -- Consider it a headshot if damage is within 12 units of head bone
@@ -429,7 +429,7 @@ function ENT:OnTakeDamage(dmgInfo)
         if math.random() < 0.5 then
             -- Execution
             local charID = self:GetCharacterID()
-            local character = ix.char.loaded[charID]
+            local character = ws.char.loaded[charID]
 
             if character then
                 local owner = self:GetOwningPlayer()
@@ -461,13 +461,13 @@ end
 -- USE / REVIVAL
 -- ============================================================================
 
--- Note: Primary interaction is now handled via net messages (ixKnockoutLoot/ixKnockoutRevive)
+-- Note: Primary interaction is now handled via net messages (wsKnockoutLoot/wsKnockoutRevive)
 -- This Use function is kept as a fallback and for compatibility
 function ENT:Use(activator, caller)
     if not IsValid(activator) or not activator:IsPlayer() then return end
 
     -- Block Use for 2 seconds after revival attempt to prevent CPR from triggering loot
-    if self.ixLastReviveAttempt and CurTime() - self.ixLastReviveAttempt < 2 then
+    if self.wsLastReviveAttempt and CurTime() - self.wsLastReviveAttempt < 2 then
         return
     end
 
@@ -491,7 +491,7 @@ function ENT:GetEntityMenu(client)
     if not self:GetPermadead() then
         -- Revive option
         options[L("attemptRevival")] = function()
-            local plugin = ix.plugin.Get("permadeath")
+            local plugin = ws.plugin.Get("permadeath")
             if plugin then
                 plugin:AttemptRevival(client, self)
             end
@@ -535,14 +535,14 @@ function ENT:OpenInventory(client)
         return
     end
 
-    local inventory = ix.item.inventories[invID]
+    local inventory = ws.item.inventories[invID]
     if not inventory then
         client:NotifyLocalized("noInventory")
         return
     end
 
     -- Play looting sound (rustling through gear)
-    local ragdoll = self.ixRagdoll
+    local ragdoll = self.wsRagdoll
     local soundPos = IsValid(ragdoll) and ragdoll:GetPos() or self:GetPos()
     sound.Play(lootSounds[math.random(#lootSounds)], soundPos, 60, 100, 0.8)
 
@@ -557,7 +557,7 @@ function ENT:OpenInventory(client)
     -- DoStaredAction traces to check if player is looking at the entity,
     -- so we need to pass the visible ragdoll they're actually looking at
     local stareEntity = IsValid(ragdoll) and ragdoll or self
-    ix.storage.Open(client, inventory, {
+    ws.storage.Open(client, inventory, {
         name = name .. "'s Body",
         entity = stareEntity,
         searchTime = 1,
@@ -571,8 +571,8 @@ end
 
 function ENT:OnRemove()
     -- Remove the ragdoll
-    if IsValid(self.ixRagdoll) then
-        self.ixRagdoll:Remove()
+    if IsValid(self.wsRagdoll) then
+        self.wsRagdoll:Remove()
     end
 
     -- Clear any revival in progress
@@ -584,14 +584,14 @@ function ENT:OnRemove()
     -- Clear reference from owner
     local owner = self:GetOwningPlayer()
     if IsValid(owner) then
-        owner.ixKnockedEntity = nil
+        owner.wsKnockedEntity = nil
     end
 
     -- Clean up from plugin tracking table to prevent memory leaks
-    if self.ixSteamID64 then
-        local plugin = ix.plugin.Get("permadeath")
+    if self.wsSteamID64 then
+        local plugin = ws.plugin.Get("permadeath")
         if plugin and plugin.knockedEntities then
-            plugin.knockedEntities[self.ixSteamID64] = nil
+            plugin.knockedEntities[self.wsSteamID64] = nil
         end
     end
 
@@ -600,7 +600,7 @@ function ENT:OnRemove()
         local invID = self:GetInventoryID()
         if invID and invID > 0 then
             -- Remove from memory
-            ix.item.inventories[invID] = nil
+            ws.item.inventories[invID] = nil
 
             -- Delete items from database
             local itemQuery = mysql:Delete("ix_items")

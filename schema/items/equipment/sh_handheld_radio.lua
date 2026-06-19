@@ -55,7 +55,7 @@ if CLIENT then
 
         -- Draw enabled indicator (green dot)
         if isEnabled then
-            ix.constants.DrawEquippedIndicator(w, h)
+            ws.constants.DrawEquippedIndicator(w, h)
         end
 
         -- Draw battery bar (single battery)
@@ -68,7 +68,7 @@ if CLIENT then
 
             -- Charge fill
             local chargeWidth = ((w - 8) / 100) * charge
-            surface.SetDrawColor(ix.constants.GetChargeColor(charge))
+            surface.SetDrawColor(ws.constants.GetChargeColor(charge))
             surface.DrawRect(4, h - 12, chargeWidth, 8)
         end
     end
@@ -91,7 +91,7 @@ if CLIENT then
         statusRow:SizeToContents()
 
         -- Volume row
-        ix.constants.AddTooltipRow(tooltip, "volume", string.format("Volume: %d%%", volume), Color(75, 75, 100))
+        ws.constants.AddTooltipRow(tooltip, "volume", string.format("Volume: %d%%", volume), Color(75, 75, 100))
 
         -- Battery row
         local batteryRow = tooltip:AddRow("battery")
@@ -102,12 +102,12 @@ if CLIENT then
             local charge = batteries[1]
             batteryRow:SetText(string.format("Battery: %dup / 100up", charge))
 
-            batteryRow:SetBackgroundColor(ix.constants.GetChargeColorDark(charge))
+            batteryRow:SetBackgroundColor(ws.constants.GetChargeColorDark(charge))
         end
         batteryRow:SizeToContents()
 
         -- Usage hint
-        ix.constants.AddTooltipRow(tooltip, "hint", "Hold H to transmit voice", Color(60, 60, 80))
+        ws.constants.AddTooltipRow(tooltip, "hint", "Hold H to transmit voice", Color(60, 60, 80))
     end
 end
 
@@ -217,7 +217,7 @@ ITEM.functions.Toggle = {
 
         -- Start/stop idle drain timer
         if SERVER then
-            local timerName = "ixRadioIdleDrain_" .. item:GetID()
+            local timerName = "wsRadioIdleDrain_" .. item:GetID()
             if newState then
                 timer.Create(timerName, 1, 0, function()
                     if not item or not item:GetData("enabled") then
@@ -244,7 +244,7 @@ ITEM.functions.Frequency = {
     tip = "Tune to a frequency.",
     icon = "icon16/transmit.png",
     OnRun = function(item)
-        netstream.Start(item.player, "ixRadioFrequency", item:GetData("frequency", "100.0"))
+        netstream.Start(item.player, "wsRadioFrequency", item:GetData("frequency", "100.0"))
         return false
     end,
     OnCanRun = function(item)
@@ -258,7 +258,7 @@ ITEM.functions.Volume = {
     tip = "Adjust receive volume.",
     icon = "icon16/sound.png",
     OnRun = function(item)
-        net.Start("ixRadioVolume")
+        net.Start("wsRadioVolume")
         net.WriteUInt(item:GetID(), 32)
         net.WriteUInt(item:GetData("volume", 50), 7)  -- 0-100 fits in 7 bits
         net.Send(item.player)
@@ -281,7 +281,7 @@ function ITEM.postHooks.drop(item, status)
 
         -- Stop drain timer
         if SERVER then
-            timer.Remove("ixRadioIdleDrain_" .. item:GetID())
+            timer.Remove("wsRadioIdleDrain_" .. item:GetID())
         end
 
         -- Update cache
@@ -298,7 +298,7 @@ end
 -- Clean up timer when item is removed
 function ITEM:OnRemoved()
     if SERVER then
-        timer.Remove("ixRadioIdleDrain_" .. self:GetID())
+        timer.Remove("wsRadioIdleDrain_" .. self:GetID())
     end
 end
 
@@ -311,7 +311,7 @@ function ITEM:OnLoadout()
             return
         end
 
-        local timerName = "ixRadioIdleDrain_" .. self:GetID()
+        local timerName = "wsRadioIdleDrain_" .. self:GetID()
         timer.Create(timerName, 1, 0, function()
             if not self or not self:GetData("enabled") then
                 timer.Remove(timerName)

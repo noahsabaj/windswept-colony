@@ -53,7 +53,7 @@ ITEM.functions.Rename = {
                     item.name = text
 
                     -- Update inventory
-                    local inventory = ix.item.inventories[item.invID]
+                    local inventory = ws.item.inventories[item.invID]
                     if inventory then
                         inventory:SendSlot(item.gridX, item.gridY, item)
                     end
@@ -83,6 +83,6 @@ end
 function ITEM:PopulateTooltip(tooltip)
     local customName = self:GetData("customName")
     if customName then
-        ix.constants.AddTooltipRow(tooltip, "note", "Labeled: " .. customName, Color(50, 50, 50))
+        ws.constants.AddTooltipRow(tooltip, "note", "Labeled: " .. customName, Color(50, 50, 50))
     end
 end

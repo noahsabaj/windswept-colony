@@ -24,7 +24,7 @@ function PANEL:Init()
     self.paperLabel:Dock(TOP)
     self.paperLabel:DockMargin(10, 5, 10, 0)
     self.paperLabel:SetText("Select Paper:")
-    self.paperLabel:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
+    self.paperLabel:SetTextColor(ws.constants.COLOR_UI_NEUTRAL)
 
     self.paperSelect = vgui.Create("DComboBox", self)
     self.paperSelect:Dock(TOP)
@@ -40,21 +40,21 @@ function PANEL:Init()
     self.contentLabel:Dock(TOP)
     self.contentLabel:DockMargin(10, 5, 10, 0)
     self.contentLabel:SetText("Type your document:")
-    self.contentLabel:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
+    self.contentLabel:SetTextColor(ws.constants.COLOR_UI_NEUTRAL)
 
     self.content = vgui.Create("DTextEntry", self)
     self.content:Dock(FILL)
     self.content:DockMargin(10, 5, 10, 10)
     self.content:SetMultiline(true)
     self.content:SetPlaceholderText("Begin typing...")
-    self.content:SetFont("ixTypewriterFont")
+    self.content:SetFont("wsTypewriterFont")
     self.content:SetEnabled(false)  -- Disabled until paper selected
     self.content.OnChange = function()
         self:UpdateCharCounter()
     end
 
     -- Create monospace font for typewriter effect
-    surface.CreateFont("ixTypewriterFont", {
+    surface.CreateFont("wsTypewriterFont", {
         font = "Courier New",
         size = 16,
         weight = 500
@@ -71,10 +71,10 @@ function PANEL:Init()
     self.charCounter:Dock(TOP)
     self.charCounter:DockMargin(10, 5, 10, 5)
     self.charCounter:SetText("Characters: 0")
-    self.charCounter:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
+    self.charCounter:SetTextColor(ws.constants.COLOR_UI_NEUTRAL)
 
     -- Button panel
-    local btnPanel, btns = ix.constants.CreateButtonBar(bottomPanel, {
+    local btnPanel, btns = ws.constants.CreateButtonBar(bottomPanel, {
         {"Cancel", 80, RIGHT, function() self:Close() end},
         {"Type", 80, RIGHT, function() self:TypeDocument() end},
     })
@@ -119,10 +119,10 @@ function PANEL:UpdateCharCounter()
     local charCount = #self.content:GetValue()
     self.charCounter:SetText(string.format("Characters: %d", charCount))
 
-    if charCount > ix.documents.MAX_CONTENT_LENGTH then
+    if charCount > ws.documents.MAX_CONTENT_LENGTH then
         self.charCounter:SetTextColor(Color(255, 100, 100))
     else
-        self.charCounter:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
+        self.charCounter:SetTextColor(ws.constants.COLOR_UI_NEUTRAL)
     end
 end
 
@@ -139,7 +139,7 @@ function PANEL:TypeDocument()
     end
 
     -- Send to server
-    net.Start("ixTypewriterWrite")
+    net.Start("wsTypewriterWrite")
         net.WriteEntity(self.typewriter)
         net.WriteUInt(self.selectedPaper, 32)
         net.WriteString(content)
@@ -155,10 +155,10 @@ end
 function PANEL:OnRemove()
     -- Make sure we notify server
     if IsValid(self.typewriter) then
-        net.Start("ixTypewriterClose")
+        net.Start("wsTypewriterClose")
             net.WriteEntity(self.typewriter)
         net.SendToServer()
     end
 end
 
-vgui.Register("ixTypewriterUI", PANEL, "DFrame")
+vgui.Register("wsTypewriterUI", PANEL, "DFrame")

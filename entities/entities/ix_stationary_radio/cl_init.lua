@@ -20,7 +20,7 @@ local function ClosePanel()
     activePanel = nil
 
     if IsValid(activeEntity) then
-        net.Start("ixStationaryRadioClose")
+        net.Start("wsStationaryRadioClose")
         net.WriteEntity(activeEntity)
         net.SendToServer()
     end
@@ -39,7 +39,7 @@ local function CreateChannelRow(parent, channelNum, ent)
     local label = vgui.Create("DLabel", row)
     label:SetPos(8, 6)
     label:SetText("CH" .. channelNum)
-    label:SetFont("ixSmallFont")
+    label:SetFont("wsSmallFont")
     label:SizeToContents()
 
     -- Frequency controls
@@ -52,15 +52,15 @@ local function CreateChannelRow(parent, channelNum, ent)
     btnLeft:SetPos(0, 0)
     btnLeft:SetSize(20, 24)
     btnLeft:SetText("<")
-    btnLeft:SetFont("ixSmallFont")
+    btnLeft:SetFont("wsSmallFont")
     btnLeft.DoClick = function()
         local getter = ent["GetCh" .. channelNum .. "Freq"]
         if not getter then return end
 
         local currentFreq = getter(ent) or "100.0"
-        local newFreq = ix.radio.DecrementFrequency(currentFreq)
+        local newFreq = ws.radio.DecrementFrequency(currentFreq)
 
-        net.Start("ixStationaryRadioConfig")
+        net.Start("wsStationaryRadioConfig")
         net.WriteEntity(ent)
         net.WriteUInt(channelNum, 3)
         net.WriteString("freq")
@@ -72,21 +72,21 @@ local function CreateChannelRow(parent, channelNum, ent)
     freqLabel:SetPos(22, 4)
     freqLabel:SetSize(56, 16)
     freqLabel:SetContentAlignment(5) -- Center
-    freqLabel:SetFont("ixSmallFont")
+    freqLabel:SetFont("wsSmallFont")
 
     local btnRight = vgui.Create("DButton", freqPanel)
     btnRight:SetPos(80, 0)
     btnRight:SetSize(20, 24)
     btnRight:SetText(">")
-    btnRight:SetFont("ixSmallFont")
+    btnRight:SetFont("wsSmallFont")
     btnRight.DoClick = function()
         local getter = ent["GetCh" .. channelNum .. "Freq"]
         if not getter then return end
 
         local currentFreq = getter(ent) or "100.0"
-        local newFreq = ix.radio.IncrementFrequency(currentFreq)
+        local newFreq = ws.radio.IncrementFrequency(currentFreq)
 
-        net.Start("ixStationaryRadioConfig")
+        net.Start("wsStationaryRadioConfig")
         net.WriteEntity(ent)
         net.WriteUInt(channelNum, 3)
         net.WriteString("freq")
@@ -98,14 +98,14 @@ local function CreateChannelRow(parent, channelNum, ent)
     local btnTX = vgui.Create("DButton", row)
     btnTX:SetPos(160, 4)
     btnTX:SetSize(60, 24)
-    btnTX:SetFont("ixSmallFont")
+    btnTX:SetFont("wsSmallFont")
     btnTX.DoClick = function()
         local getter = ent["GetCh" .. channelNum .. "TX"]
         if not getter then return end
 
         local newValue = not getter(ent)
 
-        net.Start("ixStationaryRadioConfig")
+        net.Start("wsStationaryRadioConfig")
         net.WriteEntity(ent)
         net.WriteUInt(channelNum, 3)
         net.WriteString("tx")
@@ -117,14 +117,14 @@ local function CreateChannelRow(parent, channelNum, ent)
     local btnRX = vgui.Create("DButton", row)
     btnRX:SetPos(225, 4)
     btnRX:SetSize(60, 24)
-    btnRX:SetFont("ixSmallFont")
+    btnRX:SetFont("wsSmallFont")
     btnRX.DoClick = function()
         local getter = ent["GetCh" .. channelNum .. "RX"]
         if not getter then return end
 
         local newValue = not getter(ent)
 
-        net.Start("ixStationaryRadioConfig")
+        net.Start("wsStationaryRadioConfig")
         net.WriteEntity(ent)
         net.WriteUInt(channelNum, 3)
         net.WriteString("rx")
@@ -136,7 +136,7 @@ local function CreateChannelRow(parent, channelNum, ent)
     local volLabel = vgui.Create("DLabel", row)
     volLabel:SetPos(295, 6)
     volLabel:SetText("VOL")
-    volLabel:SetFont("ixSmallFont")
+    volLabel:SetFont("wsSmallFont")
     volLabel:SizeToContents()
 
     -- Volume slider
@@ -148,7 +148,7 @@ local function CreateChannelRow(parent, channelNum, ent)
     volSlider.OnValueChanged = function(self, x, y)
         local vol = math.floor(x * 100)
 
-        net.Start("ixStationaryRadioConfig")
+        net.Start("wsStationaryRadioConfig")
         net.WriteEntity(ent)
         net.WriteUInt(channelNum, 3)
         net.WriteString("vol")
@@ -174,7 +174,7 @@ local function CreateChannelRow(parent, channelNum, ent)
             if txOn then
                 btnTX:SetTextColor(Color(255, 100, 100))
             else
-                btnTX:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
+                btnTX:SetTextColor(ws.constants.COLOR_UI_NEUTRAL)
             end
         end
 
@@ -186,7 +186,7 @@ local function CreateChannelRow(parent, channelNum, ent)
             if rxOn then
                 btnRX:SetTextColor(Color(100, 255, 100))
             else
-                btnRX:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
+                btnRX:SetTextColor(ws.constants.COLOR_UI_NEUTRAL)
             end
         end
 
@@ -249,12 +249,12 @@ local function OpenStationaryRadioUI(ent)
     textEntry:SetPos(10, 10)
     textEntry:SetSize(420, 30)
     textEntry:SetPlaceholderText("Type message here...")
-    textEntry:SetFont("ixSmallFont")
+    textEntry:SetFont("wsSmallFont")
 
     textEntry.OnEnter = function(self)
         local msg = self:GetValue()
         if msg and msg ~= "" then
-            net.Start("ixStationaryRadioTransmit")
+            net.Start("wsStationaryRadioTransmit")
             net.WriteEntity(ent)
             net.WriteString(msg)
             net.SendToServer()
@@ -268,11 +268,11 @@ local function OpenStationaryRadioUI(ent)
     btnTransmit:SetPos(260, 45)
     btnTransmit:SetSize(80, 28)
     btnTransmit:SetText("TRANSMIT")
-    btnTransmit:SetFont("ixSmallFont")
+    btnTransmit:SetFont("wsSmallFont")
     btnTransmit.DoClick = function()
         local msg = textEntry:GetValue()
         if msg and msg ~= "" then
-            net.Start("ixStationaryRadioTransmit")
+            net.Start("wsStationaryRadioTransmit")
             net.WriteEntity(ent)
             net.WriteString(msg)
             net.SendToServer()
@@ -285,14 +285,14 @@ local function OpenStationaryRadioUI(ent)
     local btnMic = vgui.Create("DButton", bottomPanel)
     btnMic:SetPos(350, 45)
     btnMic:SetSize(80, 28)
-    btnMic:SetFont("ixSmallFont")
+    btnMic:SetFont("wsSmallFont")
 
     btnMic.DoClick = function()
         if not IsValid(ent) then return end
 
         local newState = not ent:GetMicOn()
 
-        net.Start("ixStationaryRadioMic")
+        net.Start("wsStationaryRadioMic")
         net.WriteEntity(ent)
         net.WriteBool(newState)
         net.SendToServer()
@@ -307,7 +307,7 @@ local function OpenStationaryRadioUI(ent)
         if micOn then
             self:SetTextColor(Color(255, 100, 100))
         else
-            self:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
+            self:SetTextColor(ws.constants.COLOR_UI_NEUTRAL)
         end
     end
 
@@ -328,19 +328,19 @@ local function OpenStationaryRadioUI(ent)
 end
 
 -- Network receiver to open UI
-net.Receive("ixStationaryRadioOpen", function()
+net.Receive("wsStationaryRadioOpen", function()
     local ent = net.ReadEntity()
     OpenStationaryRadioUI(ent)
 end)
 
 -- Close panel when dying or disconnecting
-hook.Add("PlayerDeath", "ixStationaryRadioClose", function(victim)
+hook.Add("PlayerDeath", "wsStationaryRadioClose", function(victim)
     if victim == LocalPlayer() and IsValid(activePanel) then
         ClosePanel()
     end
 end)
 
-hook.Add("OnReloaded", "ixStationaryRadioClose", function()
+hook.Add("OnReloaded", "wsStationaryRadioClose", function()
     if IsValid(activePanel) then
         activePanel:Remove()
         activePanel = nil

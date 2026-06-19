@@ -139,7 +139,7 @@ function ENT:Draw3D2DInfo(alpha)
         lockColor = Color(50, 200, 50, alpha)
     end
 
-    draw.SimpleText(lockText, "ixMediumFont", 0, -15, lockColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+    draw.SimpleText(lockText, "wsMediumFont", 0, -15, lockColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 
     -- Health bar
     local healthPercent = maxHealth > 0 and (health / maxHealth) or 0
@@ -176,7 +176,7 @@ local DOOR_CACHE_INTERVAL = 0.2  -- Refresh every 0.2 seconds
 -- Pre-create color to avoid allocation in render loop
 local pulseColor = Color(100, 200, 100, 100)
 
-hook.Add("PostDrawTranslucentRenderables", "ixPhysicalDoorPulse", function()
+hook.Add("PostDrawTranslucentRenderables", "wsPhysicalDoorPulse", function()
     local ply = LocalPlayer()
     local weapon = ply:GetActiveWeapon()
 

@@ -25,7 +25,7 @@ end
 
 -- Equippable configuration
 ITEM.equipWeaponClass = "ix_personalid"
-ITEM.equipPlayerKey = "ixPersonalIDItem"
+ITEM.equipPlayerKey = "wsPersonalIDItem"
 ITEM.equipNotifyKey = "idCardEquipped"
 ITEM.equipSound = "physics/cardboard/cardboard_box_impact_soft1.wav"
 ITEM.equipTip = "Hold the ID card in your hand."
@@ -41,14 +41,14 @@ function ITEM:GetIDCardData()
 
     -- Determine sex from model
     local sex = "M"
-    if physical.model and ix.physical.IsFemaleModel(physical.model) then
+    if physical.model and ws.physical.IsFemaleModel(physical.model) then
         sex = "F"
     end
 
     -- Format date of birth
     local dob = "Unknown"
     if physical.birthMonth and physical.birthDay and physical.age then
-        dob = ix.birthdata.FormatDate(physical.birthMonth, physical.birthDay, physical.age)
+        dob = ws.birthdata.FormatDate(physical.birthMonth, physical.birthDay, physical.age)
     end
 
     return {
@@ -79,7 +79,7 @@ function ITEM:GetDescription()
 
     -- Determine sex from model
     local sex = "M"
-    if physical.model and ix.physical.IsFemaleModel(physical.model) then
+    if physical.model and ws.physical.IsFemaleModel(physical.model) then
         sex = "F"
     end
 
@@ -93,7 +93,7 @@ function ITEM:GetDescription()
 
     -- Add birth info if available
     if physical.birthMonth and physical.birthDay and physical.age then
-        local dob = ix.birthdata.FormatDate(physical.birthMonth, physical.birthDay, physical.age)
+        local dob = ws.birthdata.FormatDate(physical.birthMonth, physical.birthDay, physical.age)
         table.insert(lines, "DOB: " .. dob)
     end
 
@@ -112,13 +112,13 @@ function ITEM:GetDescription()
 
         -- Height (imperial + metric)
         if physical.height then
-            local feet, inches = ix.physical.CmToImperial(physical.height)
+            local feet, inches = ws.physical.CmToImperial(physical.height)
             table.insert(lines, string.format("Height: %d'%d\" (%dcm)", feet, inches, physical.height))
         end
 
         -- Weight (imperial + metric)
         if physical.weight then
-            local kg = ix.physical.LbsToKg(physical.weight)
+            local kg = ws.physical.LbsToKg(physical.weight)
             table.insert(lines, string.format("Weight: %dlbs (%dkg)", physical.weight, kg))
         end
 

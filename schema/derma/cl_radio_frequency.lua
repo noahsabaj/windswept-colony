@@ -16,7 +16,7 @@ local COLOR_DIGIT_BORDER = Color(80, 80, 80)
 local COLOR_ARROW = Color(255, 255, 255, 150)
 local COLOR_ARROW_HOVER = Color(255, 255, 255, 255)
 local COLOR_TEXT = Color(255, 255, 255)
-local COLOR_DECIMAL = ix.constants.COLOR_UI_NEUTRAL
+local COLOR_DECIMAL = ws.constants.COLOR_UI_NEUTRAL
 
 local PANEL = {}
 
@@ -25,14 +25,14 @@ function PANEL:Init()
     self.confirmedDigits = {0, 0, 0, 0}  -- Last confirmed state
 
     -- Calculate sizes based on fonts
-    surface.SetFont("ixBigFont")
+    surface.SetFont("wsBigFont")
     local digitTextW, digitTextH = surface.GetTextSize("0")
 
-    surface.SetFont("ixMediumFont")
+    surface.SetFont("wsMediumFont")
     local arrowTextW, arrowTextH = surface.GetTextSize("▲")
     local headerTextW, headerTextH = surface.GetTextSize("Set Frequency")
 
-    surface.SetFont("ixSmallFont")
+    surface.SetFont("wsSmallFont")
     local buttonTextW, buttonTextH = surface.GetTextSize("Confirm")
 
     -- Store computed sizes
@@ -64,7 +64,7 @@ end
 
 function PANEL:BuildUI()
     -- Header
-    self.header, self.closeBtn = ix.constants.CreateHeaderBar(self, "Set Frequency", self.headerHeight, function()
+    self.header, self.closeBtn = ws.constants.CreateHeaderBar(self, "Set Frequency", self.headerHeight, function()
         self:Remove()
     end)
 
@@ -86,7 +86,7 @@ function PANEL:BuildUI()
         local decimalX = (w - totalWidth) / 2 + (digitSize * 3) + (digitSpacing * 3) + (decimalWidth / 2)
         local decimalY = arrowHeight + digitSize - ScreenScale(4)
 
-        draw.SimpleText("•", "ixBigFont", decimalX, decimalY, COLOR_DECIMAL, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+        draw.SimpleText("•", "wsBigFont", decimalX, decimalY, COLOR_DECIMAL, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
     end
 
     -- Create digit spinners
@@ -101,7 +101,7 @@ function PANEL:BuildUI()
     self.buttonArea.Paint = function() end
 
     -- Calculate button width based on text
-    surface.SetFont("ixSmallFont")
+    surface.SetFont("wsSmallFont")
     local cancelW = surface.GetTextSize("Cancel")
     local resetW = surface.GetTextSize("Reset")
     local confirmW = surface.GetTextSize("Confirm")
@@ -111,8 +111,8 @@ function PANEL:BuildUI()
     -- Cancel button
     self.cancelBtn = self.buttonArea:Add("DButton")
     self.cancelBtn:SetText("Cancel")
-    self.cancelBtn:SetFont("ixSmallFont")
-    self.cancelBtn:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
+    self.cancelBtn:SetFont("wsSmallFont")
+    self.cancelBtn:SetTextColor(ws.constants.COLOR_UI_NEUTRAL)
     self.cancelBtn:Dock(LEFT)
     self.cancelBtn:SetWide(buttonWidth)
     self.cancelBtn.Paint = function(btn, w, h)
@@ -132,8 +132,8 @@ function PANEL:BuildUI()
     -- Confirm button
     self.confirmBtn = self.buttonArea:Add("DButton")
     self.confirmBtn:SetText("Confirm")
-    self.confirmBtn:SetFont("ixSmallFont")
-    self.confirmBtn:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
+    self.confirmBtn:SetFont("wsSmallFont")
+    self.confirmBtn:SetTextColor(ws.constants.COLOR_UI_NEUTRAL)
     self.confirmBtn:Dock(RIGHT)
     self.confirmBtn:SetWide(buttonWidth)
     self.confirmBtn.Paint = function(btn, w, h)
@@ -144,7 +144,7 @@ function PANEL:BuildUI()
     end
     self.confirmBtn.DoClick = function()
         local freq = self:GetFrequencyString()
-        ix.command.Send("SetFreq", freq)
+        ws.command.Send("SetFreq", freq)
 
         -- Update confirmed state
         for i = 1, 4 do
@@ -158,8 +158,8 @@ function PANEL:BuildUI()
     -- Reset button (center)
     self.resetBtn = self.buttonArea:Add("DButton")
     self.resetBtn:SetText("Reset")
-    self.resetBtn:SetFont("ixSmallFont")
-    self.resetBtn:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
+    self.resetBtn:SetFont("wsSmallFont")
+    self.resetBtn:SetTextColor(ws.constants.COLOR_UI_NEUTRAL)
     self.resetBtn:Dock(FILL)
     self.resetBtn:DockMargin(self.digitSpacing, 0, self.digitSpacing, 0)
     self.resetBtn.Paint = function(btn, w, h)
@@ -225,7 +225,7 @@ function PANEL:CreateDigitSpinners()
             -- Up arrow
             local upHovered = pnl.upHovered
             local upColor = upHovered and COLOR_ARROW_HOVER or COLOR_ARROW
-            draw.SimpleText("▲", "ixMediumFont", w/2, arrowHeight/2, upColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+            draw.SimpleText("▲", "wsMediumFont", w/2, arrowHeight/2, upColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 
             -- Digit box
             draw.RoundedBox(4, 0, midY, w, digitSize, COLOR_DIGIT_BG)
@@ -234,13 +234,13 @@ function PANEL:CreateDigitSpinners()
 
             -- Digit text
             local digit = pnl.parent.digits[pnl.digitIndex] or 0
-            draw.SimpleText(tostring(digit), "ixBigFont", w/2, midY + digitSize/2, COLOR_TEXT, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+            draw.SimpleText(tostring(digit), "wsBigFont", w/2, midY + digitSize/2, COLOR_TEXT, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 
             -- Down arrow
             local downY = midY + digitSize
             local downHovered = pnl.downHovered
             local downColor = downHovered and COLOR_ARROW_HOVER or COLOR_ARROW
-            draw.SimpleText("▼", "ixMediumFont", w/2, downY + arrowHeight/2, downColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+            draw.SimpleText("▼", "wsMediumFont", w/2, downY + arrowHeight/2, downColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
         end
 
         digitPanel.OnCursorMoved = function(pnl, x, y)
@@ -290,4 +290,4 @@ function PANEL:OnKeyCodePressed(key)
     end
 end
 
-vgui.Register("ixRadioFrequency", PANEL, "DFrame")
+vgui.Register("wsRadioFrequency", PANEL, "DFrame")

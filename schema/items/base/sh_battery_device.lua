@@ -6,7 +6,7 @@
 
     Override these properties in child items:
     - ITEM.weaponClass          (string)  SWEP class name, e.g., "ix_flashlight"
-    - ITEM.playerItemKey        (string)  Player variable, e.g., "ixFlashlightItem"
+    - ITEM.playerItemKey        (string)  Player variable, e.g., "wsFlashlightItem"
     - ITEM.maxBatteries         (number)  Battery slot count, default 1
     - ITEM.equipSound           (string)  Sound on equip
     - ITEM.unequipSound         (string)  Sound on unequip (optional, uses equipSound at lower pitch)
@@ -114,12 +114,12 @@ end
 
 -- Auto-eject depleted batteries if enabled
 function ITEM:AutoEjectDepleted(client)
-    if not ix.option.Get(client, "batteryAutoEject", true) then
+    if not ws.option.Get(client, "batteryAutoEject", true) then
         return false
     end
 
     local batteries = self:GetBatteries()
-    local character, inventory = ix.constants.GetCharacterInventory(client)
+    local character, inventory = ws.constants.GetCharacterInventory(client)
     if not character or not inventory then return false end
 
     local ejected = false
@@ -148,7 +148,7 @@ end
 
 -- Auto-load battery from inventory if enabled
 function ITEM:AutoLoadFromInventory(client)
-    if not ix.option.Get(client, "batteryAutoLoad", true) then
+    if not ws.option.Get(client, "batteryAutoLoad", true) then
         return false
     end
 
@@ -157,7 +157,7 @@ function ITEM:AutoLoadFromInventory(client)
         return false
     end
 
-    local character, inventory = ix.constants.GetCharacterInventory(client)
+    local character, inventory = ws.constants.GetCharacterInventory(client)
     if not character or not inventory then return false end
 
     local bestBattery, bestCharge = self:FindBestBatteryInInventory(inventory)
@@ -188,7 +188,7 @@ if CLIENT then
 
         -- Draw equipped indicator (green dot)
         if isEquipped then
-            ix.constants.DrawEquippedIndicator(w, h)
+            ws.constants.DrawEquippedIndicator(w, h)
         end
 
         -- Draw battery bar(s)
@@ -203,7 +203,7 @@ if CLIENT then
 
                 -- Charge fill with granular colors
                 local chargeWidth = ((w - 8) / 100) * charge
-                surface.SetDrawColor(ix.constants.GetChargeColor(charge))
+                surface.SetDrawColor(ws.constants.GetChargeColor(charge))
                 surface.DrawRect(4, h - 12, chargeWidth, 8)
             end
         else
@@ -248,7 +248,7 @@ if CLIENT then
             local charge = batteries[1]
             batteryRow:SetText(string.format("Battery: %dup / 100up", charge))
 
-            batteryRow:SetBackgroundColor(ix.constants.GetChargeColorDark(charge))
+            batteryRow:SetBackgroundColor(ws.constants.GetChargeColorDark(charge))
         else
             -- Multiple battery display (defibrillator style)
             local fullCount, partialCount, depletedCount = 0, 0, 0
@@ -274,7 +274,7 @@ if CLIENT then
 
         -- Add requirement note for full-battery devices
         if self.requireFullBattery then
-            ix.constants.AddTooltipRow(tooltip, "requirement", "Requires fully charged batteries (100up)", Color(75, 75, 100))
+            ws.constants.AddTooltipRow(tooltip, "requirement", "Requires fully charged batteries (100up)", Color(75, 75, 100))
         end
     end
 end
@@ -290,10 +290,10 @@ ITEM.functions.LoadBattery = {
     isMulti = true,
     multiOptions = function(item, client)
         local options = {}
-        local character, inventory = ix.constants.GetCharacterInventory(client)
+        local character, inventory = ws.constants.GetCharacterInventory(client)
         if not character or not inventory then return options end
 
-        local filterEmpty = ix.option.Get(client, "batteryFilterEmpty", true)
+        local filterEmpty = ws.option.Get(client, "batteryFilterEmpty", true)
 
         for _, invItem in pairs(inventory:GetItems()) do
             if invItem.uniqueID == "battery" then
@@ -328,12 +328,17 @@ ITEM.functions.LoadBattery = {
     end,
     OnRun = function(item, data)
         local client = item.player
-        local batteryID = data and data.batteryID
+        if not IsValid(client) then return false end
 
+        local batteryID = data and data.batteryID
         if not batteryID then return false end
 
-        local batteryItem = ix.item.instances[batteryID]
-        if not batteryItem or batteryItem.uniqueID ~= "battery" then
+        -- Validate the battery belongs to the caller. Helix only ownership-checks
+        -- the acting item (the device); arbitrary data fields like batteryID are
+        -- attacker-controlled, so without this a crafted ID could consume another
+        -- player's (or a dropped) battery.
+        local batteryItem = ws.constants.VerifyItemAccessible(client, batteryID, "battery")
+        if not batteryItem then
             return false
         end
 
@@ -368,7 +373,7 @@ ITEM.functions.LoadBattery = {
         local client = item.player
         if not IsValid(client) then return false end
 
-        local character, inventory = ix.constants.GetCharacterInventory(client)
+        local character, inventory = ws.constants.GetCharacterInventory(client)
         if not character or not inventory then return false end
 
         for _, invItem in pairs(inventory:GetItems()) do
@@ -468,7 +473,7 @@ ITEM.functions.Equip = {
         -- Give the SWEP
         local weapon = client:Give(item.weaponClass)
         if IsValid(weapon) then
-            weapon.ixItem = item
+            weapon.wsItem = item
             client:SelectWeapon(item.weaponClass)
         end
 
@@ -577,7 +582,7 @@ function ITEM:OnLoadout()
 
         local weapon = client:Give(self.weaponClass, true)
         if IsValid(weapon) then
-            weapon.ixItem = self
+            weapon.wsItem = self
             client[self.playerItemKey] = self
 
             -- Ensure light is off on loadout

@@ -136,7 +136,7 @@ if CLIENT then
     function ITEM:PaintOver(item, w, h)
         local percent = item:GetData(item.resourceName, item.maxResource) / item.maxResource
         local color = item:GetStrokeColor()
-        ix.constants.DrawDurabilityBar(w, h, percent, Color(color[1], color[2], color[3], 255), "thin")
+        ws.constants.DrawDurabilityBar(w, h, percent, Color(color[1], color[2], color[3], 255), "thin")
 
         if item.hasEraser then
             surface.SetDrawColor(255, 150, 180, 200)
@@ -156,7 +156,7 @@ ITEM.functions.combine = {
             return false
         end
 
-        local targetItem = ix.item.instances[data[1]]
+        local targetItem = ws.item.instances[data[1]]
         if not targetItem then return false end
 
         -- Only allow ink cartridge
@@ -186,7 +186,7 @@ ITEM.functions.combine = {
     OnCanRun = function(item, data)
         if not item.canRefill then return false end
 
-        local targetItem = ix.item.instances[data[1]]
+        local targetItem = ws.item.instances[data[1]]
         if not targetItem then return false end
         return targetItem.uniqueID == "ink_cartridge"
     end

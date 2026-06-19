@@ -64,6 +64,6 @@ end
 if CLIENT then
     function ITEM:PaintOver(item, w, h)
         local durPercent = item:GetData("durability", item.maxDurability) / item.maxDurability
-        ix.constants.DrawDurabilityBar(w, h, durPercent, Color(255, 150, 180, 255), "thin")
+        ws.constants.DrawDurabilityBar(w, h, durPercent, Color(255, 150, 180, 255), "thin")
     end
 end

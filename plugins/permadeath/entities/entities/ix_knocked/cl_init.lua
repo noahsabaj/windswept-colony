@@ -90,7 +90,7 @@ local function GetKnockedEntity(ent)
 
     -- prop_ragdoll linked to ix_knocked (via networked variable)
     if ent:GetClass() == "prop_ragdoll" then
-        local knockedEnt = ent:GetNetVar("ixKnockedEntity")
+        local knockedEnt = ent:GetNetVar("wsKnockedEntity")
         if IsValid(knockedEnt) then
             return knockedEnt
         end
@@ -105,7 +105,7 @@ local useKeyTarget = nil
 local reviveSent = false  -- Prevent sending multiple revive requests
 
 -- Custom target ID drawing for knocked bodies (works with ragdolls)
-hook.Add("HUDDrawTargetID", "ixKnockedTargetID", function()
+hook.Add("HUDDrawTargetID", "wsKnockedTargetID", function()
     local client = LocalPlayer()
     local trace = client:GetEyeTrace()
     local knockedEnt = GetKnockedEntity(trace.Entity)
@@ -139,30 +139,30 @@ hook.Add("HUDDrawTargetID", "ixKnockedTargetID", function()
         end
     end
 
-    draw.SimpleTextOutlined(text, "ixMediumFont", pos.x, pos.y, color, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+    draw.SimpleTextOutlined(text, "wsMediumFont", pos.x, pos.y, color, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
 
     -- Add cremation progress if burning
     if isBurning then
         local duration = 240
         local progressText = string.format("Cremation: %d/%ds", math.floor(burnProgress), duration)
-        draw.SimpleTextOutlined(progressText, "ixSmallFont", pos.x, pos.y + 30, Color(255, 200, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+        draw.SimpleTextOutlined(progressText, "wsSmallFont", pos.x, pos.y + 30, Color(255, 200, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
     else
         -- Draw action hints (only when not burning - can't search a burning body)
         local yOffset = 30
-        draw.SimpleTextOutlined("E: Search body", "ixSmallFont", pos.x, pos.y + yOffset, ix.constants.COLOR_UI_NEUTRAL, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+        draw.SimpleTextOutlined("E: Search body", "wsSmallFont", pos.x, pos.y + yOffset, ws.constants.COLOR_UI_NEUTRAL, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
 
         -- Show CPR hint only if not dead and holding hands lowered
         if not knockedEnt:GetPermadead() then
             local weapon = client:GetActiveWeapon()
             if IsValid(weapon) and weapon:GetClass() == "ix_hands" and not client:IsWepRaised() then
-                draw.SimpleTextOutlined("Hold LMB: Attempt CPR", "ixSmallFont", pos.x, pos.y + yOffset + 30, Color(100, 200, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+                draw.SimpleTextOutlined("Hold LMB: Attempt CPR", "wsSmallFont", pos.x, pos.y + yOffset + 30, Color(100, 200, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
             end
         end
     end
 
     -- Draw hold progress bar if holding LMB for CPR on a knocked (not dead) target
     if useKeyDownTime and useKeyTarget == knockedEnt and not knockedEnt:GetPermadead() then
-        local plugin = ix.plugin.Get("permadeath")
+        local plugin = ws.plugin.Get("permadeath")
         local holdTime = plugin and plugin.reviveHoldTime or 1.5
         local progress = math.Clamp((RealTime() - useKeyDownTime) / holdTime, 0, 1)
 
@@ -198,7 +198,7 @@ local cprStartTime = nil
 local cprSent = false
 
 -- Think hook for CPR (Hold LMB with hands lowered)
-hook.Add("Think", "ixKnockedCPR", function()
+hook.Add("Think", "wsKnockedCPR", function()
     local client = LocalPlayer()
     if not IsValid(client) then return end
 
@@ -240,14 +240,14 @@ hook.Add("Think", "ixKnockedCPR", function()
             reviveSent = false
         elseif cprTarget == knockedEnt then
             -- Still holding on same target
-            local plugin = ix.plugin.Get("permadeath")
+            local plugin = ws.plugin.Get("permadeath")
             local holdTime = plugin and plugin.reviveHoldTime or 1.5
             local heldDuration = RealTime() - cprStartTime
 
             -- Check if held long enough
             if heldDuration >= holdTime and not cprSent then
                 -- Threshold reached, send revive request
-                net.Start("ixKnockoutRevive")
+                net.Start("wsKnockoutRevive")
                     net.WriteEntity(knockedEnt)
                 net.SendToServer()
 
@@ -285,7 +285,7 @@ end)
 local wasUseDown = false
 local lastLootTime = 0
 
-hook.Add("Think", "ixKnockedLoot", function()
+hook.Add("Think", "wsKnockedLoot", function()
     local client = LocalPlayer()
     if not IsValid(client) then return end
 
@@ -316,7 +316,7 @@ hook.Add("Think", "ixKnockedLoot", function()
 
         if IsValid(knockedEnt) then
             -- Send loot request
-            net.Start("ixKnockoutLoot")
+            net.Start("wsKnockoutLoot")
                 net.WriteEntity(knockedEnt)
             net.SendToServer()
             lastLootTime = RealTime()
@@ -342,7 +342,7 @@ local COLOR_WHITE = Color(255, 255, 255)
 local CREMATION_DURATION = 240
 
 -- Darken burning ragdolls based on cremation progress
-hook.Add("PreDrawOpaqueRenderables", "ixKnockedBurnDarkening", function()
+hook.Add("PreDrawOpaqueRenderables", "wsKnockedBurnDarkening", function()
     local curTime = RealTime()
 
     -- Update cache periodically - only find KNOCKED ragdolls, not all ragdolls
@@ -354,7 +354,7 @@ hook.Add("PreDrawOpaqueRenderables", "ixKnockedBurnDarkening", function()
         -- Only iterate ragdolls once per cache interval
         for _, ragdoll in ipairs(ents.FindByClass("prop_ragdoll")) do
             if IsValid(ragdoll) then
-                local knockedEnt = ragdoll:GetNetVar("ixKnockedEntity")
+                local knockedEnt = ragdoll:GetNetVar("wsKnockedEntity")
                 if IsValid(knockedEnt) then
                     knockedRagdollCache[ragdoll] = knockedEnt
                     knockedRagdollCount = knockedRagdollCount + 1

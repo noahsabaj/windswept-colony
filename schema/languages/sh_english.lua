@@ -81,6 +81,8 @@ LANGUAGE = {
     cameraFlashOff = "Flash disabled.",
     cameraEquipped = "Unequip the camera first.",
     cameraAutoLoaded = "Auto-loaded battery (%dup).",
+    cameraStorageFull = "Photo storage is full - cannot take more photos right now.",
+    cameraTooManyPhotos = "You are carrying too many photographs.",
 
     -- Photo
     photoRenamed = "Photo named: %s",

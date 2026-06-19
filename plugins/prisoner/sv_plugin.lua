@@ -9,10 +9,10 @@
     - Leash mechanics (tie to surfaces)
 ]]--
 
-util.AddNetworkString("ixDragStart")
-util.AddNetworkString("ixDragStop")
-util.AddNetworkString("ixLeashStart")
-util.AddNetworkString("ixLeashStop")
+util.AddNetworkString("wsDragStart")
+util.AddNetworkString("wsDragStop")
+util.AddNetworkString("wsLeashStart")
+util.AddNetworkString("wsLeashStop")
 
 -- Store reference to plugin for use in net.Receive handlers
 -- (PLUGIN global is only available during initial load)
@@ -55,7 +55,7 @@ function PLUGIN:PlayerUse(client, entity)
         entity:NotifyLocalized("unrestrained")
 
         -- Give the zip tie to the untier
-        local _, inventory = ix.constants.GetCharacterInventory(client)
+        local _, inventory = ws.constants.GetCharacterInventory(client)
         if inventory then
             inventory:Add("ziptie", 1)
             client:NotifyLocalized("zipTieRecovered")
@@ -82,7 +82,7 @@ function PLUGIN:KeyPress(client, key)
     if not target:IsRestricted() then return end
 
     -- Must be within interaction range
-    if not ix.constants.CanInteractClose(client, target) then return end
+    if not ws.constants.CanInteractClose(client, target) then return end
 
     -- Toggle gag state
     local gagged = target:GetNetVar("gagged", false)
@@ -119,7 +119,7 @@ function PLUGIN:PlayerDisconnected(client)
     self:StopDrag(client)
 
     -- Also check if this player was being dragged
-    local draggedBy = client:GetNetVar("ixDraggedBy")
+    local draggedBy = client:GetNetVar("wsDraggedBy")
     if draggedBy then
         local dragger = Entity(draggedBy)
         if IsValid(dragger) then
@@ -157,25 +157,25 @@ function PLUGIN:StartDrag(dragger, target)
     if dragger:IsWepRaised() then return false end
 
     -- Check if dragger is already dragging someone
-    if dragger:GetNetVar("ixDragging") then return false end
+    if dragger:GetNetVar("wsDragging") then return false end
 
     -- Check if target is already being dragged
-    if target:GetNetVar("ixDraggedBy") then return false end
+    if target:GetNetVar("wsDraggedBy") then return false end
 
     -- Check distance
-    if not ix.constants.CanInteractClose(dragger, target) then return false end
+    if not ws.constants.CanInteractClose(dragger, target) then return false end
 
     -- Set drag state
-    dragger:SetNetVar("ixDragging", target:EntIndex())
-    target:SetNetVar("ixDraggedBy", dragger:EntIndex())
+    dragger:SetNetVar("wsDragging", target:EntIndex())
+    target:SetNetVar("wsDraggedBy", dragger:EntIndex())
 
     -- Track in active drags table for efficient Think iteration
     self.activeDrags[dragger] = target
 
     -- Store original speeds to restore later
-    dragger.ixOriginalRunSpeed = dragger:GetRunSpeed()
-    target.ixOriginalWalkSpeed = target:GetWalkSpeed()
-    target.ixOriginalRunSpeed = target:GetRunSpeed()
+    dragger.wsOriginalRunSpeed = dragger:GetRunSpeed()
+    target.wsOriginalWalkSpeed = target:GetWalkSpeed()
+    target.wsOriginalRunSpeed = target:GetRunSpeed()
 
     -- Dragger can't sprint while dragging
     dragger:SetRunSpeed(dragger:GetWalkSpeed())
@@ -194,7 +194,7 @@ end
 function PLUGIN:StopDrag(dragger)
     if not IsValid(dragger) then return end
 
-    local targetIndex = dragger:GetNetVar("ixDragging")
+    local targetIndex = dragger:GetNetVar("wsDragging")
     if not targetIndex then return end
 
     local target = Entity(targetIndex)
@@ -203,25 +203,25 @@ function PLUGIN:StopDrag(dragger)
     self.activeDrags[dragger] = nil
 
     -- Restore dragger speed
-    if dragger.ixOriginalRunSpeed then
-        dragger:SetRunSpeed(dragger.ixOriginalRunSpeed)
-        dragger.ixOriginalRunSpeed = nil
+    if dragger.wsOriginalRunSpeed then
+        dragger:SetRunSpeed(dragger.wsOriginalRunSpeed)
+        dragger.wsOriginalRunSpeed = nil
     end
 
     -- Restore target speed (if still valid and restrained)
     if IsValid(target) then
-        if target.ixOriginalWalkSpeed then
-            target:SetWalkSpeed(target.ixOriginalWalkSpeed)
-            target.ixOriginalWalkSpeed = nil
+        if target.wsOriginalWalkSpeed then
+            target:SetWalkSpeed(target.wsOriginalWalkSpeed)
+            target.wsOriginalWalkSpeed = nil
         end
-        if target.ixOriginalRunSpeed then
-            target:SetRunSpeed(target.ixOriginalRunSpeed)
-            target.ixOriginalRunSpeed = nil
+        if target.wsOriginalRunSpeed then
+            target:SetRunSpeed(target.wsOriginalRunSpeed)
+            target.wsOriginalRunSpeed = nil
         end
-        target:SetNetVar("ixDraggedBy", nil)
+        target:SetNetVar("wsDraggedBy", nil)
     end
 
-    dragger:SetNetVar("ixDragging", nil)
+    dragger:SetNetVar("wsDragging", nil)
 end
 
 -- Think hook for drag physics
@@ -267,7 +267,7 @@ function PLUGIN:LeashPlayer(client, target, hitPos, hitNormal)
     if target:GetNetVar("leashed") then return false end
 
     -- Stop any active drag first
-    local draggedBy = target:GetNetVar("ixDraggedBy")
+    local draggedBy = target:GetNetVar("wsDraggedBy")
     if draggedBy then
         local dragger = Entity(draggedBy)
         if IsValid(dragger) then
@@ -317,12 +317,12 @@ end
 -- ============================================================================
 
 -- Stop drag and unleash when target is unrestrained
-hook.Add("OnPlayerUnRestricted", "ixStopDragOnUnrestrain", function(target)
-    local plugin = ix.plugin.Get("prisoner")
+hook.Add("OnPlayerUnRestricted", "wsStopDragOnUnrestrain", function(target)
+    local plugin = ws.plugin.Get("prisoner")
     if not plugin then return end
 
     -- Stop drag
-    local draggedBy = target:GetNetVar("ixDraggedBy")
+    local draggedBy = target:GetNetVar("wsDraggedBy")
     if draggedBy then
         local dragger = Entity(draggedBy)
         if IsValid(dragger) then
@@ -340,20 +340,20 @@ end)
 -- NETWORK RECEIVERS
 -- ============================================================================
 
-net.Receive("ixDragStart", function(len, client)
+net.Receive("wsDragStart", function(len, client)
     local target = net.ReadEntity()
     if restraintPlugin then
         restraintPlugin:StartDrag(client, target)
     end
 end)
 
-net.Receive("ixDragStop", function(len, client)
+net.Receive("wsDragStop", function(len, client)
     if restraintPlugin then
         restraintPlugin:StopDrag(client)
     end
 end)
 
-net.Receive("ixLeashStart", function(len, client)
+net.Receive("wsLeashStart", function(len, client)
     if not IsValid(client) then return end
     if client:IsRestricted() then return end
 
@@ -361,7 +361,7 @@ net.Receive("ixLeashStart", function(len, client)
     if not IsValid(target) or not target:IsPlayer() then return end
 
     -- Range check
-    if not ix.constants.CanInteractClose(client, target) then return end
+    if not ws.constants.CanInteractClose(client, target) then return end
 
     -- Trace from client to find surface
     local tr = util.TraceLine({
@@ -381,7 +381,7 @@ net.Receive("ixLeashStart", function(len, client)
     end
 end)
 
-net.Receive("ixLeashStop", function(len, client)
+net.Receive("wsLeashStop", function(len, client)
     if not IsValid(client) then return end
     if client:IsRestricted() then return end
 
@@ -389,7 +389,7 @@ net.Receive("ixLeashStop", function(len, client)
     if not IsValid(target) or not target:IsPlayer() then return end
 
     -- Range check
-    if not ix.constants.CanInteractClose(client, target) then return end
+    if not ws.constants.CanInteractClose(client, target) then return end
 
     if restraintPlugin:UnleashPlayer(target) then
         client:Notify("You have unleashed " .. target:Name() .. ".")

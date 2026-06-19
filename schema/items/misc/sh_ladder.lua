@@ -25,7 +25,7 @@ end
 
 -- Equippable configuration
 ITEM.equipWeaponClass = "weapon_ladder_yl"
-ITEM.equipPlayerKey = "ixLadderItem"
+ITEM.equipPlayerKey = "wsLadderItem"
 ITEM.equipNotifyKey = "ladderEquipped"
 ITEM.equipTip = "Hold the ladder in your hands."
 ITEM.unequipTip = "Put the ladder away."

@@ -46,7 +46,7 @@ local function ResetSuicideState()
 end
 
 -- G key detection and state machine
-hook.Add("Think", "ixSuicideGesture", function()
+hook.Add("Think", "wsSuicideGesture", function()
     local client = LocalPlayer()
     if not IsValid(client) then return end
 
@@ -73,18 +73,18 @@ hook.Add("Think", "ixSuicideGesture", function()
             -- Completed raise
             suicideState = "raised"
             suicideRaisedTime = RealTime()
-            ix.util.Notify("You have aimed the gun at your temple. Pull the trigger, or press G to lower the gun.")
+            ws.util.Notify("You have aimed the gun at your temple. Pull the trigger, or press G to lower the gun.")
         end
 
     elseif suicideState == "raised" then
         -- Check for G tap to lower
         if gKeyDown and not suicideWasGDown then
             ResetSuicideState()
-            ix.util.Notify("You lower the gun.")
+            ws.util.Notify("You lower the gun.")
         elseif RealTime() - suicideRaisedTime >= SUICIDE_TIMEOUT then
             -- Check for timeout
             ResetSuicideState()
-            ix.util.Notify("You lower the gun.")
+            ws.util.Notify("You lower the gun.")
         end
 
         -- Check for LMB - pull trigger (bang or click depending on ammo)
@@ -92,7 +92,7 @@ hook.Add("Think", "ixSuicideGesture", function()
             local weapon = client:GetActiveWeapon()
             if IsValid(weapon) and weapon:Clip1() >= 1 then
                 -- Has ammo - execute suicide
-                net.Start("ixSuicideExecute")
+                net.Start("wsSuicideExecute")
                 net.SendToServer()
                 ResetSuicideState()
             else
@@ -109,7 +109,7 @@ end)
 
 -- Vignette effect for suicide gesture
 -- Optimized: reduced from 11 iterations (44 rects) to 4 iterations (16 rects)
-hook.Add("HUDPaint", "ixSuicideVignette", function()
+hook.Add("HUDPaint", "wsSuicideVignette", function()
     if suicideState == "idle" then return end
 
     local alpha = 0
@@ -148,13 +148,13 @@ hook.Add("HUDPaint", "ixSuicideVignette", function()
 end)
 
 -- Reset suicide state when weapon changes
-hook.Add("HUDWeaponPickedUp", "ixSuicideWeaponChange", function()
+hook.Add("HUDWeaponPickedUp", "wsSuicideWeaponChange", function()
     if suicideState ~= "idle" then
         ResetSuicideState()
     end
 end)
 
-hook.Add("PlayerSwitchWeapon", "ixSuicideWeaponSwitch", function(ply, oldWeapon, newWeapon)
+hook.Add("PlayerSwitchWeapon", "wsSuicideWeaponSwitch", function(ply, oldWeapon, newWeapon)
     if ply == LocalPlayer() and suicideState ~= "idle" then
         ResetSuicideState()
     end
@@ -181,7 +181,7 @@ function PANEL:Init()
     -- Create Give Up button (subtle, at bottom)
     self.giveUpButton = vgui.Create("DButton", self)
     self.giveUpButton:SetText(L("giveUp"))
-    self.giveUpButton:SetFont("ixSmallFont")
+    self.giveUpButton:SetFont("wsSmallFont")
     self.giveUpButton:SetSize(120, 30)
     self.giveUpButton:SetPos(ScrW() / 2 - 60, ScrH() - 160)
     self.giveUpButton:SetTextColor(Color(150, 150, 150))
@@ -207,7 +207,7 @@ function PANEL:ShowGiveUpConfirmation()
     local noText = L("giveUpNo")
 
     -- Calculate button sizes based on text
-    surface.SetFont("ixSmallFont")
+    surface.SetFont("wsSmallFont")
     local yesW = surface.GetTextSize(yesText) + 20  -- padding
     local noW = surface.GetTextSize(noText) + 20
 
@@ -229,15 +229,15 @@ function PANEL:ShowGiveUpConfirmation()
     -- Confirmation text
     local label = vgui.Create("DLabel", self.confirmDialog)
     label:SetText(confirmText)
-    label:SetFont("ixMediumFont")
-    label:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
+    label:SetFont("wsMediumFont")
+    label:SetTextColor(ws.constants.COLOR_UI_NEUTRAL)
     label:SizeToContents()
     label:SetPos(dialogWidth / 2 - label:GetWide() / 2, 20)
 
     -- Yes button
     local yesBtn = vgui.Create("DButton", self.confirmDialog)
     yesBtn:SetText(yesText)
-    yesBtn:SetFont("ixSmallFont")
+    yesBtn:SetFont("wsSmallFont")
     yesBtn:SetSize(yesW, 30)
     yesBtn:SetPos(buttonPadding, 70)
     yesBtn:SetTextColor(Color(200, 100, 100))
@@ -249,7 +249,7 @@ function PANEL:ShowGiveUpConfirmation()
     end
     yesBtn.DoClick = function()
         -- Send give up request to server
-        net.Start("ixKnockoutGiveUp")
+        net.Start("wsKnockoutGiveUp")
         net.SendToServer()
 
         -- Hide the Give Up button (can't give up twice)
@@ -267,7 +267,7 @@ function PANEL:ShowGiveUpConfirmation()
     -- No button
     local noBtn = vgui.Create("DButton", self.confirmDialog)
     noBtn:SetText(noText)
-    noBtn:SetFont("ixSmallFont")
+    noBtn:SetFont("wsSmallFont")
     noBtn:SetSize(noW, 30)
     noBtn:SetPos(dialogWidth - noW - buttonPadding, 70)
     noBtn:SetTextColor(Color(150, 150, 150))
@@ -325,7 +325,7 @@ function PANEL:Paint(w, h)
     local timeText = string.format("%02d:%02d", minutes, seconds)
 
     -- Draw centered timer
-    surface.SetFont("ixMenuButtonHugeFont")
+    surface.SetFont("wsMenuButtonHugeFont")
     local tw, th = surface.GetTextSize(timeText)
     surface.SetTextColor(255, 255, 255, 255)
     surface.SetTextPos(w / 2 - tw / 2, h / 2 - th / 2)
@@ -333,7 +333,7 @@ function PANEL:Paint(w, h)
 
     -- Draw instruction at bottom
     local instructionText = "You are knocked out. Wait for rescue or death."
-    surface.SetFont("ixSmallFont")
+    surface.SetFont("wsSmallFont")
     local iw, ih = surface.GetTextSize(instructionText)
     surface.SetTextColor(100, 100, 100, 255)
     surface.SetTextPos(w / 2 - iw / 2, h - 100)
@@ -346,11 +346,11 @@ function PANEL:Think()
 
     -- Check if timer expired (server will handle permadeath)
     if self:GetRemainingTime() <= 0 then
-        -- Timer expired - wait for server to send ixKnockoutEnd
+        -- Timer expired - wait for server to send wsKnockoutEnd
     end
 end
 
-vgui.Register("ixKnockoutScreen", PANEL, "DPanel")
+vgui.Register("wsKnockoutScreen", PANEL, "DPanel")
 
 -- ============================================================================
 -- DEATH MEMORIAL SCREEN
@@ -373,21 +373,21 @@ function MEMORIAL:Init()
     -- Data (set via SetMemorialData)
     self.charName = "Unknown"
     self.birthDate = "Unknown"
-    self.deathDate = ix.birthdata.GetCurrentDate()
+    self.deathDate = ws.birthdata.GetCurrentDate()
     self.model = "models/player/group01/male_01.mdl"
     self.skin = 0
     self.bodygroups = ""
 
     -- Calculate sizes based on fonts
-    surface.SetFont("ixMediumFont")
+    surface.SetFont("wsMediumFont")
     local _, headerH = surface.GetTextSize("You have died.")
     self.headerHeight = headerH
 
-    surface.SetFont("ixBigFont")
+    surface.SetFont("wsBigFont")
     local _, nameH = surface.GetTextSize("W")
     self.nameHeight = nameH
 
-    surface.SetFont("ixSmallFont")
+    surface.SetFont("wsSmallFont")
     local _, smallH = surface.GetTextSize("W")
     self.smallHeight = smallH
 
@@ -407,15 +407,15 @@ function MEMORIAL:SetMemorialData(charName, model, skin, bodygroups, birthMonth,
     self.bodygroups = bodygroups
 
     -- Format birth date
-    self.birthDate = ix.birthdata.FormatDate(birthMonth, birthDay, age)
-    self.deathDate = ix.birthdata.GetCurrentDate()
+    self.birthDate = ws.birthdata.FormatDate(birthMonth, birthDay, age)
+    self.deathDate = ws.birthdata.GetCurrentDate()
 
     -- Create model panel
     if IsValid(self.modelPanel) then
         self.modelPanel:Remove()
     end
 
-    self.modelPanel = vgui.Create("ixModelPanel", self)
+    self.modelPanel = vgui.Create("wsModelPanel", self)
     self.modelPanel:SetModel(model, skin, bodygroups)
     self.modelPanel:SetSize(self.modelSize, self.modelSize)
 
@@ -437,7 +437,7 @@ function MEMORIAL:Paint(w, h)
     local y = self.contentStartY  -- Vertically centered
 
     -- "You have died."
-    surface.SetFont("ixMediumFont")
+    surface.SetFont("wsMediumFont")
     local headerText = "You have died."
     local headerW, headerH = surface.GetTextSize(headerText)
     surface.SetTextColor(200, 200, 200, 255)
@@ -447,7 +447,7 @@ function MEMORIAL:Paint(w, h)
     y = y + headerH + self.sectionGap + self.modelSize + self.sectionGap
 
     -- Character name
-    surface.SetFont("ixBigFont")
+    surface.SetFont("wsBigFont")
     local nameW, nameH = surface.GetTextSize(self.charName)
     surface.SetTextColor(255, 255, 255, 255)
     surface.SetTextPos(centerX - nameW / 2, y)
@@ -456,7 +456,7 @@ function MEMORIAL:Paint(w, h)
     y = y + nameH + self.sectionGap
 
     -- Lifespan
-    surface.SetFont("ixSmallFont")
+    surface.SetFont("wsSmallFont")
     local lifespanText = self.birthDate .. "  —  " .. self.deathDate
     local lifespanW, lifespanH = surface.GetTextSize(lifespanText)
     surface.SetTextColor(180, 180, 180, 255)
@@ -468,7 +468,7 @@ function MEMORIAL:Paint(w, h)
         local elapsed = RealTime() - self.startTime
         local promptAlpha = math.Clamp((elapsed - 5) * 255, 0, 255)  -- Fade in over 1 second
 
-        surface.SetFont("ixSmallFont")
+        surface.SetFont("wsSmallFont")
         local promptText = "Press any key to continue..."
         local promptW, promptH = surface.GetTextSize(promptText)
         surface.SetTextColor(150, 150, 150, promptAlpha)
@@ -494,7 +494,7 @@ function MEMORIAL:OnKeyCodePressed(key)
         self.dismissed = true
 
         -- Notify server we're ready
-        net.Start("ixPermadeathReady")
+        net.Start("wsPermadeathReady")
         net.SendToServer()
 
         -- Remove panel
@@ -508,7 +508,7 @@ function MEMORIAL:OnMousePressed(key)
     if self.canDismiss and not self.dismissed then
         self.dismissed = true
 
-        net.Start("ixPermadeathReady")
+        net.Start("wsPermadeathReady")
         net.SendToServer()
 
         self:Remove()
@@ -519,7 +519,7 @@ function MEMORIAL:OnRemove()
     memorialActive = false
 end
 
-vgui.Register("ixDeathMemorial", MEMORIAL, "EditablePanel")
+vgui.Register("wsDeathMemorial", MEMORIAL, "EditablePanel")
 
 -- ============================================================================
 -- NETWORK RECEIVERS
@@ -527,7 +527,7 @@ vgui.Register("ixDeathMemorial", MEMORIAL, "EditablePanel")
 
 local knockoutPanel = nil
 
-net.Receive("ixKnockoutStart", function()
+net.Receive("wsKnockoutStart", function()
     local duration = net.ReadFloat()
     local count = net.ReadUInt(8)
 
@@ -542,14 +542,14 @@ net.Receive("ixKnockoutStart", function()
     end
 
     -- Create knockout screen
-    knockoutPanel = vgui.Create("ixKnockoutScreen")
+    knockoutPanel = vgui.Create("wsKnockoutScreen")
     if IsValid(knockoutPanel) then
         knockoutPanel:SetKnockoutData(duration, count)
     else
     end
 end)
 
-net.Receive("ixKnockoutTimerSync", function()
+net.Receive("wsKnockoutTimerSync", function()
     local newDuration = net.ReadFloat()
 
     knockoutDuration = newDuration
@@ -577,7 +577,7 @@ local function CleanupKnockoutUI()
     gui.EnableScreenClicker(false)
 end
 
-net.Receive("ixKnockoutEnd", function()
+net.Receive("wsKnockoutEnd", function()
     local revived = net.ReadBool()
     local health = net.ReadUInt(8)
 
@@ -586,15 +586,15 @@ net.Receive("ixKnockoutEnd", function()
 
     -- Show appropriate notification
     if revived then
-        ix.util.Notify(L("revivalSuccess"))
-        ix.util.Notify(string.format("You regained consciousness with %d HP.", health))
+        ws.util.Notify(L("revivalSuccess"))
+        ws.util.Notify(string.format("You regained consciousness with %d HP.", health))
     else
-        ix.util.Notify(L("characterPermadead"))
+        ws.util.Notify(L("characterPermadead"))
     end
 end)
 
 -- Receive permadeath memorial data
-net.Receive("ixPermadeathScreen", function()
+net.Receive("wsPermadeathScreen", function()
     local charName = net.ReadString()
     local model = net.ReadString()
     local skin = net.ReadUInt(8)
@@ -614,7 +614,7 @@ net.Receive("ixPermadeathScreen", function()
     gui.EnableScreenClicker(false)
 
     -- Create memorial panel
-    local memorial = vgui.Create("ixDeathMemorial")
+    local memorial = vgui.Create("wsDeathMemorial")
     memorial:SetMemorialData(charName, model, skin, bodygroups, birthMonth, birthDay, age)
 end)
 
@@ -687,7 +687,7 @@ function PLUGIN:HUDPaint()
         local seconds = math.floor(remaining % 60)
         local timeText = string.format("%02d:%02d", minutes, seconds)
 
-        surface.SetFont("ixMenuButtonHugeFont")
+        surface.SetFont("wsMenuButtonHugeFont")
         local tw, th = surface.GetTextSize(timeText)
         surface.SetTextColor(255, 255, 255, 255)
         surface.SetTextPos(ScrW() / 2 - tw / 2, ScrH() / 2 - th / 2)

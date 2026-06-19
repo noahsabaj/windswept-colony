@@ -21,10 +21,10 @@ resource.AddWorkshop("635535045")   -- Handheld Radio Model (c_model + w_model)
 RunConsoleCommand("sv_tfa_cmenu", "0")
 
 -- Centralized network string registry (schema + entities)
-ix.util.Include("sv_netstrings.lua")
+ws.util.Include("sv_netstrings.lua")
 
 -- Document system server handlers
-ix.util.Include("sv_documents.lua")
+ws.util.Include("sv_documents.lua")
 
 -- Validate a give target (valid player, in range, alive, not incapacitated)
 -- Returns targetChar on success, nil on failure (notifications sent to client)
@@ -34,7 +34,7 @@ local function ValidateGiveTarget(client, target)
         return nil
     end
 
-    if not ix.constants.CanInteract(client, target) then
+    if not ws.constants.CanInteract(client, target) then
         client:NotifyLocalized("targetTooFar")
         return nil
     end
@@ -50,12 +50,12 @@ local function ValidateGiveTarget(client, target)
         return nil
     end
 
-    if target:GetNetVar("ixKnocked", false) then
+    if target:GetNetVar("wsKnocked", false) then
         client:NotifyLocalized("targetKnocked")
         return nil
     end
 
-    if target:GetNetVar("ixRestricted", false) then
+    if target:GetNetVar("wsRestricted", false) then
         client:NotifyLocalized("targetRestrained")
         return nil
     end
@@ -64,17 +64,17 @@ local function ValidateGiveTarget(client, target)
 end
 
 -- Wallet give handler
-net.Receive("ixWalletGive", function(len, client)
+net.Receive("wsWalletGive", function(len, client)
     local walletItemID = net.ReadUInt(32)
     local cents = net.ReadUInt(32)
     local target = net.ReadEntity()
 
     -- Validate wallet item
-    local walletItem = ix.item.instances[walletItemID]
+    local walletItem = ws.item.instances[walletItemID]
     if not walletItem or walletItem.uniqueID ~= "wallet" then return end
 
     -- Validate ownership
-    local character, inventory = ix.constants.GetCharacterInventory(client)
+    local character, inventory = ws.constants.GetCharacterInventory(client)
     if not character or not inventory then return end
 
     -- Check wallet is in player's main inventory
@@ -84,7 +84,7 @@ net.Receive("ixWalletGive", function(len, client)
     local walletInvID = walletItem:GetData("id")
     if not walletInvID then return end
 
-    local walletInv = ix.item.inventories[walletInvID]
+    local walletInv = ws.item.inventories[walletInvID]
     if not walletInv then return end
 
     -- Validate target
@@ -92,7 +92,7 @@ net.Receive("ixWalletGive", function(len, client)
     if not targetChar then return end
 
     -- Calculate available money in wallet
-    local available = ix.wallet and ix.wallet.GetWalletMoney and ix.wallet.GetWalletMoney(walletInv) or 0
+    local available = ws.wallet and ws.wallet.GetWalletMoney and ws.wallet.GetWalletMoney(walletInv) or 0
     cents = math.min(cents, available)
 
     if cents <= 0 then
@@ -101,23 +101,23 @@ net.Receive("ixWalletGive", function(len, client)
     end
 
     -- Remove from wallet
-    if not ix.currency.RemoveFromInventory(walletInv, cents) then
+    if not ws.currency.RemoveFromInventory(walletInv, cents) then
         client:NotifyLocalized("walletEmpty")
         return
     end
 
     -- Give to target (using wallet routing if available)
     local success
-    if ix.currency.AddToInventoryWithWallet then
-        success = ix.currency.AddToInventoryWithWallet(target, cents)
+    if ws.currency.AddToInventoryWithWallet then
+        success = ws.currency.AddToInventoryWithWallet(target, cents)
     else
         local targetInv = targetChar:GetInventory()
-        success = targetInv and ix.currency.AddToInventory(targetInv, cents)
+        success = targetInv and ws.currency.AddToInventory(targetInv, cents)
     end
 
     if not success then
         -- Refund if target can't receive
-        ix.currency.AddToInventory(walletInv, cents)
+        ws.currency.AddToInventory(walletInv, cents)
         client:NotifyLocalized("targetInventoryFull")
         return
     end
@@ -142,7 +142,7 @@ function playerMeta:HasWhitelist(faction)
 end
 
 -- Give Personal ID to ALL new characters (moved from Civilians faction)
-hook.Add("OnCharacterCreated", "ixWindsweptPersonalID", function(client, character)
+hook.Add("OnCharacterCreated", "wsWindsweptPersonalID", function(client, character)
     -- Generate a unique 5-digit ID number
     local id = string.format("%05d", math.random(1, 99999))
     local inventory = character:GetInventory()

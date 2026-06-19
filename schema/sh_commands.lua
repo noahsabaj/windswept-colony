@@ -9,7 +9,7 @@
 -- /Radio <message> command
 do
     local COMMAND = {}
-    COMMAND.arguments = ix.type.text
+    COMMAND.arguments = ws.type.text
 
     -- Calculate speaking time from message length (15 chars/sec average)
     local function GetSpeakingTime(message)
@@ -17,7 +17,7 @@ do
     end
 
     function COMMAND:OnRun(client, message)
-        local character, inventory = ix.constants.GetCharacterInventory(client)
+        local character, inventory = ws.constants.GetCharacterInventory(client)
         if not character or not inventory then return end
 
         local radios = inventory:GetItemsByUniqueID("handheld_radio", true)
@@ -50,12 +50,12 @@ do
 
                 -- Store message info for receiver battery drain
                 -- (receivers will drain in the chat class CanHear)
-                ix.radioMessageLength = string.len(message)
+                ws.radioMessageLength = string.len(message)
 
-                ix.chat.Send(client, "radio", message)
-                ix.chat.Send(client, "radio_eavesdrop", message)
+                ws.chat.Send(client, "radio", message)
+                ws.chat.Send(client, "radio_eavesdrop", message)
 
-                ix.radioMessageLength = nil
+                ws.radioMessageLength = nil
             else
                 return "@notNow"
             end
@@ -66,17 +66,17 @@ do
         end
     end
 
-    ix.command.Add("Radio", COMMAND)
-    ix.command.Add("R", COMMAND)  -- Shortcut
+    ws.command.Add("Radio", COMMAND)
+    ws.command.Add("R", COMMAND)  -- Shortcut
 end
 
 -- /SetFreq <frequency> command
 do
     local COMMAND = {}
-    COMMAND.arguments = ix.type.text
+    COMMAND.arguments = ws.type.text
 
     function COMMAND:OnRun(client, frequency)
-        local character, inventory = ix.constants.GetCharacterInventory(client)
+        local character, inventory = ws.constants.GetCharacterInventory(client)
         if not character or not inventory then return end
 
         local radio = inventory:HasItem("handheld_radio")
@@ -95,7 +95,7 @@ do
         end
     end
 
-    ix.command.Add("SetFreq", COMMAND)
+    ws.command.Add("SetFreq", COMMAND)
 end
 
 -- ============================================================================
@@ -104,7 +104,7 @@ end
 -- Description is generated from physical attributes during character creation
 -- ============================================================================
 
-ix.command.Add("CharDesc", {
+ws.command.Add("CharDesc", {
     description = "@cmdCharDesc",
     OnCheckAccess = function(self, client)
         return false, "descEditDisabled"

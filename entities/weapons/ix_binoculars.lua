@@ -73,6 +73,17 @@ function SWEP:Holster()
     return true
 end
 
+-- Reset the zoom FOV/viewmodel if the weapon is removed while zoomed (death,
+-- StripWeapon, disconnect/respawn). Holster handles the clean path, but those
+-- bypass Holster and would otherwise leave the player stuck at a narrow FOV.
+function SWEP:OnRemove()
+    local owner = self:GetOwner()
+    if IsValid(owner) then
+        owner:SetFOV(0, 0)
+        owner:DrawViewModel(true, 0)
+    end
+end
+
 -- ============================================================================
 -- ZOOM MECHANICS
 -- ============================================================================
@@ -176,7 +187,7 @@ end
 
 if CLIENT then
     -- Create font for HUD text
-    surface.CreateFont("ixBinocularsHUD", {
+    surface.CreateFont("wsBinocularsHUD", {
         font = "TargetID",
         size = 32,
         weight = 600,
@@ -212,7 +223,7 @@ if CLIENT then
         end
 
         -- Draw range on left side
-        surface.SetFont("ixBinocularsHUD")
+        surface.SetFont("wsBinocularsHUD")
         surface.SetTextColor(255, 255, 255, 255)
         surface.SetTextPos(w * 0.165, h / 2 + 16)
         surface.DrawText("Range: " .. range)

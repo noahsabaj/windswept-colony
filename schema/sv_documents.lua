@@ -9,7 +9,7 @@
 -- DOCUMENT WRITE HANDLER
 -- ============================================================================
 
-net.Receive("ixDocumentWrite", function(len, client)
+net.Receive("wsDocumentWrite", function(len, client)
     local itemID = net.ReadUInt(32)
     local toolItemID = net.ReadUInt(32)
     local content = net.ReadString()
@@ -17,7 +17,7 @@ net.Receive("ixDocumentWrite", function(len, client)
     local signatureJSON = hasSignature and net.ReadString() or nil
 
     -- Validate paper item ownership
-    local item = ix.constants.VerifyItemOwnership(client, itemID, "paper")
+    local item = ws.constants.VerifyItemOwnership(client, itemID, "paper")
     if not item then return end
 
     local char = client:GetCharacter()
@@ -29,7 +29,7 @@ net.Receive("ixDocumentWrite", function(len, client)
     end
 
     -- Validate writing tool ownership
-    local toolItem = ix.constants.VerifyItemOwnership(client, toolItemID)
+    local toolItem = ws.constants.VerifyItemOwnership(client, toolItemID)
     if not toolItem then
         client:NotifyLocalized("needWritingTool")
         return
@@ -59,6 +59,12 @@ net.Receive("ixDocumentWrite", function(len, client)
         return
     end
 
+    -- Limit content length BEFORE costing it (so ink/lead isn't charged for text
+    -- that gets discarded by truncation)
+    if #content > ws.documents.MAX_CONTENT_LENGTH then
+        content = string.sub(content, 1, ws.documents.MAX_CONTENT_LENGTH)
+    end
+
     -- Calculate resource cost
     local contentCost = #content
     local signatureCost = hasSignature and 50 or 0
@@ -77,21 +83,16 @@ net.Receive("ixDocumentWrite", function(len, client)
         return
     end
 
-    -- Limit content length
-    if #content > ix.documents.MAX_CONTENT_LENGTH then
-        content = string.sub(content, 1, ix.documents.MAX_CONTENT_LENGTH)
-    end
-
     -- Get or create paper ID
     local paperID = item:GetPaperID()
     local isNewDocument = not paperID
 
     if isNewDocument then
-        paperID = ix.documents.GenerateID()
+        paperID = ws.documents.GenerateID()
     end
 
     -- Load existing document or create new
-    local docData = ix.documents.Load(paperID) or {
+    local docData = ws.documents.Load(paperID) or {
         content = "",
         entries = {}
     }
@@ -115,9 +116,10 @@ net.Receive("ixDocumentWrite", function(len, client)
         end
     end
 
-    -- Add signature (supports multiple signatures)
+    -- Add signature (supports multiple signatures). Validate/limit stroke data so
+    -- this path can't bypass the caps enforced by wsSignatureSave.
     if hasSignature and signatureJSON then
-        local sigData = util.JSONToTable(signatureJSON)
+        local sigData = ws.documents.ValidateSignature(util.JSONToTable(signatureJSON))
         if sigData then
             -- Initialize signatures array if not present
             docData.signatures = docData.signatures or {}
@@ -134,7 +136,7 @@ net.Receive("ixDocumentWrite", function(len, client)
     end
 
     -- Save document file
-    if not ix.documents.Save(paperID, docData) then
+    if not ws.documents.Save(paperID, docData) then
         client:NotifyLocalized("documentSaveFailed")
         return
     end
@@ -149,7 +151,7 @@ net.Receive("ixDocumentWrite", function(len, client)
         item:SetData("timestamp", os.time())
     end
 
-    item:SetData("wordCount", ix.documents.CountWords(docData.content))
+    item:SetData("wordCount", ws.documents.CountWords(docData.content))
     item:SetData("lastEdited", os.time())
 
     if hasSignature then
@@ -172,20 +174,21 @@ end)
 -- DOCUMENT READ HANDLER
 -- ============================================================================
 
-net.Receive("ixDocumentRead", function(len, client)
+net.Receive("wsDocumentRead", function(len, client)
     local itemID = net.ReadUInt(32)
     local forEditor = net.ReadBool()
 
-    -- Validate item
-    local item = ix.item.instances[itemID]
+    -- Validate paper item is accessible to the requester (held in their own
+    -- inventory or in a container they own). Prevents reading arbitrary documents
+    -- by enumerating itemIDs.
+    local item = ws.constants.VerifyItemAccessible(client, itemID, "paper")
     if not item then return end
-    if item.uniqueID ~= "paper" then return end
 
     local paperID = item:GetPaperID()
     if not paperID then return end
 
     -- Load document
-    local docData = ix.documents.Load(paperID)
+    local docData = ws.documents.Load(paperID)
     if not docData then return end
 
     local response = {
@@ -197,7 +200,7 @@ net.Receive("ixDocumentRead", function(len, client)
         entries = docData.entries or {}
     }
 
-    net.Start("ixDocumentData")
+    net.Start("wsDocumentData")
         net.WriteBool(forEditor)
         net.WriteString(util.TableToJSON(response))
     net.Send(client)
@@ -207,11 +210,11 @@ end)
 -- DOCUMENT ERASE HANDLER
 -- ============================================================================
 
-net.Receive("ixDocumentErase", function(len, client)
+net.Receive("wsDocumentErase", function(len, client)
     local itemID = net.ReadUInt(32)
 
     -- Validate paper item ownership
-    local item = ix.constants.VerifyItemOwnership(client, itemID, "paper")
+    local item = ws.constants.VerifyItemOwnership(client, itemID, "paper")
     if not item then return end
 
     -- Check if document is erasable (pencil only)
@@ -221,7 +224,7 @@ net.Receive("ixDocumentErase", function(len, client)
     end
 
     -- Find eraser in inventory (standalone eraser or pencil with eraser)
-    local _, inv = ix.constants.GetCharacterInventory(client)
+    local _, inv = ws.constants.GetCharacterInventory(client)
     if not inv then return end
 
     local eraserItem = nil
@@ -244,7 +247,7 @@ net.Receive("ixDocumentErase", function(len, client)
     local paperID = item:GetPaperID()
     if not paperID then return end
 
-    local docData = ix.documents.Load(paperID)
+    local docData = ws.documents.Load(paperID)
     if not docData then return end
 
     local contentLength = #(docData.content or "")
@@ -263,7 +266,7 @@ net.Receive("ixDocumentErase", function(len, client)
     -- Pencil with eraser has unlimited erasing (no durability cost)
 
     -- Delete the document file
-    ix.documents.Delete(paperID)
+    ws.documents.Delete(paperID)
 
     -- Reset item data to blank paper
     item:SetData("paperID", nil)
@@ -286,18 +289,18 @@ end)
 -- DOCUMENT DESTROY HANDLER
 -- ============================================================================
 
-net.Receive("ixDocumentDestroy", function(len, client)
+net.Receive("wsDocumentDestroy", function(len, client)
     local itemID = net.ReadUInt(32)
 
     -- Validate character
     -- Validate paper item ownership
-    local item = ix.constants.VerifyItemOwnership(client, itemID, "paper")
+    local item = ws.constants.VerifyItemOwnership(client, itemID, "paper")
     if not item then return end
 
     -- Delete document file if exists
     local paperID = item:GetPaperID()
     if paperID then
-        ix.documents.Delete(paperID)
+        ws.documents.Delete(paperID)
     end
 
     -- Remove the item
@@ -310,12 +313,12 @@ end)
 -- CONTAINER RENAME HANDLER (envelopes, folders)
 -- ============================================================================
 
-net.Receive("ixContainerRename", function(len, client)
+net.Receive("wsContainerRename", function(len, client)
     local itemID = net.ReadUInt(32)
     local newName = net.ReadString()
 
     -- Validate container ownership (no specific uniqueID filter)
-    local item = ix.constants.VerifyItemOwnership(client, itemID)
+    local item = ws.constants.VerifyItemOwnership(client, itemID)
     if not item then return end
 
     -- Only allow renaming containers (envelopes, folders)
@@ -328,7 +331,7 @@ net.Receive("ixContainerRename", function(len, client)
     if not validContainers[item.uniqueID] then return end
 
     -- Check for writing tool in inventory
-    if not ix.documents.HasWritingTool(client) then
+    if not ws.documents.HasWritingTool(client) then
         client:NotifyLocalized("needWritingTool")
         return
     end
@@ -347,42 +350,20 @@ end)
 -- SIGNATURE SAVE HANDLER
 -- ============================================================================
 
-net.Receive("ixSignatureSave", function(len, client)
+net.Receive("wsSignatureSave", function(len, client)
     local signatureJSON = net.ReadString()
 
     -- Validate character
     local char = client:GetCharacter()
     if not char then return end
 
-    -- Parse signature data
-    local strokes = util.JSONToTable(signatureJSON)
-    if not strokes or type(strokes) ~= "table" then return end
+    -- Parse signature data (silent return on malformed JSON)
+    local parsed = util.JSONToTable(signatureJSON)
+    if type(parsed) ~= "table" then return end
 
     -- Validate and limit stroke data (prevent abuse)
-    local maxStrokes = 50
-    local maxPointsTotal = 500
-    local totalPoints = 0
-
-    if #strokes > maxStrokes then
-        -- Truncate to max strokes
-        local truncated = {}
-        for i = 1, maxStrokes do
-            truncated[i] = strokes[i]
-        end
-        strokes = truncated
-    end
-
-    -- Count and limit total points
-    for i, stroke in ipairs(strokes) do
-        if type(stroke) ~= "table" then
-            strokes[i] = {}
-        else
-            totalPoints = totalPoints + #stroke
-        end
-    end
-
-    if totalPoints > maxPointsTotal then
-        -- Too many points, reject
+    local strokes = ws.documents.ValidateSignature(parsed)
+    if not strokes then
         client:NotifyLocalized("signatureTooComplex")
         return
     end
@@ -393,32 +374,8 @@ net.Receive("ixSignatureSave", function(len, client)
     client:NotifyLocalized("signatureSaved")
 end)
 
--- ============================================================================
--- PEN REFILL HANDLER
--- ============================================================================
-
-net.Receive("ixPenRefill", function(len, client)
-    local penItemID = net.ReadUInt(32)
-    local cartridgeItemID = net.ReadUInt(32)
-
-    -- Validate item ownership
-    local penItem = ix.constants.VerifyItemOwnership(client, penItemID, "pen")
-    if not penItem then return end
-
-    local cartridgeItem = ix.constants.VerifyItemOwnership(client, cartridgeItemID, "ink_cartridge")
-    if not cartridgeItem then return end
-
-    -- Check if pen needs refill
-    if penItem:GetInk() >= penItem.maxInk then
-        client:NotifyLocalized("penAlreadyFull")
-        return
-    end
-
-    -- Refill pen
-    penItem:Refill(penItem.maxInk)
-
-    -- Remove cartridge
-    cartridgeItem:Remove()
-
-    client:NotifyLocalized("penRefilled")
-end)
+-- NOTE: pen refilling is handled by the writer base's `combine` function
+-- (schema/items/base/sh_writer.lua), which is properly ownership-checked. The old
+-- wsPenRefill net handler here was dead (no client ever sent it) and broken
+-- (referenced a non-existent maxInk field), so it was removed along with its
+-- network string in sv_netstrings.lua.

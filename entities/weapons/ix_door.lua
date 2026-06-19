@@ -4,7 +4,7 @@
     Controls:
     - RMB while looking at empty frame: Install door (requires toolkit in inventory)
 
-    Works with the ix.doors frame system.
+    Works with the ws.doors frame system.
 ]]--
 
 AddCSLuaFile()
@@ -83,8 +83,8 @@ function SWEP:GetTargetFrame()
     })
 
     -- Check if we hit an empty frame
-    -- Frames are stored in ix.doors.frames
-    if not ix or not ix.doors or not ix.doors.frames then return nil end
+    -- Frames are stored in ws.doors.frames
+    if not ix or not ws.doors or not ws.doors.frames then return nil end
 
     local hitPos = tr.HitPos
 
@@ -92,7 +92,7 @@ function SWEP:GetTargetFrame()
     local nearestFrame = nil
     local nearestDist = 64  -- Max distance from frame center
 
-    for mapID, frameData in pairs(ix.doors.frames) do
+    for mapID, frameData in pairs(ws.doors.frames) do
         if not frameData.disabled and not frameData.hasDoor then
             local dist = hitPos:Distance(frameData.pos)
             if dist < nearestDist then
@@ -109,7 +109,7 @@ function SWEP:GetTargetFrame()
 end
 
 function SWEP:HasToolkit()
-    return ix.constants.FindBestToolkit(self:GetOwner())
+    return ws.constants.FindBestToolkit(self:GetOwner())
 end
 
 function SWEP:IsInstalling()
@@ -132,8 +132,8 @@ end
 -- ============================================================================
 
 if SERVER then
-    ix.weapon.NetReceive("ixDoorInstall", "ix_door", "StartInstall")
-    ix.weapon.NetReceive("ixDoorCancel", "ix_door", "CancelInstall")
+    ws.weapon.NetReceive("wsDoorInstall", "ix_door", "StartInstall")
+    ws.weapon.NetReceive("wsDoorCancel", "ix_door", "CancelInstall")
 end
 
 function SWEP:StartInstall()
@@ -168,7 +168,7 @@ function SWEP:StartInstall()
 end
 
 function SWEP:CancelInstall()
-    ix.constants.CancelSWEPAction(self, function() return self:IsInstalling() end, function()
+    ws.constants.CancelSWEPAction(self, function() return self:IsInstalling() end, function()
         self:SetInstalling(false)
         self.targetFrame = nil
         self.installingToolkit = nil
@@ -180,7 +180,7 @@ function SWEP:CompleteInstall()
 
     local owner = self:GetOwner()
     local frame = self.targetFrame
-    local item = self.ixItem
+    local item = self.wsItem
 
     if not frame or not item then
         self:CancelInstall()
@@ -195,7 +195,7 @@ function SWEP:CompleteInstall()
     }
 
     -- Spawn door using centralized function (uses prop_door_rotating)
-    local door = ix.doors.SpawnDoor(frame.mapID, doorData)
+    local door = ws.doors.SpawnDoor(frame.mapID, doorData)
     if not IsValid(door) then
         self:CancelInstall()
         owner:NotifyLocalized("doorInstallFailed")
@@ -209,14 +209,14 @@ function SWEP:CompleteInstall()
     end
 
     -- Remove door from inventory
-    local _, inventory = ix.constants.GetCharacterInventory(owner)
+    local _, inventory = ws.constants.GetCharacterInventory(owner)
     if inventory then
         inventory:Remove(item:GetID())
     end
 
     -- Strip weapon and clean up
     owner:StripWeapon("ix_door")
-    owner.ixDoorItem = nil
+    owner.wsDoorItem = nil
 
     owner:EmitSound("physics/wood/wood_plank_impact_hard1.wav", 70)
     owner:NotifyLocalized("doorInstalled")
@@ -226,8 +226,8 @@ function SWEP:CompleteInstall()
     self.installingToolkit = nil
 
     -- Save persistence
-    if ix.doors and ix.doors.Save then
-        ix.doors.Save()
+    if ws.doors and ws.doors.Save then
+        ws.doors.Save()
     end
 end
 
@@ -240,16 +240,16 @@ function SWEP:Think()
     if not IsValid(owner) then return end
 
     if CLIENT then
-        local lmb, rmb = ix.constants.ProcessSWEPInput(self)
+        local lmb, rmb = ws.constants.ProcessSWEPInput(self)
 
         if rmb and not self:IsInstalling() and CurTime() >= (self.nextInstallAttempt or 0) then
             self.nextInstallAttempt = CurTime() + 0.5
-            net.Start("ixDoorInstall")
+            net.Start("wsDoorInstall")
             net.SendToServer()
         end
 
         if lmb and self:IsInstalling() then
-            net.Start("ixDoorCancel")
+            net.Start("wsDoorCancel")
             net.SendToServer()
         end
     end
@@ -302,6 +302,6 @@ if CLIENT then
         if not self:IsInstalling() then return end
 
         local progress = math.Clamp((CurTime() - self:GetInstallStartTime()) / self:GetInstallDuration(), 0, 1)
-        ix.constants.DrawProgressBar("Installing Door...", progress, Color(150, 100, 50), "LMB to cancel")
+        ws.constants.DrawProgressBar("Installing Door...", progress, Color(150, 100, 50), "LMB to cancel")
     end
 end

@@ -1,7 +1,7 @@
 --[[
     Wallet-Aware Currency Routing
 
-    Provides ix.currency.AddToInventoryWithWallet() which routes money to wallets
+    Provides ws.currency.AddToInventoryWithWallet() which routes money to wallets
     before falling back to main inventory.
 
     Priority:
@@ -11,12 +11,12 @@
     Wallets are sorted by current money amount (descending) within each priority tier.
 ]]
 
-ix.wallet = ix.wallet or {}
+ws.wallet = ws.wallet or {}
 
 if SERVER then
     -- Find all wallets in a player's main inventory
-    function ix.wallet.GetWallets(client)
-        local character, inventory = ix.constants.GetCharacterInventory(client)
+    function ws.wallet.GetWallets(client)
+        local character, inventory = ws.constants.GetCharacterInventory(client)
         if not character or not inventory then return {} end
 
         local wallets = {}
@@ -24,7 +24,7 @@ if SERVER then
             if item.uniqueID == "wallet" then
                 local invID = item:GetData("id")
                 if invID then
-                    local walletInv = ix.item.inventories[invID]
+                    local walletInv = ws.item.inventories[invID]
                     if walletInv then
                         table.insert(wallets, {
                             item = item,
@@ -40,7 +40,7 @@ if SERVER then
     end
 
     -- Calculate total money in a wallet inventory
-    function ix.wallet.GetWalletMoney(walletInv)
+    function ws.wallet.GetWalletMoney(walletInv)
         local total = 0
         for _, item in pairs(walletInv:GetItems()) do
             if item.isCurrency then
@@ -54,13 +54,13 @@ if SERVER then
     -- Find best wallet for a currency type
     -- Returns wallet inventory or nil
     -- Priority: specialized wallet -> general (both) wallet
-    function ix.wallet.FindBestWallet(client, currencyType)
-        local wallets = ix.wallet.GetWallets(client)
+    function ws.wallet.FindBestWallet(client, currencyType)
+        local wallets = ws.wallet.GetWallets(client)
         if #wallets == 0 then return nil end
 
         -- Cache item definition lookup (avoid repeated table access)
         local itemClass = currencyType == "cash" and "cash" or "coins"
-        local itemDef = ix.item.list[itemClass]
+        local itemDef = ws.item.list[itemClass]
         if not itemDef then return nil end
 
         local itemWidth = itemDef.width or 1
@@ -72,7 +72,7 @@ if SERVER then
 
         for _, wallet in ipairs(wallets) do
             -- Cache money amount during categorization (avoids recalculating during sort)
-            wallet.cachedMoney = ix.wallet.GetWalletMoney(wallet.inventory)
+            wallet.cachedMoney = ws.wallet.GetWalletMoney(wallet.inventory)
 
             if wallet.designation == currencyType then
                 specialized[#specialized + 1] = wallet
@@ -114,61 +114,50 @@ if SERVER then
     end
 
     -- Add money to inventory with wallet routing
-    -- This is the main function to use instead of ix.currency.AddToInventory
+    -- This is the main function to use instead of ws.currency.AddToInventory
     -- Routes to wallets first, then falls back to main inventory
-    function ix.currency.AddToInventoryWithWallet(client, cents)
-        if cents <= 0 then return true end
+    function ws.currency.AddToInventoryWithWallet(client, cents)
+        if cents <= 0 then return cents == 0 end
 
-        local character, mainInv = ix.constants.GetCharacterInventory(client)
+        local character, mainInv = ws.constants.GetCharacterInventory(client)
         if not character or not mainInv then return false end
 
         -- Split into dollars and coins
         local dollars = math.floor(cents / 100)
         local coins = cents % 100
 
-        local success = true
+        -- Track applied portions so the whole operation is all-or-nothing. Without
+        -- this, a partial success (dollars placed, coins overflow) would return
+        -- false AFTER depositing the dollars, and the caller's refund would mint
+        -- money. On any failure we roll back everything already added.
+        local applied = {}
 
-        -- Route dollars
-        if dollars > 0 then
-            local dollarCents = dollars * 100
-            local cashWallet = ix.wallet.FindBestWallet(client, "cash")
+        local function place(amount, currencyType)
+            if amount <= 0 then return true end
 
-            if cashWallet then
-                -- Try wallet first
-                if not ix.currency.AddToInventory(cashWallet, dollarCents) then
-                    -- Overflow to main inventory
-                    if not ix.currency.AddToInventory(mainInv, dollarCents) then
-                        success = false
-                    end
-                end
-            else
-                -- No wallet, use main inventory
-                if not ix.currency.AddToInventory(mainInv, dollarCents) then
-                    success = false
-                end
+            local wallet = ws.wallet.FindBestWallet(client, currencyType)
+            if wallet and ws.currency.AddToInventory(wallet, amount) then
+                applied[#applied + 1] = {inv = wallet, amount = amount}
+                return true
             end
+
+            if ws.currency.AddToInventory(mainInv, amount) then
+                applied[#applied + 1] = {inv = mainInv, amount = amount}
+                return true
+            end
+
+            return false
         end
 
-        -- Route coins
-        if coins > 0 then
-            local coinsWallet = ix.wallet.FindBestWallet(client, "coins")
-
-            if coinsWallet then
-                -- Try wallet first
-                if not ix.currency.AddToInventory(coinsWallet, coins) then
-                    -- Overflow to main inventory
-                    if not ix.currency.AddToInventory(mainInv, coins) then
-                        success = false
-                    end
-                end
-            else
-                -- No wallet, use main inventory
-                if not ix.currency.AddToInventory(mainInv, coins) then
-                    success = false
-                end
+        if not place(dollars * 100, "cash") or not place(coins, "coins") then
+            -- Roll back any portion already deposited (we just added these exact
+            -- amounts, so RemoveFromInventory is guaranteed to succeed)
+            for _, a in ipairs(applied) do
+                ws.currency.RemoveFromInventory(a.inv, a.amount)
             end
+            return false
         end
 
-        return success
+        return true
     end
 end

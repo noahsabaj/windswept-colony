@@ -43,7 +43,7 @@ function ENT:Use(activator, caller, useType, value)
         self.usePlayer = activator
     end
 
-    local holdTime = ix.config.Get("itemPickupTime", 0.5)
+    local holdTime = ws.config.Get("itemPickupTime", 0.5)
     local heldDuration = CurTime() - self.useStartTime
 
     -- Check for hold to pickup
@@ -99,7 +99,7 @@ function ENT:OpenUI(client)
     end
 
     -- Send UI open message
-    net.Start("ixTypewriterOpen")
+    net.Start("wsTypewriterOpen")
         net.WriteEntity(self)
         net.WriteTable(papers)
     net.Send(client)
@@ -119,7 +119,7 @@ function ENT:PickUp(client)
     if not inv then return end
 
     -- Find empty slot
-    local item = ix.item.instances[self.ixItemID or self:GetNetVar("ixItemID", 0)]
+    local item = ws.item.instances[self.wsItemID or self:GetNetVar("wsItemID", 0)]
     if not item then
         -- Create new typewriter item if original doesn't exist
         local success = inv:Add("typewriter", 1)
@@ -144,7 +144,7 @@ function ENT:PickUp(client)
 end
 
 -- Handle typewriter close from client
-net.Receive("ixTypewriterClose", function(len, client)
+net.Receive("wsTypewriterClose", function(len, client)
     local ent = net.ReadEntity()
 
     if IsValid(ent) and ent:GetClass() == "ix_typewriter" then
@@ -153,7 +153,7 @@ net.Receive("ixTypewriterClose", function(len, client)
 end)
 
 -- Handle typewriter write request
-net.Receive("ixTypewriterWrite", function(len, client)
+net.Receive("wsTypewriterWrite", function(len, client)
     local ent = net.ReadEntity()
     local paperID = net.ReadUInt(32)
     local content = net.ReadString()
@@ -165,7 +165,7 @@ net.Receive("ixTypewriterWrite", function(len, client)
     local char = client:GetCharacter()
     if not char then return end
 
-    local item = ix.item.instances[paperID]
+    local item = ws.item.instances[paperID]
     if not item or item.uniqueID ~= "paper" then return end
 
     -- Validate ownership
@@ -183,8 +183,8 @@ net.Receive("ixTypewriterWrite", function(len, client)
     if not found then return end
 
     -- Limit content length
-    if #content > ix.documents.MAX_CONTENT_LENGTH then
-        content = string.sub(content, 1, ix.documents.MAX_CONTENT_LENGTH)
+    if #content > ws.documents.MAX_CONTENT_LENGTH then
+        content = string.sub(content, 1, ws.documents.MAX_CONTENT_LENGTH)
     end
 
     -- Create or get paper ID
@@ -192,11 +192,11 @@ net.Receive("ixTypewriterWrite", function(len, client)
     local isNewDocument = not docID
 
     if isNewDocument then
-        docID = ix.documents.GenerateID()
+        docID = ws.documents.GenerateID()
     end
 
     -- Load or create document
-    local docData = ix.documents.Load(docID) or {
+    local docData = ws.documents.Load(docID) or {
         content = "",
         entries = {}
     }
@@ -218,7 +218,7 @@ net.Receive("ixTypewriterWrite", function(len, client)
     end
 
     -- Save document
-    if not ix.documents.Save(docID, docData) then
+    if not ws.documents.Save(docID, docData) then
         client:NotifyLocalized("documentSaveFailed")
         return
     end
@@ -232,7 +232,7 @@ net.Receive("ixTypewriterWrite", function(len, client)
         item:SetData("timestamp", os.time())
     end
 
-    item:SetData("wordCount", ix.documents.CountWords(docData.content))
+    item:SetData("wordCount", ws.documents.CountWords(docData.content))
     item:SetData("lastEdited", os.time())
 
     client:NotifyLocalized("documentSaved")

@@ -11,7 +11,7 @@ local PLUGIN = PLUGIN
 -- ============================================================================
 
 -- Disable Helix's default door info rendering
-hook.Add("PostDrawTranslucentRenderables", "ixWindsweptDoorInfo", function(_, bSkybox)
+hook.Add("PostDrawTranslucentRenderables", "wsWindsweptDoorInfo", function(_, bSkybox)
     if bSkybox then return end
 
     local client = LocalPlayer()
@@ -23,8 +23,8 @@ hook.Add("PostDrawTranslucentRenderables", "ixWindsweptDoorInfo", function(_, bS
 
     if not IsValid(entity) then return end
 
-    -- Only draw for our managed doors (prop_door_rotating with ixIsWindsweptDoor marker)
-    if not entity.ixIsWindsweptDoor then return end
+    -- Only draw for our managed doors (prop_door_rotating with wsIsWindsweptDoor marker)
+    if not entity.wsIsWindsweptDoor then return end
 
     -- Managed doors use native prop_door_rotating rendering
 end)
@@ -37,7 +37,7 @@ end)
 local framePulseAlpha = 0
 local framePulseDir = 1
 
-hook.Add("PostDrawTranslucentRenderables", "ixWindsweptFramePulse", function(_, bSkybox)
+hook.Add("PostDrawTranslucentRenderables", "wsWindsweptFramePulse", function(_, bSkybox)
     if bSkybox then return end
 
     local client = LocalPlayer()
@@ -62,7 +62,7 @@ hook.Add("PostDrawTranslucentRenderables", "ixWindsweptFramePulse", function(_, 
 
     -- Draw instruction text on screen
     local scrW, scrH = ScrW(), ScrH()
-    draw.SimpleText("Point at an empty door frame and press RMB to install", "ixSmallFont",
+    draw.SimpleText("Point at an empty door frame and press RMB to install", "wsSmallFont",
         scrW / 2, scrH * 0.8, Color(200, 200, 200, framePulseAlpha), TEXT_ALIGN_CENTER)
 end)
 
@@ -70,7 +70,7 @@ end)
 -- KEYBIND HINTS
 -- ============================================================================
 
-hook.Add("HUDPaint", "ixWindsweptDoorHints", function()
+hook.Add("HUDPaint", "wsWindsweptDoorHints", function()
     local client = LocalPlayer()
     local weapon = client:GetActiveWeapon()
 
@@ -102,7 +102,7 @@ hook.Add("HUDPaint", "ixWindsweptDoorHints", function()
     local y = scrH - 100
 
     for i, hint in ipairs(hints) do
-        draw.SimpleText(hint, "ixSmallFont", scrW - 20, y, Color(200, 200, 200, 200), TEXT_ALIGN_RIGHT)
+        draw.SimpleText(hint, "wsSmallFont", scrW - 20, y, Color(200, 200, 200, 200), TEXT_ALIGN_RIGHT)
         y = y + 30
     end
 end)
@@ -112,7 +112,7 @@ end)
 -- ============================================================================
 
 -- Prevent Helix's door menu from opening
-hook.Add("ShowHelp", "ixWindsweptDoorMenu", function()
+hook.Add("ShowHelp", "wsWindsweptDoorMenu", function()
     local client = LocalPlayer()
     local data = {}
         data.start = client:GetShootPos()
@@ -122,7 +122,7 @@ hook.Add("ShowHelp", "ixWindsweptDoorMenu", function()
 
     -- If looking at a managed door or hidden map door, don't show Helix menu
     if IsValid(entity) then
-        if entity.ixIsWindsweptDoor then
+        if entity.wsIsWindsweptDoor then
             return true  -- Block Helix menu for our managed doors
         end
 

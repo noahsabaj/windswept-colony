@@ -16,7 +16,7 @@ ITEM.base = "base_equippable"
 
 -- Equippable configuration
 ITEM.equipWeaponClass = "ix_batteringram"
-ITEM.equipPlayerKey = "ixBatteringRamItem"
+ITEM.equipPlayerKey = "wsBatteringRamItem"
 ITEM.equipNotifyKey = "batteringRamEquipped"
 ITEM.equipTip = "Hold the battering ram in your hands."
 ITEM.unequipTip = "Put the battering ram away."

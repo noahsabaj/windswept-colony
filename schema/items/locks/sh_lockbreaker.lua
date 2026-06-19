@@ -24,7 +24,7 @@ ITEM.base = "base_equippable"
 
 -- Equippable configuration
 ITEM.equipWeaponClass = "ix_lockbreaker"
-ITEM.equipPlayerKey = "ixLockbreakerItem"
+ITEM.equipPlayerKey = "wsLockbreakerItem"
 ITEM.equipNotifyKey = "lockbreakerEquipped"
 ITEM.equipSound = "physics/metal/metal_box_impact_hard1.wav"
 ITEM.equipTip = "Hold the lockbreaker to destroy locks."

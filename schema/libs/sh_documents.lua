@@ -29,32 +29,32 @@
     }
 ]]--
 
-ix.documents = ix.documents or {}
+ws.documents = ws.documents or {}
 
 -- Document storage directory
-ix.documents.STORAGE_DIR = "ix_documents"
+ws.documents.STORAGE_DIR = "ix_documents"
 
 -- Maximum content length per write (prevents abuse)
-ix.documents.MAX_CONTENT_LENGTH = 10000
+ws.documents.MAX_CONTENT_LENGTH = 10000
 
 -- ============================================================================
 -- ID GENERATION AND VALIDATION
 -- ============================================================================
 
 -- Generate unique document ID (timestamp + random)
-function ix.documents.GenerateID()
+function ws.documents.GenerateID()
     return os.time() .. "_" .. math.random(10000, 99999)
 end
 
 -- Validate document ID format (prevents path traversal)
-function ix.documents.ValidateID(id)
+function ws.documents.ValidateID(id)
     return isstring(id) and id:match("^%d+_%d+$") ~= nil
 end
 
 -- Get file path for document
-function ix.documents.GetFilePath(documentID)
-    if not ix.documents.ValidateID(documentID) then return nil end
-    return ix.documents.STORAGE_DIR .. "/" .. documentID .. ".json"
+function ws.documents.GetFilePath(documentID)
+    if not ws.documents.ValidateID(documentID) then return nil end
+    return ws.documents.STORAGE_DIR .. "/" .. documentID .. ".json"
 end
 
 -- ============================================================================
@@ -63,16 +63,16 @@ end
 
 if SERVER then
     -- Ensure storage directory exists
-    file.CreateDir(ix.documents.STORAGE_DIR)
+    file.CreateDir(ws.documents.STORAGE_DIR)
 
     -- Save document content to file
     -- @param documentID string The document's unique ID
     -- @param data table The document data to save
     -- @return boolean Success
-    function ix.documents.Save(documentID, data)
-        if not ix.documents.ValidateID(documentID) then return false end
+    function ws.documents.Save(documentID, data)
+        if not ws.documents.ValidateID(documentID) then return false end
 
-        local path = ix.documents.GetFilePath(documentID)
+        local path = ws.documents.GetFilePath(documentID)
         if not path then return false end
 
         local json = util.TableToJSON(data, true)
@@ -85,10 +85,10 @@ if SERVER then
     -- Load document content from file
     -- @param documentID string The document's unique ID
     -- @return table|nil The document data or nil if not found
-    function ix.documents.Load(documentID)
-        if not ix.documents.ValidateID(documentID) then return nil end
+    function ws.documents.Load(documentID)
+        if not ws.documents.ValidateID(documentID) then return nil end
 
-        local path = ix.documents.GetFilePath(documentID)
+        local path = ws.documents.GetFilePath(documentID)
         if not path then return nil end
 
         if not file.Exists(path, "DATA") then return nil end
@@ -102,10 +102,10 @@ if SERVER then
     -- Delete document file
     -- @param documentID string The document's unique ID
     -- @return boolean Success
-    function ix.documents.Delete(documentID)
-        if not ix.documents.ValidateID(documentID) then return false end
+    function ws.documents.Delete(documentID)
+        if not ws.documents.ValidateID(documentID) then return false end
 
-        local path = ix.documents.GetFilePath(documentID)
+        local path = ws.documents.GetFilePath(documentID)
         if not path then return false end
 
         if file.Exists(path, "DATA") then
@@ -119,10 +119,10 @@ if SERVER then
     -- Check if document exists
     -- @param documentID string The document's unique ID
     -- @return boolean Exists
-    function ix.documents.Exists(documentID)
-        if not ix.documents.ValidateID(documentID) then return false end
+    function ws.documents.Exists(documentID)
+        if not ws.documents.ValidateID(documentID) then return false end
 
-        local path = ix.documents.GetFilePath(documentID)
+        local path = ws.documents.GetFilePath(documentID)
         if not path then return false end
 
         return file.Exists(path, "DATA")
@@ -136,7 +136,7 @@ end
 -- Check if a player has a writing tool (pen with ink or pencil with lead) in inventory
 -- @param client Player The player to check
 -- @return boolean Has a usable writing tool
-function ix.documents.HasWritingTool(client)
+function ws.documents.HasWritingTool(client)
     local char = client:GetCharacter()
     if not char then return false end
 
@@ -156,10 +156,49 @@ function ix.documents.HasWritingTool(client)
     return false
 end
 
+-- Signature limits (shared by the signature-save and document-write paths)
+ws.documents.MAX_SIGNATURE_STROKES = 50
+ws.documents.MAX_SIGNATURE_POINTS = 500
+
+-- Validate and sanitize signature stroke data parsed from client JSON.
+-- Truncates to MAX_SIGNATURE_STROKES, coerces non-table strokes to empty, and
+-- rejects (returns nil) if total points exceed MAX_SIGNATURE_POINTS. Used by both
+-- wsSignatureSave and wsDocumentWrite so neither path can bypass the caps.
+-- @param strokes table Parsed stroke array
+-- @return table|nil Sanitized strokes, or nil if invalid/too complex
+function ws.documents.ValidateSignature(strokes)
+    if type(strokes) ~= "table" then return nil end
+
+    -- Truncate to max strokes
+    if #strokes > ws.documents.MAX_SIGNATURE_STROKES then
+        local truncated = {}
+        for i = 1, ws.documents.MAX_SIGNATURE_STROKES do
+            truncated[i] = strokes[i]
+        end
+        strokes = truncated
+    end
+
+    -- Coerce invalid strokes and count total points
+    local totalPoints = 0
+    for i, stroke in ipairs(strokes) do
+        if type(stroke) ~= "table" then
+            strokes[i] = {}
+        else
+            totalPoints = totalPoints + #stroke
+        end
+    end
+
+    if totalPoints > ws.documents.MAX_SIGNATURE_POINTS then
+        return nil
+    end
+
+    return strokes
+end
+
 -- Count words in text
 -- @param text string The text to count words in
 -- @return number Word count
-function ix.documents.CountWords(text)
+function ws.documents.CountWords(text)
     if not text or text == "" then return 0 end
 
     local count = 0
@@ -173,14 +212,14 @@ end
 -- Check if content type is erasable (pencil only)
 -- @param contentType string "handwritten", "pencil", or "typed"
 -- @return boolean Erasable
-function ix.documents.IsErasable(contentType)
+function ws.documents.IsErasable(contentType)
     return contentType == "pencil"
 end
 
 -- Format document type for display
 -- @param docType string The document type
 -- @return string Formatted name
-function ix.documents.FormatType(docType)
+function ws.documents.FormatType(docType)
     local types = {
         handwritten = "Handwritten",
         pencil = "Pencil",

@@ -18,7 +18,7 @@ ITEM.noBusiness = true
 -- Battery device configuration
 ITEM.maxBatteries = 4
 ITEM.weaponClass = "ix_defibrillator"
-ITEM.playerItemKey = "ixDefibItem"
+ITEM.playerItemKey = "wsDefibItem"
 ITEM.equipSound = "defibl/deploy.wav"
 ITEM.notifyPrefix = "defib"
 ITEM.requireFullBattery = true

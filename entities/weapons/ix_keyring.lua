@@ -64,7 +64,7 @@ end
 -- ============================================================================
 
 function SWEP:GetItem()
-    return self.ixItem
+    return self.wsItem
 end
 
 function SWEP:GetCurrentKey()
@@ -94,7 +94,7 @@ function SWEP:UpdateCurrentKey()
 end
 
 function SWEP:GetTargetDoor()
-    return ix.doors.GetTargetDoor(self:GetOwner(), self.MaxUseDistance)
+    return ws.doors.GetTargetDoor(self:GetOwner(), self.MaxUseDistance)
 end
 
 function SWEP:CanKeyFitLock(door)
@@ -102,7 +102,7 @@ function SWEP:CanKeyFitLock(door)
     if not keying or keying == "" then return false end
 
     -- Use centralized keying check
-    return ix.doors.CheckKeying(door, keying)
+    return ws.doors.CheckKeying(door, keying)
 end
 
 -- ============================================================================
@@ -110,9 +110,9 @@ end
 -- ============================================================================
 
 if SERVER then
-    ix.weapon.NetReceive("ixKeyringCycle", "ix_keyring", "DoCycle")
-    ix.weapon.NetReceive("ixKeyringLock", "ix_keyring", "DoLock")
-    ix.weapon.NetReceive("ixKeyringUnlock", "ix_keyring", "DoUnlock")
+    ws.weapon.NetReceive("wsKeyringCycle", "ix_keyring", "DoCycle")
+    ws.weapon.NetReceive("wsKeyringLock", "ix_keyring", "DoLock")
+    ws.weapon.NetReceive("wsKeyringUnlock", "ix_keyring", "DoUnlock")
 end
 
 function SWEP:DoCycle()
@@ -139,7 +139,7 @@ function SWEP:DoLock()
         return
     end
 
-    if not ix.doors.HasLock(door) then
+    if not ws.doors.HasLock(door) then
         owner:NotifyLocalized("keyNoLock")
         return
     end
@@ -156,13 +156,13 @@ function SWEP:DoLock()
     end
 
     -- Check if door is open (can't lock an open door)
-    if ix.doors.IsDoorOpen(door) then
+    if ws.doors.IsDoorOpen(door) then
         owner:NotifyLocalized("keyDoorOpen")
         return
     end
 
     -- Lock the door (syncs to partner for double doors)
-    ix.doors.LockDoor(door)
+    ws.doors.LockDoor(door)
     door:EmitSound("doors/door_latch3.wav", 70)
     owner:NotifyLocalized("keyLocked")
 end
@@ -178,7 +178,7 @@ function SWEP:DoUnlock()
         return
     end
 
-    if not ix.doors.HasLock(door) then
+    if not ws.doors.HasLock(door) then
         owner:NotifyLocalized("keyNoLock")
         return
     end
@@ -195,7 +195,7 @@ function SWEP:DoUnlock()
     end
 
     -- Unlock the door (syncs to partner for double doors)
-    ix.doors.UnlockDoor(door)
+    ws.doors.UnlockDoor(door)
     door:EmitSound("doors/door_latch1.wav", 70)
     owner:NotifyLocalized("keyUnlocked")
 end
@@ -209,17 +209,17 @@ function SWEP:Think()
     if not IsValid(owner) then return end
 
     if CLIENT then
-        local lmb, rmb = ix.constants.ProcessSWEPInput(self)
+        local lmb, rmb = ws.constants.ProcessSWEPInput(self)
 
         if lmb and CurTime() >= (self.nextLockAttempt or 0) then
             self.nextLockAttempt = CurTime() + 1
-            net.Start("ixKeyringLock")
+            net.Start("wsKeyringLock")
             net.SendToServer()
         end
 
         if rmb and CurTime() >= (self.nextUnlockAttempt or 0) then
             self.nextUnlockAttempt = CurTime() + 1
-            net.Start("ixKeyringUnlock")
+            net.Start("wsKeyringUnlock")
             net.SendToServer()
         end
 
@@ -227,7 +227,7 @@ function SWEP:Think()
         local reloadDown = input.IsKeyDown(KEY_R)
         if reloadDown and self.wasReloadDown == false and CurTime() >= (self.nextCycleAttempt or 0) then
             self.nextCycleAttempt = CurTime() + 0.3
-            net.Start("ixKeyringCycle")
+            net.Start("wsKeyringCycle")
             net.SendToServer()
         end
         self.wasReloadDown = reloadDown
@@ -239,7 +239,7 @@ end
 -- ============================================================================
 
 function SWEP:DrawWorldModel()
-    ix.constants.DrawWorldModelBone(self, {3, 1, -1}, {{"Forward", 90}, {"Up", 180}})
+    ws.constants.DrawWorldModelBone(self, {3, 1, -1}, {{"Forward", 90}, {"Up", 180}})
 end
 
 -- ============================================================================
@@ -260,7 +260,7 @@ if CLIENT then
         local lineSpacing = ScreenScale(2)
 
         -- Measure text sizes
-        surface.SetFont("ixSmallFont")
+        surface.SetFont("wsSmallFont")
         local nameW, nameH = surface.GetTextSize(keyName)
         local keyingW, keyingH = 0, 0
         local keyingText = ""
@@ -289,15 +289,15 @@ if CLIENT then
 
         -- Key name
         local textY = y + padding
-        draw.SimpleText(keyName, "ixSmallFont", w / 2, textY, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+        draw.SimpleText(keyName, "wsSmallFont", w / 2, textY, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
         textY = textY + nameH + lineSpacing
 
         -- Keying (if valid)
         if keyingText ~= "" then
-            draw.SimpleText(keyingText, "ixSmallFont", w / 2, textY, Color(150, 150, 150), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+            draw.SimpleText(keyingText, "wsSmallFont", w / 2, textY, Color(150, 150, 150), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
         end
 
         -- Instructions (below box)
-        draw.SimpleText(instructionText, "ixSmallFont", w / 2, y + boxH + lineSpacing, Color(100, 100, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+        draw.SimpleText(instructionText, "wsSmallFont", w / 2, y + boxH + lineSpacing, Color(100, 100, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
     end
 end

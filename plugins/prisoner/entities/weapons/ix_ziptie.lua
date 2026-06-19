@@ -34,7 +34,7 @@ end
 
 if CLIENT then
     function SWEP:DrawWorldModel()
-        ix.constants.DrawWorldModelBone(self, {3, 1, -1}, {{"Right", 90}}, true)
+        ws.constants.DrawWorldModelBone(self, {3, 1, -1}, {{"Right", 90}}, true)
     end
 end
 
@@ -55,7 +55,7 @@ function SWEP:Think()
             if lmbDown and not self.wasLMBDown then
                 if not self.nextUseTime or self.nextUseTime <= CurTime() then
                     self.nextUseTime = CurTime() + 0.5
-                    net.Start("ixZipTieUse")
+                    net.Start("wsZipTieUse")
                     net.SendToServer()
                 end
             end
@@ -72,9 +72,9 @@ end
 -- ============================================================================
 
 if SERVER then
-    util.AddNetworkString("ixZipTieUse")
+    util.AddNetworkString("wsZipTieUse")
 
-    net.Receive("ixZipTieUse", function(len, client)
+    net.Receive("wsZipTieUse", function(len, client)
         local weapon = client:GetActiveWeapon()
         if not IsValid(weapon) or weapon:GetClass() ~= "ix_ziptie" then return end
 
@@ -88,7 +88,7 @@ if SERVER then
         if weapon:GetTying() then return end
 
         -- Get linked item
-        local item = weapon.ixItem
+        local item = weapon.wsItem
         if not item then return end
 
         -- Trace to find target
@@ -101,7 +101,7 @@ if SERVER then
         end
 
         -- Check distance
-        if not ix.constants.CanInteractClose(client, target) then
+        if not ws.constants.CanInteractClose(client, target) then
             client:Notify("You are too far away.")
             return
         end
@@ -124,7 +124,7 @@ if SERVER then
         client:EmitSound("physics/metal/metal_solid_impact_soft3.wav", 50)
 
         -- Play periodic tying sounds during the 5-second process
-        local timerName = "ixZipTie_" .. client:SteamID64()
+        local timerName = "wsZipTie_" .. client:SteamID64()
         timer.Create(timerName, 0.8, 6, function()
             if IsValid(client) and IsValid(weapon) and weapon:GetTying() then
                 client:EmitSound("physics/metal/metal_solid_impact_soft3.wav", 50)
@@ -152,7 +152,7 @@ if SERVER then
                 weapon:SetTyingTarget(nil)
             end
 
-            client.ixZipTieItem = nil
+            client.wsZipTieItem = nil
 
             if client:HasWeapon("ix_ziptie") then
                 client:StripWeapon("ix_ziptie")

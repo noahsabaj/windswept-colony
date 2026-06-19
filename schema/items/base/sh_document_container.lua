@@ -45,7 +45,7 @@ function ITEM:GetDescription()
     local invID = self:GetData("id")
 
     if invID then
-        local inv = ix.item.inventories[invID]
+        local inv = ws.item.inventories[invID]
         if inv then
             local count = 0
             for _ in pairs(inv:GetItems()) do
@@ -67,7 +67,7 @@ function ITEM:OnRemoveContents(inv)
         if containedItem.uniqueID == "paper" then
             local paperID = containedItem:GetPaperID()
             if paperID then
-                ix.documents.Delete(paperID)
+                ws.documents.Delete(paperID)
             end
         end
     end
@@ -94,7 +94,7 @@ ITEM.functions.Rename = {
             currentName,
             function(text)
                 if text then
-                    net.Start("ixContainerRename")
+                    net.Start("wsContainerRename")
                         net.WriteUInt(item:GetID(), 32)
                         net.WriteString(string.sub(text, 1, 32))
                     net.SendToServer()
@@ -110,6 +110,6 @@ ITEM.functions.Rename = {
         if IsValid(item.entity) then return false end
         if not CLIENT then return true end
 
-        return ix.documents.HasWritingTool(LocalPlayer())
+        return ws.documents.HasWritingTool(LocalPlayer())
     end
 }

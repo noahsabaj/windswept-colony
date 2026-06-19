@@ -4,7 +4,7 @@
     Controls:
     - RMB while looking at door: Install lock (requires toolkit in inventory)
 
-    Works with Windswept managed doors (prop_door_rotating with ixIsWindsweptDoor marker).
+    Works with Windswept managed doors (prop_door_rotating with wsIsWindsweptDoor marker).
 ]]--
 
 AddCSLuaFile()
@@ -68,11 +68,11 @@ end
 -- ============================================================================
 
 function SWEP:GetTargetDoor()
-    return ix.doors.GetTargetDoor(self:GetOwner(), self.MaxUseDistance)
+    return ws.doors.GetTargetDoor(self:GetOwner(), self.MaxUseDistance)
 end
 
 function SWEP:HasToolkit()
-    return ix.constants.FindBestToolkit(self:GetOwner())
+    return ws.constants.FindBestToolkit(self:GetOwner())
 end
 
 function SWEP:GetInstallTime()
@@ -91,8 +91,8 @@ end
 -- ============================================================================
 
 if SERVER then
-    ix.weapon.NetReceive("ixLockInstall", "ix_lock", "StartInstall")
-    ix.weapon.NetReceive("ixLockCancel", "ix_lock", "CancelInstall")
+    ws.weapon.NetReceive("wsLockInstall", "ix_lock", "StartInstall")
+    ws.weapon.NetReceive("wsLockCancel", "ix_lock", "CancelInstall")
 end
 
 function SWEP:StartInstall()
@@ -108,7 +108,7 @@ function SWEP:StartInstall()
     end
 
     -- Check if door already has a lock
-    if ix.doors.HasLock(door) then
+    if ws.doors.HasLock(door) then
         owner:NotifyLocalized("lockAlreadyHasLock")
         return
     end
@@ -132,7 +132,7 @@ function SWEP:StartInstall()
 end
 
 function SWEP:CancelInstall()
-    ix.constants.CancelSWEPAction(self, function() return self:GetInstalling() end, function()
+    ws.constants.CancelSWEPAction(self, function() return self:GetInstalling() end, function()
         self:SetInstalling(false)
         self.targetDoor = nil
         self.installingToolkit = nil
@@ -144,7 +144,7 @@ function SWEP:CompleteInstall()
 
     local owner = self:GetOwner()
     local door = self.targetDoor
-    local item = self.ixItem
+    local item = self.wsItem
 
     if not IsValid(door) or not item then
         self:CancelInstall()
@@ -159,7 +159,7 @@ function SWEP:CompleteInstall()
     }
 
     -- Install lock on door using centralized function
-    ix.doors.InstallLock(door, lockData)
+    ws.doors.InstallLock(door, lockData)
 
     -- Damage toolkit slightly
     local toolkit = self.installingToolkit
@@ -168,14 +168,14 @@ function SWEP:CompleteInstall()
     end
 
     -- Remove lock from inventory
-    local _, inventory = ix.constants.GetCharacterInventory(owner)
+    local _, inventory = ws.constants.GetCharacterInventory(owner)
     if inventory then
         inventory:Remove(item:GetID())
     end
 
     -- Strip weapon and clean up
     owner:StripWeapon("ix_lock")
-    owner.ixLockItem = nil
+    owner.wsLockItem = nil
 
     owner:EmitSound("buttons/button14.wav", 60)
     owner:NotifyLocalized("lockInstalled")
@@ -194,16 +194,16 @@ function SWEP:Think()
     if not IsValid(owner) then return end
 
     if CLIENT then
-        local lmb, rmb = ix.constants.ProcessSWEPInput(self)
+        local lmb, rmb = ws.constants.ProcessSWEPInput(self)
 
         if rmb and not self:GetInstalling() and CurTime() >= (self.nextInstallAttempt or 0) then
             self.nextInstallAttempt = CurTime() + 0.5
-            net.Start("ixLockInstall")
+            net.Start("wsLockInstall")
             net.SendToServer()
         end
 
         if lmb and self:GetInstalling() then
-            net.Start("ixLockCancel")
+            net.Start("wsLockCancel")
             net.SendToServer()
         end
     end
@@ -211,7 +211,7 @@ function SWEP:Think()
     -- Installation progress checks (server only)
     if self:GetInstalling() then
         if SERVER then
-            local valid, reason = ix.weapon.IsTargetValid(owner, self:GetTargetDoor(), self.targetDoor, self.MaxUseDistance)
+            local valid, reason = ws.weapon.IsTargetValid(owner, self:GetTargetDoor(), self.targetDoor, self.MaxUseDistance)
             if not valid then
                 self:CancelInstall()
                 if reason == "looked_away" then owner:NotifyLocalized("lockLookedAway")
@@ -235,7 +235,7 @@ end
 -- ============================================================================
 
 function SWEP:DrawWorldModel()
-    ix.constants.DrawWorldModelBone(self, {4, 1, -2}, {{"Forward", 90}})
+    ws.constants.DrawWorldModelBone(self, {4, 1, -2}, {{"Forward", 90}})
 end
 
 -- ============================================================================
@@ -247,6 +247,6 @@ if CLIENT then
         if not self:GetInstalling() then return end
 
         local progress = math.Clamp((CurTime() - self:GetInstallStartTime()) / self:GetInstallDuration(), 0, 1)
-        ix.constants.DrawProgressBar("Installing Lock...", progress, Color(100, 150, 200), "LMB to cancel")
+        ws.constants.DrawProgressBar("Installing Lock...", progress, Color(100, 150, 200), "LMB to cancel")
     end
 end

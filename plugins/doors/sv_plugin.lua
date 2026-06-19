@@ -11,11 +11,11 @@ local PLUGIN = PLUGIN
 -- ============================================================================
 
 -- Hook to handle E key on physical doors
-hook.Add("PlayerUse", "ixWindsweptDoorUse", function(client, entity)
+hook.Add("PlayerUse", "wsWindsweptDoorUse", function(client, entity)
     if not IsValid(entity) then return end
 
-    -- Handle our managed doors (prop_door_rotating with ixIsWindsweptDoor marker)
-    if entity.ixIsWindsweptDoor then
+    -- Handle our managed doors (prop_door_rotating with wsIsWindsweptDoor marker)
+    if entity.wsIsWindsweptDoor then
         -- Native prop_door_rotating handles Use automatically
         return true
     end
@@ -31,9 +31,9 @@ end)
 -- ============================================================================
 
 -- Hook for battering ram and fist damage to managed doors
-hook.Add("EntityTakeDamage", "ixWindsweptDoorDamage", function(target, dmgInfo)
+hook.Add("EntityTakeDamage", "wsWindsweptDoorDamage", function(target, dmgInfo)
     -- Only handle our managed doors
-    if not target.ixIsWindsweptDoor then return end
+    if not target.wsIsWindsweptDoor then return end
 
     local inflictor = dmgInfo:GetInflictor()
     local attacker = dmgInfo:GetAttacker()
@@ -42,14 +42,14 @@ hook.Add("EntityTakeDamage", "ixWindsweptDoorDamage", function(target, dmgInfo)
     if IsValid(inflictor) and inflictor:GetClass() == "ix_batteringram" then
         -- Handle damage via our system
         local damage = dmgInfo:GetDamage()
-        ix.doors.DamageDoor(target, damage, attacker, inflictor)
+        ws.doors.DamageDoor(target, damage, attacker, inflictor)
         return true  -- Block default damage
     end
 
     -- Check if it's fists (ix_hands)
     if IsValid(inflictor) and inflictor:GetClass() == "ix_hands" then
         -- Handle damage via our system (will check if fist damage is allowed)
-        ix.doors.DamageDoor(target, 1, attacker, inflictor)
+        ws.doors.DamageDoor(target, 1, attacker, inflictor)
         return true  -- Block default damage
     end
 
@@ -62,7 +62,7 @@ end)
 -- ============================================================================
 
 -- Save doors when a player disconnects (in case they were editing)
-hook.Add("PlayerDisconnected", "ixWindsweptDoorSave", function(client)
+hook.Add("PlayerDisconnected", "wsWindsweptDoorSave", function(client)
     -- Close any locksmith machines they were using
     for _, ent in ipairs(ents.FindByClass("ix_auto_locksmith")) do
         if ent:GetUser() == client then
@@ -76,11 +76,11 @@ end)
 -- ============================================================================
 
 -- Command to spawn a door at a frame for testing
-ix.command.Add("DoorSpawn", {
+ws.command.Add("DoorSpawn", {
     description = "Spawn a door at the nearest empty frame.",
     adminOnly = true,
     arguments = {
-        ix.type.string  -- Door type: "wood", "metal", "gate"
+        ws.type.string  -- Door type: "wood", "metal", "gate"
     },
     OnRun = function(self, client, doorType)
         doorType = string.lower(doorType or "wood")
@@ -96,7 +96,7 @@ ix.command.Add("DoorSpawn", {
         local nearestID = nil
         local nearestDist = 256
 
-        for mapID, frameData in pairs(ix.doors.frames or {}) do
+        for mapID, frameData in pairs(ws.doors.frames or {}) do
             if not frameData.disabled and not frameData.hasDoor then
                 local dist = pos:Distance(frameData.pos)
                 if dist < nearestDist then
@@ -115,9 +115,9 @@ ix.command.Add("DoorSpawn", {
             doorType = doorType
         }
 
-        local door = ix.doors.SpawnDoor(nearestID, doorData)
+        local door = ws.doors.SpawnDoor(nearestID, doorData)
         if IsValid(door) then
-            ix.doors.Save()
+            ws.doors.Save()
             return "@doorSpawned"
         else
             return "@doorSpawnFailed"
@@ -126,11 +126,11 @@ ix.command.Add("DoorSpawn", {
 })
 
 -- Command to give admin door/lock/key items for testing
-ix.command.Add("DoorGiveItems", {
+ws.command.Add("DoorGiveItems", {
     description = "Give yourself door system test items.",
     adminOnly = true,
     OnRun = function(self, client)
-        local character, inventory = ix.constants.GetCharacterInventory(client)
+        local character, inventory = ws.constants.GetCharacterInventory(client)
         if not character or not inventory then return end
 
         -- Give test items

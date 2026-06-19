@@ -93,11 +93,11 @@ ITEM.functions.View = {
         if title == "" then title = "Untitled Photograph" end
 
         -- Store title keyed by photoID to avoid race conditions in multiplayer
-        ix.photoRequestTitles = ix.photoRequestTitles or {}
-        ix.photoRequestTitles[photoID] = title
+        ws.photoRequestTitles = ws.photoRequestTitles or {}
+        ws.photoRequestTitles[photoID] = title
 
         -- Request photo data from server
-        net.Start("ixPhotoRequest")
+        net.Start("wsPhotoRequest")
             net.WriteString(photoID)
         net.SendToServer()
 
@@ -125,7 +125,7 @@ ITEM.functions.Rename = {
             function(text)
                 if text and text ~= "" then
                     -- Send to server
-                    net.Start("ixPhotoRename")
+                    net.Start("wsPhotoRename")
                         net.WriteUInt(item:GetID(), 32)
                         net.WriteString(string.sub(text, 1, 64))
                     net.SendToServer()
@@ -164,7 +164,7 @@ ITEM.functions.Destroy = {
             "Yes, Destroy",
             function()
                 -- Send destroy request to server
-                net.Start("ixPhotoDestroy")
+                net.Start("wsPhotoDestroy")
                     net.WriteUInt(item:GetID(), 32)
                 net.SendToServer()
             end,
@@ -181,8 +181,17 @@ ITEM.functions.Destroy = {
     end
 }
 
+-- Clean up the backing image file when the photo item is truly destroyed.
+-- (Dropping to the ground keeps the same item instance, so OnRemoved does not
+-- fire there and the photo is preserved.)
+function ITEM:OnRemoved()
+    if SERVER then
+        ws.photo.DeletePhotoFile(self:GetData("photoID", ""))
+    end
+end
+
 -- ============================================================================
--- CLIENT: Photo Viewer Panel (inherits ixPhotoViewerBase)
+-- CLIENT: Photo Viewer Panel (inherits wsPhotoViewerBase)
 -- ============================================================================
 
 if CLIENT then
@@ -191,7 +200,7 @@ if CLIENT then
     function PANEL:SetPhotoData(imageData, title)
         self.title = title or "Untitled Photograph"
         self.loading = false
-        self.material, self.tempPath = ix.photo.LoadMaterial(imageData, "view_" .. SysTime())
+        self.material, self.tempPath = ws.photo.LoadMaterial(imageData, "view_" .. SysTime())
     end
 
     function PANEL:SetLoading(title)
@@ -205,55 +214,55 @@ if CLIENT then
     function PANEL:IsPhotoLoading() return self.loading end
 
     function PANEL:OnCleanup()
-        ix.photo.CleanupTempFile(self.tempPath)
-        ix.gui.photoViewer = nil
+        ws.photo.CleanupTempFile(self.tempPath)
+        ws.gui.photoViewer = nil
     end
 
-    vgui.Register("ixPhotoViewer", PANEL, "ixPhotoViewerBase")
+    vgui.Register("wsPhotoViewer", PANEL, "wsPhotoViewerBase")
 
     -- ========================================================================
     -- CLIENT NETWORKING
     -- ========================================================================
 
     -- Receive photo data from server (raw JPEG binary)
-    net.Receive("ixPhotoData", function()
+    net.Receive("wsPhotoData", function()
         local photoID = net.ReadString()
         local dataLen = net.ReadUInt(32)
         local imageData = net.ReadData(dataLen)
 
         -- Fire hook for album viewer cache (and any other listeners)
-        hook.Run("ixPhotoDataReceived", photoID, imageData)
+        hook.Run("wsPhotoDataReceived", photoID, imageData)
 
         -- Look up title from our request table (avoids race conditions)
-        ix.photoRequestTitles = ix.photoRequestTitles or {}
-        local title = ix.photoRequestTitles[photoID] or "Untitled Photograph"
+        ws.photoRequestTitles = ws.photoRequestTitles or {}
+        local title = ws.photoRequestTitles[photoID] or "Untitled Photograph"
 
         -- Only open photo viewer if this was a direct view request (has title in queue)
         -- Album requests don't add to photoRequestTitles, so they won't open the viewer
-        if ix.photoRequestTitles[photoID] then
-            ix.photoRequestTitles[photoID] = nil  -- Clean up
+        if ws.photoRequestTitles[photoID] then
+            ws.photoRequestTitles[photoID] = nil  -- Clean up
 
-            if IsValid(ix.gui.photoViewer) then
-                ix.gui.photoViewer:SetPhotoData(imageData, title)
+            if IsValid(ws.gui.photoViewer) then
+                ws.gui.photoViewer:SetPhotoData(imageData, title)
             else
-                ix.gui.photoViewer = vgui.Create("ixPhotoViewer")
-                ix.gui.photoViewer:SetPhotoData(imageData, title)
+                ws.gui.photoViewer = vgui.Create("wsPhotoViewer")
+                ws.gui.photoViewer:SetPhotoData(imageData, title)
             end
         end
     end)
 
     -- Receive photo from ground viewing (raw JPEG binary)
-    net.Receive("ixPhotoViewFromGround", function()
+    net.Receive("wsPhotoViewFromGround", function()
         local dataLen = net.ReadUInt(32)
         local imageData = net.ReadData(dataLen)
         local title = net.ReadString()
 
-        if IsValid(ix.gui.photoViewer) then
-            ix.gui.photoViewer:Remove()
+        if IsValid(ws.gui.photoViewer) then
+            ws.gui.photoViewer:Remove()
         end
 
-        ix.gui.photoViewer = vgui.Create("ixPhotoViewer")
-        ix.gui.photoViewer:SetPhotoData(imageData, title)
+        ws.gui.photoViewer = vgui.Create("wsPhotoViewer")
+        ws.gui.photoViewer:SetPhotoData(imageData, title)
     end)
 end
 
@@ -263,12 +272,17 @@ end
 
 if SERVER then
     -- Client requests photo data by ID (sends raw JPEG binary)
-    net.Receive("ixPhotoRequest", function(len, client)
+    net.Receive("wsPhotoRequest", function(len, client)
         local photoID = net.ReadString()
-        local imageData = ix.photo.ReadPhotoFile(photoID)
+
+        -- Only serve photos the client owns or was legitimately shown (album browse
+        -- / ground view grant). Prevents fetching arbitrary photos by ID.
+        if not ws.photo.CanAccessPhoto(client, photoID) then return end
+
+        local imageData = ws.photo.ReadPhotoFile(photoID)
 
         if imageData then
-            net.Start("ixPhotoData")
+            net.Start("wsPhotoData")
                 net.WriteString(photoID)
                 net.WriteUInt(#imageData, 32)
                 net.WriteData(imageData, #imageData)
@@ -276,11 +290,11 @@ if SERVER then
         end
     end)
 
-    net.Receive("ixPhotoRename", function(len, client)
+    net.Receive("wsPhotoRename", function(len, client)
         local itemID = net.ReadUInt(32)
         local title = net.ReadString()
 
-        local item = ix.photo.VerifyOwnership(client, itemID, "photo")
+        local item = ws.photo.VerifyOwnership(client, itemID, "photo")
         if not item then return end
 
         -- Check if already named
@@ -297,16 +311,16 @@ if SERVER then
         client:NotifyLocalized("photoRenamed", title)
     end)
 
-    net.Receive("ixPhotoDestroy", function(len, client)
+    net.Receive("wsPhotoDestroy", function(len, client)
         local itemID = net.ReadUInt(32)
 
-        local item = ix.photo.VerifyOwnership(client, itemID, "photo")
+        local item = ws.photo.VerifyOwnership(client, itemID, "photo")
         if not item then return end
 
         -- Delete the photo file
         local photoID = item:GetData("photoID", "")
         if photoID ~= "" then
-            ix.photo.DeletePhotoFile(photoID)
+            ws.photo.DeletePhotoFile(photoID)
         end
 
         -- Destroy the item
@@ -325,10 +339,10 @@ function ITEM:OnEntityCreated(entity)
     end
 end
 
-hook.Add("PlayerUse", "ixPhotoGroundView", function(client, entity)
+hook.Add("PlayerUse", "wsPhotoGroundView", function(client, entity)
     if not IsValid(entity) then return end
 
-    local item = entity.ixItem
+    local item = entity.wsItem
     if not item then return end
     if item.uniqueID ~= "photo" then return end
 
@@ -337,9 +351,9 @@ hook.Add("PlayerUse", "ixPhotoGroundView", function(client, entity)
         local title = item:GetData("title", "")
         if title == "" then title = "Untitled Photograph" end
 
-        local imageData = ix.photo.ReadPhotoFile(photoID) or ""
+        local imageData = ws.photo.ReadPhotoFile(photoID) or ""
 
-        net.Start("ixPhotoViewFromGround")
+        net.Start("wsPhotoViewFromGround")
             net.WriteUInt(#imageData, 32)
             net.WriteData(imageData, #imageData)
             net.WriteString(title)

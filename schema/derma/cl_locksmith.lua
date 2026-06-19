@@ -15,7 +15,7 @@ local PANEL = {}
 
 local function getInventoryItems(cachedItems)
     if cachedItems then return cachedItems end
-    local _, inventory = ix.constants.GetCharacterInventory(LocalPlayer())
+    local _, inventory = ws.constants.GetCharacterInventory(LocalPlayer())
     if not inventory then return nil end
     return inventory:GetItems()
 end
@@ -98,7 +98,7 @@ end
 
 function PANEL:RefreshInventory()
     -- Cache inventory items ONCE instead of 6+ GetItems() calls
-    local character, inventory = ix.constants.GetCharacterInventory(LocalPlayer())
+    local character, inventory = ws.constants.GetCharacterInventory(LocalPlayer())
     if not character or not inventory then return end
 
     local cachedItems = inventory:GetItems()
@@ -129,7 +129,7 @@ function PANEL:CreateProgramLockTab()
     self.blankLockList = CreateItemListView(panel, "Blank Locks", 10, 35, 400, 200)
 
     CreateNetButton(panel, "Program Lock", 10, 245, 400, 30, self,
-        "ixLocksmithProgramLock",
+        "wsLocksmithProgramLock",
         function() return GetSelectedItemID(self.blankLockList) end,
         function() self:RefreshInventory() end
     )
@@ -184,7 +184,7 @@ function PANEL:CreateProgramKeyTab()
 
         if not blankItemID or not sourceItemID then return end
 
-        net.Start("ixLocksmithProgramKey")
+        net.Start("wsLocksmithProgramKey")
             net.WriteEntity(self.station)
             net.WriteUInt(blankItemID, 32)
             net.WriteUInt(sourceItemID, 32)
@@ -274,7 +274,7 @@ function PANEL:CreateAddKeyingTab()
 
         if not lockItemID or not keyItemID then return end
 
-        net.Start("ixLocksmithAddKeying")
+        net.Start("wsLocksmithAddKeying")
             net.WriteEntity(self.station)
             net.WriteUInt(lockItemID, 32)
             net.WriteUInt(keyItemID, 32)
@@ -362,7 +362,7 @@ function PANEL:CreateRenameTab()
         local newName = self.renameEntry:GetValue()
         if newName == "" then return end
 
-        net.Start("ixLocksmithRename")
+        net.Start("wsLocksmithRename")
             net.WriteEntity(self.station)
             net.WriteUInt(itemID, 32)
             net.WriteString(newName)
@@ -425,7 +425,7 @@ function PANEL:CreateViewKeyingsTab()
     self.viewLockList = CreateItemListView(panel, "Lock", 10, 35, 400, 180)
 
     CreateNetButton(panel, "View Keyings", 10, 225, 400, 30, self,
-        "ixLocksmithViewKeyings",
+        "wsLocksmithViewKeyings",
         function() return GetSelectedItemID(self.viewLockList) end,
         nil
     )
@@ -439,7 +439,7 @@ end
 
 function PANEL:OnRemove()
     if IsValid(self.station) then
-        net.Start("ixLocksmithClose")
+        net.Start("wsLocksmithClose")
             net.WriteEntity(self.station)
         net.SendToServer()
     end
@@ -455,4 +455,4 @@ function PANEL:Think()
     end
 end
 
-vgui.Register("ixLocksmithMenu", PANEL, "DFrame")
+vgui.Register("wsLocksmithMenu", PANEL, "DFrame")

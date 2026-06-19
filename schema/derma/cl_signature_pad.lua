@@ -25,7 +25,7 @@ function PANEL:Init()
     instructions:Dock(TOP)
     instructions:DockMargin(10, 5, 10, 5)
     instructions:SetText("Draw your signature below. Click and drag to draw.")
-    instructions:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
+    instructions:SetTextColor(ws.constants.COLOR_UI_NEUTRAL)
 
     -- Canvas panel
     self.canvas = vgui.Create("DPanel", self)
@@ -59,7 +59,7 @@ function PANEL:Init()
         surface.DrawLine(20, lineY, w - 20, lineY)
 
         -- X mark
-        draw.SimpleText("X", "ixSmallFont", 10, lineY - 10, Color(80, 80, 80), TEXT_ALIGN_LEFT, TEXT_ALIGN_BOTTOM)
+        draw.SimpleText("X", "wsSmallFont", 10, lineY - 10, Color(80, 80, 80), TEXT_ALIGN_LEFT, TEXT_ALIGN_BOTTOM)
     end
 
     self.canvas.OnMousePressed = function(pnl, code)
@@ -99,7 +99,7 @@ function PANEL:Init()
     end
 
     -- Button panel
-    ix.constants.CreateButtonBar(self, {
+    ws.constants.CreateButtonBar(self, {
         {"Clear", 70, LEFT, function()
             self.strokes = {}
             self.currentStroke = nil
@@ -110,7 +110,7 @@ function PANEL:Init()
         {"Save & Sign", 90, RIGHT, function()
             if #self.strokes > 0 then
                 -- Save signature to character
-                net.Start("ixSignatureSave")
+                net.Start("wsSignatureSave")
                     net.WriteString(util.TableToJSON(self.strokes))
                 net.SendToServer()
 
@@ -160,4 +160,4 @@ function PANEL:OnRemove()
     -- Cleanup
 end
 
-vgui.Register("ixSignaturePad", PANEL, "DFrame")
+vgui.Register("wsSignaturePad", PANEL, "DFrame")

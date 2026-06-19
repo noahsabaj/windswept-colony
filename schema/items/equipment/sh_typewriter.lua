@@ -31,8 +31,8 @@ function ITEM:OnDrop(dropPos)
         typewriter:Activate()
 
         -- Store item ID for pickup
-        typewriter.ixItemID = self:GetID()
-        typewriter:SetNetVar("ixItemID", self:GetID())
+        typewriter.wsItemID = self:GetID()
+        typewriter:SetNetVar("wsItemID", self:GetID())
 
         -- Don't create default item entity
         return false
@@ -70,8 +70,8 @@ ITEM.functions.Drop = {
             typewriter:Activate()
 
             -- Store item ID reference
-            typewriter.ixItemID = item:GetID()
-            typewriter:SetNetVar("ixItemID", item:GetID())
+            typewriter.wsItemID = item:GetID()
+            typewriter:SetNetVar("wsItemID", item:GetID())
 
             -- Move item to "placed" state (remove from inventory but keep instance)
             local inv = client:GetCharacter():GetInventory()

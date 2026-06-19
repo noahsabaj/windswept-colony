@@ -15,7 +15,7 @@ function PLUGIN:RenderScreenspaceEffects()
     if not LocalPlayer():GetNetVar("gagged") then return end
 
     -- Check if knocked out - knockout screen takes priority
-    local permadeath = ix.plugin.list["permadeath"]
+    local permadeath = ws.plugin.list["permadeath"]
     if permadeath and permadeath.IsLocalPlayerKnockedOut and permadeath:IsLocalPlayerKnockedOut() then
         return
     end
@@ -38,7 +38,7 @@ function PLUGIN:HUDShouldDraw(name)
     if not LocalPlayer():GetNetVar("gagged") then return end
 
     -- Check if knocked out - knockout handles its own HUD blocking
-    local permadeath = ix.plugin.list["permadeath"]
+    local permadeath = ws.plugin.list["permadeath"]
     if permadeath and permadeath.IsLocalPlayerKnockedOut and permadeath:IsLocalPlayerKnockedOut() then
         return
     end
@@ -53,7 +53,7 @@ end
 -- ============================================================================
 
 -- Draw [RESTRAINED] status and action hints when looking at restrained player
-hook.Add("HUDDrawTargetID", "ixRestrainedTargetID", function()
+hook.Add("HUDDrawTargetID", "wsRestrainedTargetID", function()
     local client = LocalPlayer()
     local trace = client:GetEyeTrace()
     local target = trace.Entity
@@ -75,19 +75,19 @@ hook.Add("HUDDrawTargetID", "ixRestrainedTargetID", function()
     -- Draw [RESTRAINED] status
     local statusText = "[RESTRAINED]"
     local statusColor = Color(255, 150, 50)  -- Orange
-    draw.SimpleTextOutlined(statusText, "ixMediumFont", pos.x, pos.y, statusColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+    draw.SimpleTextOutlined(statusText, "wsMediumFont", pos.x, pos.y, statusColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
 
     local yOffset = 30
 
     -- Draw [GAGGED] if gagged
     if target:GetNetVar("gagged") then
-        draw.SimpleTextOutlined("[GAGGED]", "ixSmallFont", pos.x, pos.y + yOffset, Color(200, 100, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+        draw.SimpleTextOutlined("[GAGGED]", "wsSmallFont", pos.x, pos.y + yOffset, Color(200, 100, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
         yOffset = yOffset + 25
     end
 
     -- Draw [LEASHED] if leashed
     if target:GetNetVar("leashed") then
-        draw.SimpleTextOutlined("[LEASHED]", "ixSmallFont", pos.x, pos.y + yOffset, Color(150, 150, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+        draw.SimpleTextOutlined("[LEASHED]", "wsSmallFont", pos.x, pos.y + yOffset, Color(150, 150, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
         yOffset = yOffset + 25
     end
 
@@ -99,22 +99,22 @@ hook.Add("HUDDrawTargetID", "ixRestrainedTargetID", function()
     local isLeashed = target:GetNetVar("leashed")
 
     -- Check if we're currently dragging this target
-    local isDragging = client:GetNetVar("ixDragging") == target:EntIndex()
+    local isDragging = client:GetNetVar("wsDragging") == target:EntIndex()
 
     if isDragging then
-        draw.SimpleTextOutlined("Release LMB: Stop dragging", "ixSmallFont", pos.x, pos.y + yOffset, ix.constants.COLOR_UI_NEUTRAL, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+        draw.SimpleTextOutlined("Release LMB: Stop dragging", "wsSmallFont", pos.x, pos.y + yOffset, ws.constants.COLOR_UI_NEUTRAL, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
     elseif isLeashed then
         -- Leashed player - show unleash hint
-        draw.SimpleTextOutlined("E: Unleash | R: " .. gagText, "ixSmallFont", pos.x, pos.y + yOffset, ix.constants.COLOR_UI_NEUTRAL, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+        draw.SimpleTextOutlined("E: Unleash | R: " .. gagText, "wsSmallFont", pos.x, pos.y + yOffset, ws.constants.COLOR_UI_NEUTRAL, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
     else
         -- Not leashed - show untie/drag/leash hints
-        draw.SimpleTextOutlined("E: Untie | R: " .. gagText, "ixSmallFont", pos.x, pos.y + yOffset, ix.constants.COLOR_UI_NEUTRAL, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+        draw.SimpleTextOutlined("E: Untie | R: " .. gagText, "wsSmallFont", pos.x, pos.y + yOffset, ws.constants.COLOR_UI_NEUTRAL, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
         yOffset = yOffset + 25
 
         -- Show drag/leash hint only if holding hands and lowered
         local weapon = client:GetActiveWeapon()
         if IsValid(weapon) and weapon:GetClass() == "ix_hands" and not client:IsWepRaised() then
-            draw.SimpleTextOutlined("Hold LMB: Drag | Hold RMB: Leash", "ixSmallFont", pos.x, pos.y + yOffset, ix.constants.COLOR_UI_NEUTRAL, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
+            draw.SimpleTextOutlined("Hold LMB: Drag | Hold RMB: Leash", "wsSmallFont", pos.x, pos.y + yOffset, ws.constants.COLOR_UI_NEUTRAL, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
         end
     end
 end)
@@ -124,7 +124,7 @@ end)
 -- ============================================================================
 
 -- Draw a rope/chain line from leashed players to their anchor point
-hook.Add("PostDrawOpaqueRenderables", "ixLeashVisual", function()
+hook.Add("PostDrawOpaqueRenderables", "wsLeashVisual", function()
     for _, ply in ipairs(player.GetAll()) do
         if ply:GetNetVar("leashed") then
             local leashPos = ply:GetNetVar("leashPos")
@@ -154,7 +154,7 @@ local DRAG_CHECK_INTERVAL = 0.1  -- Only check NetVar every 0.1 seconds
 local leashHoldStart = nil
 local LEASH_HOLD_TIME = 1.0  -- Hold RMB for 1 second to leash
 
-hook.Add("Think", "ixDragInput", function()
+hook.Add("Think", "wsDragInput", function()
     local client = LocalPlayer()
     if not IsValid(client) then return end
 
@@ -197,7 +197,7 @@ hook.Add("Think", "ixDragInput", function()
     -- Throttle NetVar lookup - only check periodically or on input change
     local now = CurTime()
     if lmbDown ~= wasLMBDown or now - lastDragCheckTime > DRAG_CHECK_INTERVAL then
-        cachedDraggingState = client:GetNetVar("ixDragging")
+        cachedDraggingState = client:GetNetVar("wsDragging")
         lastDragCheckTime = now
     end
 
@@ -214,7 +214,7 @@ hook.Add("Think", "ixDragInput", function()
                     if not target:GetNetVar("leashed") then
                         -- Start dragging
                         currentDragTarget = target
-                        net.Start("ixDragStart")
+                        net.Start("wsDragStart")
                         net.WriteEntity(target)
                         net.SendToServer()
                         cachedDraggingState = target:EntIndex()  -- Optimistic update
@@ -225,7 +225,7 @@ hook.Add("Think", "ixDragInput", function()
     else
         if wasLMBDown and cachedDraggingState then
             -- Released LMB while dragging - stop
-            net.Start("ixDragStop")
+            net.Start("wsDragStop")
             net.SendToServer()
             currentDragTarget = nil
             cachedDraggingState = nil  -- Optimistic update
@@ -255,7 +255,7 @@ hook.Add("Think", "ixDragInput", function()
                 local target = trace.Entity
 
                 if IsValid(target) and target:IsPlayer() and target:IsRestricted() then
-                    net.Start("ixLeashStart")
+                    net.Start("wsLeashStart")
                     net.WriteEntity(target)
                     net.SendToServer()
                 end
@@ -275,7 +275,7 @@ end)
 -- LEASH PROGRESS INDICATOR
 -- ============================================================================
 
-hook.Add("HUDPaint", "ixLeashProgress", function()
+hook.Add("HUDPaint", "wsLeashProgress", function()
     if not leashHoldStart then return end
 
     local client = LocalPlayer()
@@ -301,5 +301,5 @@ hook.Add("HUDPaint", "ixLeashProgress", function()
     surface.DrawRect(x, y, barW * progress, barH)
 
     -- Text
-    draw.SimpleText("Leashing...", "ixSmallFont", ScrW() / 2, y - 15, ix.constants.COLOR_UI_NEUTRAL, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
+    draw.SimpleText("Leashing...", "wsSmallFont", ScrW() / 2, y - 15, ws.constants.COLOR_UI_NEUTRAL, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
 end)

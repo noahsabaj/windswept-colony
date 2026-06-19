@@ -41,7 +41,7 @@ end
 
 if CLIENT then
     function SWEP:DrawWorldModel()
-        ix.constants.DrawWorldModelBone(self, {3, 1, -1}, {{"Right", 90}, {"Up", 180}}, true)
+        ws.constants.DrawWorldModelBone(self, {3, 1, -1}, {{"Right", 90}, {"Up", 180}}, true)
     end
 end
 
@@ -61,11 +61,11 @@ function SWEP:Think()
             return
         end
 
-        local lmb, rmb = ix.constants.ProcessSWEPInput(self)
+        local lmb, rmb = ws.constants.ProcessSWEPInput(self)
 
         if lmb and CurTime() >= (self.nextShowTime or 0) then
             self.nextShowTime = CurTime() + 0.5
-            net.Start("ixPersonalIDShowForward")
+            net.Start("wsPersonalIDShowForward")
             net.SendToServer()
         end
 
@@ -82,10 +82,10 @@ end
 
 if CLIENT then
     -- Find the equipped personal_id item from inventory
-    -- (self.ixItem is only set server-side, not networked to client)
+    -- (self.wsItem is only set server-side, not networked to client)
     function SWEP:GetEquippedItem()
         local client = LocalPlayer()
-        local character, inventory = ix.constants.GetCharacterInventory(client)
+        local character, inventory = ws.constants.GetCharacterInventory(client)
         if not character or not inventory then return nil end
 
         for _, item in pairs(inventory:GetItems()) do
@@ -109,15 +109,15 @@ if CLIENT then
         local data = item:GetIDCardData()
 
         -- Remove any existing self-view ID card
-        if IsValid(ix.gui.selfIDCard) then
-            ix.gui.selfIDCard:Remove()
+        if IsValid(ws.gui.selfIDCard) then
+            ws.gui.selfIDCard:Remove()
         end
 
-        local card = vgui.Create("ixPersonalIDCard")
+        local card = vgui.Create("wsPersonalIDCard")
         card:SetData(data)
         card:SetSelfViewMode()
 
-        ix.gui.selfIDCard = card
+        ws.gui.selfIDCard = card
     end
 end
 
@@ -126,7 +126,7 @@ end
 -- ============================================================================
 
 if SERVER then
-    net.Receive("ixPersonalIDShowForward", function(len, client)
+    net.Receive("wsPersonalIDShowForward", function(len, client)
         -- Verify client has the weapon equipped
         local weapon = client:GetActiveWeapon()
         if not IsValid(weapon) or weapon:GetClass() ~= "ix_personalid" then
@@ -140,7 +140,7 @@ if SERVER then
         end
 
         -- Get the linked item
-        local item = weapon.ixItem
+        local item = weapon.wsItem
         if not item then
             return
         end
@@ -158,14 +158,14 @@ if SERVER then
         if IsValid(target) and target:IsPlayer() then
             -- Determine sex from model
             local sex = "M"
-            if physical.model and ix.physical.IsFemaleModel(physical.model) then
+            if physical.model and ws.physical.IsFemaleModel(physical.model) then
                 sex = "F"
             end
 
             -- Format date of birth
             local dob = "Unknown"
             if physical.birthMonth and physical.birthDay and physical.age then
-                dob = ix.birthdata.FormatDate(physical.birthMonth, physical.birthDay, physical.age)
+                dob = ws.birthdata.FormatDate(physical.birthMonth, physical.birthDay, physical.age)
             end
 
             -- Build data table for network
@@ -190,7 +190,7 @@ if SERVER then
             }
 
             -- Send to target player (using existing net message)
-            net.Start("ixShowPersonalID")
+            net.Start("wsShowPersonalID")
                 net.WriteTable(data)
             net.Send(target)
 

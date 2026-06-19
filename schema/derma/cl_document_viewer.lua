@@ -54,7 +54,7 @@ function PANEL:Init()
     self.contentLabel:SetWrap(true)
     self.contentLabel:SetAutoStretchVertical(true)
     self.contentLabel:SetText("Loading...")
-    self.contentLabel:SetTextColor(ix.constants.COLOR_UI_NEUTRAL)
+    self.contentLabel:SetTextColor(ws.constants.COLOR_UI_NEUTRAL)
 
     -- Update content background height when content changes
     self.contentLabel.PerformLayout = function(lbl)
@@ -84,7 +84,7 @@ function PANEL:SetDocument(data)
     if not data then return end
 
     -- Metadata (NO author - fog of war)
-    local docType = ix.documents and ix.documents.FormatType(data.documentType) or (data.documentType or "Unknown")
+    local docType = ws.documents and ws.documents.FormatType(data.documentType) or (data.documentType or "Unknown")
     local wordCount = data.wordCount or 0
 
     self.metaLabel:SetText(string.format("%s | %d words", docType, wordCount))
@@ -116,8 +116,30 @@ function PANEL:CreateSignaturePanels(signatures)
         sigPanel:DockMargin(0, i > 1 and spacing or 0, 0, 0)
         sigPanel:SetTall(sigHeight)
 
-        -- Get stroke color (default gray if missing)
-        local strokeColor = sigData.color or {200, 200, 200}
+        -- Pre-sanitize stroke + color data ONCE (not per-frame). This is networked
+        -- from another player's signature; a malformed point/color would otherwise
+        -- error inside Paint every frame, freezing the viewer for whoever opens it.
+        local rawColor = sigData.color
+        local strokeColor = {
+            (istable(rawColor) and isnumber(rawColor[1])) and rawColor[1] or 200,
+            (istable(rawColor) and isnumber(rawColor[2])) and rawColor[2] or 200,
+            (istable(rawColor) and isnumber(rawColor[3])) and rawColor[3] or 200,
+        }
+
+        local cleanStrokes = {}
+        for _, stroke in ipairs(sigData.strokes or {}) do
+            if istable(stroke) then
+                local pts = {}
+                for _, p in ipairs(stroke) do
+                    if istable(p) and isnumber(p.x) and isnumber(p.y) then
+                        pts[#pts + 1] = p
+                    end
+                end
+                if #pts >= 2 then
+                    cleanStrokes[#cleanStrokes + 1] = pts
+                end
+            end
+        end
 
         sigPanel.Paint = function(pnl, w, h)
             -- Background
@@ -134,18 +156,16 @@ function PANEL:CreateSignaturePanels(signatures)
             surface.SetDrawColor(35, 35, 35)
             surface.DrawRect(sigX, sigY, sigW, sigH)
 
-            -- Draw strokes with color
+            -- Draw strokes with color (pre-sanitized above)
             surface.SetDrawColor(strokeColor[1], strokeColor[2], strokeColor[3])
-            local strokes = sigData.strokes or {}
-            for _, stroke in ipairs(strokes) do
-                if #stroke >= 2 then
-                    for j = 2, #stroke do
-                        local x1 = sigX + stroke[j - 1].x * sigW
-                        local y1 = sigY + stroke[j - 1].y * sigH
-                        local x2 = sigX + stroke[j].x * sigW
-                        local y2 = sigY + stroke[j].y * sigH
-                        surface.DrawLine(x1, y1, x2, y2)
-                    end
+            for _, stroke in ipairs(cleanStrokes) do
+                for j = 2, #stroke do
+                    surface.DrawLine(
+                        sigX + stroke[j - 1].x * sigW,
+                        sigY + stroke[j - 1].y * sigH,
+                        sigX + stroke[j].x * sigW,
+                        sigY + stroke[j].y * sigH
+                    )
                 end
             end
 
@@ -166,4 +186,4 @@ function PANEL:OnRemove()
     -- Cleanup
 end
 
-vgui.Register("ixDocumentViewer", PANEL, "DFrame")
+vgui.Register("wsDocumentViewer", PANEL, "DFrame")

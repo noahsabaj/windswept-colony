@@ -13,27 +13,27 @@ end
 -- Players will not be able to change their class freely
 -- They must go through roleplay processes to do so
 -- Note: Unlike Business, Classes doesn't check a hook - we must remove it directly
-hook.Remove("CreateMenuButtons", "ixClasses")
+hook.Remove("CreateMenuButtons", "wsClasses")
 
 -- ============================================================================
 -- PERSONAL ID NETWORKING
 -- Receive ID card display from another player
 -- ============================================================================
 
-net.Receive("ixShowPersonalID", function()
+net.Receive("wsShowPersonalID", function()
     local data = net.ReadTable()
 
     -- Remove any existing recipient ID cards
-    if IsValid(ix.gui.recipientIDCard) then
-        ix.gui.recipientIDCard:Remove()
+    if IsValid(ws.gui.recipientIDCard) then
+        ws.gui.recipientIDCard:Remove()
     end
 
     -- Create new ID card in recipient mode
-    local card = vgui.Create("ixPersonalIDCard")
+    local card = vgui.Create("wsPersonalIDCard")
     card:SetData(data)
     card:SetRecipientMode()
 
-    ix.gui.recipientIDCard = card
+    ws.gui.recipientIDCard = card
 end)
 
 -- ============================================================================
@@ -58,12 +58,12 @@ local wasHKeyDown = false
 
 local function StopRadioTransmission()
     if not radioTransmitting then return end
-    net.Start("ixRadioVoiceStop")
+    net.Start("wsRadioVoiceStop")
     net.SendToServer()
     radioTransmitting = false
 end
 
-hook.Add("Think", "ixRadioVoiceTransmit", function()
+hook.Add("Think", "wsRadioVoiceTransmit", function()
     local client = LocalPlayer()
     if not IsValid(client) then return end
 
@@ -83,12 +83,12 @@ hook.Add("Think", "ixRadioVoiceTransmit", function()
         if character and character:GetData("ixHasActiveRadio") then
             -- Check we can transmit (not knocked, gagged, restrained, dead)
             local canTransmit = client:Alive()
-                and not client:GetNetVar("ixKnocked")
+                and not client:GetNetVar("wsKnocked")
                 and not client:GetNetVar("gagged")
-                and not client:GetNetVar("ixRestricted")
+                and not client:GetNetVar("wsRestricted")
 
             if canTransmit then
-                net.Start("ixRadioVoiceStart")
+                net.Start("wsRadioVoiceStart")
                 net.SendToServer()
                 radioTransmitting = true
             end
@@ -102,10 +102,10 @@ hook.Add("Think", "ixRadioVoiceTransmit", function()
 end)
 
 -- Stop transmitting on death/knockout
-hook.Add("EntityNetworkedVarChanged", "ixRadioStopOnIncapacitate", function(ent, name, old, new)
+hook.Add("EntityNetworkedVarChanged", "wsRadioStopOnIncapacitate", function(ent, name, old, new)
     if ent ~= LocalPlayer() then return end
 
-    if (name == "ixKnocked" or name == "gagged" or name == "ixRestricted") and new then
+    if (name == "wsKnocked" or name == "gagged" or name == "wsRestricted") and new then
         StopRadioTransmission()
     end
 end)
@@ -119,7 +119,7 @@ end)
 local lastAmplitudeSent = 0
 local AMPLITUDE_SEND_INTERVAL = 0.1
 
-timer.Create("ixVoiceAmplitudeSync", AMPLITUDE_SEND_INTERVAL, 0, function()
+timer.Create("wsVoiceAmplitudeSync", AMPLITUDE_SEND_INTERVAL, 0, function()
     local client = LocalPlayer()
     if not IsValid(client) then return end
 
@@ -128,7 +128,7 @@ timer.Create("ixVoiceAmplitudeSync", AMPLITUDE_SEND_INTERVAL, 0, function()
 
         -- Only send if changed significantly (reduce network traffic)
         if math.abs(amp - lastAmplitudeSent) > 0.05 then
-            net.Start("ixVoiceAmplitude")
+            net.Start("wsVoiceAmplitude")
             net.WriteFloat(amp)
             net.SendToServer()
             lastAmplitudeSent = amp
@@ -200,7 +200,7 @@ local function OpenVolumeSlider(title, text, currentValue, minValue, maxValue, c
     end
 end
 
-net.Receive("ixRadioVolume", function()
+net.Receive("wsRadioVolume", function()
     local itemID = net.ReadUInt(32)
     local currentVolume = net.ReadUInt(7)
 
@@ -211,7 +211,7 @@ net.Receive("ixRadioVolume", function()
         0,
         100,
         function(value)
-            net.Start("ixRadioVolumeSet")
+            net.Start("wsRadioVolumeSet")
             net.WriteUInt(itemID, 32)
             net.WriteUInt(math.floor(value), 7)
             net.SendToServer()

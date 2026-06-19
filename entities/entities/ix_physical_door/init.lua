@@ -192,9 +192,9 @@ function ENT:OnDestroyed(attacker)
     -- Clear frame reference
     local frameID = self:GetFrameID()
     if frameID and frameID ~= "" then
-        if ix.doors and ix.doors.frames and ix.doors.frames[frameID] then
-            ix.doors.frames[frameID].hasDoor = false
-            ix.doors.frames[frameID].doorEntity = nil
+        if ws.doors and ws.doors.frames and ws.doors.frames[frameID] then
+            ws.doors.frames[frameID].hasDoor = false
+            ws.doors.frames[frameID].doorEntity = nil
         end
     end
 
@@ -202,8 +202,8 @@ function ENT:OnDestroyed(attacker)
     self:Remove()
 
     -- Save persistence
-    if ix.doors and ix.doors.Save then
-        ix.doors.Save()
+    if ws.doors and ws.doors.Save then
+        ws.doors.Save()
     end
 end
 

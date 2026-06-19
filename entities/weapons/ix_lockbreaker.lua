@@ -77,7 +77,7 @@ end
 -- ============================================================================
 
 function SWEP:GetTargetDoor()
-    return ix.doors.GetTargetDoor(self:GetOwner(), self.MaxUseDistance)
+    return ws.doors.GetTargetDoor(self:GetOwner(), self.MaxUseDistance)
 end
 
 -- ============================================================================
@@ -85,8 +85,8 @@ end
 -- ============================================================================
 
 if SERVER then
-    ix.weapon.NetReceive("ixLockbreakerStart", "ix_lockbreaker", "StartBreaking")
-    ix.weapon.NetReceive("ixLockbreakerCancel", "ix_lockbreaker", "CancelBreaking")
+    ws.weapon.NetReceive("wsLockbreakerStart", "ix_lockbreaker", "StartBreaking")
+    ws.weapon.NetReceive("wsLockbreakerCancel", "ix_lockbreaker", "CancelBreaking")
 end
 
 function SWEP:StartBreaking()
@@ -103,7 +103,7 @@ function SWEP:StartBreaking()
     end
 
     -- Check if door has a lock
-    if not ix.doors.HasLock(door) then
+    if not ws.doors.HasLock(door) then
         owner:NotifyLocalized("lockbreakerNoLock")
         return
     end
@@ -119,14 +119,14 @@ function SWEP:StartBreaking()
 
     -- Broadcast to nearby players that someone is breaking a lock
     for _, ply in ipairs(player.GetAll()) do
-        if ix.constants.WithinRange(ply, owner, ix.constants.RANGE_SOUND_FAR) then
+        if ws.constants.WithinRange(ply, owner, ws.constants.RANGE_SOUND_FAR) then
             ply:NotifyLocalized("lockbreakerHeard")
         end
     end
 end
 
 function SWEP:CancelBreaking()
-    ix.constants.CancelSWEPAction(self, function() return self:IsBreaking() end, function()
+    ws.constants.CancelSWEPAction(self, function() return self:IsBreaking() end, function()
         self:SetBreaking(false)
         self.targetDoor = nil
     end)
@@ -144,7 +144,7 @@ function SWEP:CompleteBreaking()
     end
 
     -- Destroy the lock completely
-    ix.doors.RemoveLock(door)
+    ws.doors.RemoveLock(door)
     door:Fire("unlock")
 
     -- Loud snap sound
@@ -163,8 +163,8 @@ function SWEP:CompleteBreaking()
     self.targetDoor = nil
 
     -- Save persistence
-    if ix.doors and ix.doors.Save then
-        ix.doors.Save()
+    if ws.doors and ws.doors.Save then
+        ws.doors.Save()
     end
 end
 
@@ -177,16 +177,16 @@ function SWEP:Think()
     if not IsValid(owner) then return end
 
     if CLIENT then
-        local lmb, rmb = ix.constants.ProcessSWEPInput(self)
+        local lmb, rmb = ws.constants.ProcessSWEPInput(self)
 
         if rmb and not self:IsBreaking() and CurTime() >= (self.nextBreakAttempt or 0) then
             self.nextBreakAttempt = CurTime() + 0.5
-            net.Start("ixLockbreakerStart")
+            net.Start("wsLockbreakerStart")
             net.SendToServer()
         end
 
         if lmb and self:IsBreaking() then
-            net.Start("ixLockbreakerCancel")
+            net.Start("wsLockbreakerCancel")
             net.SendToServer()
         end
     end
@@ -194,7 +194,7 @@ function SWEP:Think()
     -- Breaking progress checks
     if self:IsBreaking() then
         if SERVER then
-            local valid, reason = ix.weapon.IsTargetValid(owner, self:GetTargetDoor(), self.targetDoor, self.MaxUseDistance, 16)
+            local valid, reason = ws.weapon.IsTargetValid(owner, self:GetTargetDoor(), self.targetDoor, self.MaxUseDistance, 16)
             if not valid then
                 self:CancelBreaking()
                 if reason == "looked_away" then owner:NotifyLocalized("lockbreakerLookedAway")
@@ -237,7 +237,7 @@ end
 -- ============================================================================
 
 function SWEP:DrawWorldModel()
-    ix.constants.DrawWorldModelBone(self, {5, 2, -3}, {{"Right", -90}, {"Forward", 180}})
+    ws.constants.DrawWorldModelBone(self, {5, 2, -3}, {{"Right", -90}, {"Forward", 180}})
 end
 
 -- ============================================================================
@@ -249,6 +249,6 @@ if CLIENT then
         if not self:IsBreaking() then return end
 
         local progress = math.Clamp((CurTime() - self:GetBreakStartTime()) / self.BreakTime, 0, 1)
-        ix.constants.DrawProgressBar("Breaking Lock...", progress, Color(200, 100, 50), "LMB to cancel", Color(255, 150, 100))
+        ws.constants.DrawProgressBar("Breaking Lock...", progress, Color(200, 100, 50), "LMB to cancel", Color(255, 150, 100))
     end
 end

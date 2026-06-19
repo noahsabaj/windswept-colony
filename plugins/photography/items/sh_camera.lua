@@ -74,7 +74,7 @@ if CLIENT then
 
         -- Draw equipped indicator (green dot)
         if isEquipped then
-            ix.constants.DrawEquippedIndicator(w, h)
+            ws.constants.DrawEquippedIndicator(w, h)
         end
 
         local barY = h - 6
@@ -95,7 +95,7 @@ if CLIENT then
             local chargeWidth = ((w - 8) / 100) * charge
             -- Optional helper for charge colors (use fallback if missing)
             local function GetChargeColor(c)
-                if ix.constants and ix.constants.GetChargeColor then return ix.constants.GetChargeColor(c) end
+                if ws.constants and ws.constants.GetChargeColor then return ws.constants.GetChargeColor(c) end
                 return c >= 20 and Color(100, 255, 100) or Color(255, 100, 100)
             end
             surface.SetDrawColor(GetChargeColor(charge))
@@ -132,7 +132,7 @@ if CLIENT then
                 batteryRow:SetText(string.format("Battery: %dup / 100up", charge))
                 
                 local function GetChargeColorDark(c)
-                    if ix.constants and ix.constants.GetChargeColorDark then return ix.constants.GetChargeColorDark(c) end
+                    if ws.constants and ws.constants.GetChargeColorDark then return ws.constants.GetChargeColorDark(c) end
                     return c >= 20 and Color(50, 150, 50) or Color(150, 50, 50)
                 end
                 
@@ -171,7 +171,7 @@ ITEM.functions.LoadFilm = {
     isMulti = true,
     multiOptions = function(item, client)
         local options = {}
-        local character, inventory = ix.constants.GetCharacterInventory(client)
+        local character, inventory = ws.constants.GetCharacterInventory(client)
         if not character or not inventory then return options end
 
         for _, invItem in pairs(inventory:GetItems()) do
@@ -198,7 +198,7 @@ ITEM.functions.LoadFilm = {
 
         if not filmID then return false end
 
-        local filmItem = ix.item.instances[filmID]
+        local filmItem = ws.item.instances[filmID]
         if not filmItem or filmItem.uniqueID ~= "film" then
             return false
         end
@@ -224,7 +224,7 @@ ITEM.functions.LoadFilm = {
         local client = item.player
         if not IsValid(client) then return false end
 
-        local character, inventory = ix.constants.GetCharacterInventory(client)
+        local character, inventory = ws.constants.GetCharacterInventory(client)
         if not character or not inventory then return false end
 
         for _, invItem in pairs(inventory:GetItems()) do
@@ -255,7 +255,7 @@ ITEM.functions.Equip = {
             return false
         end
 
-        local existingItem = client.ixCameraItem
+        local existingItem = client.wsCameraItem
         if existingItem and existingItem ~= item then
             existingItem:SetData("equipped", nil)
         end
@@ -266,11 +266,11 @@ ITEM.functions.Equip = {
 
         local weapon = client:Give(item.weaponClass)
         if IsValid(weapon) then
-            weapon.ixItem = item
+            weapon.wsItem = item
             client:SelectWeapon(item.weaponClass)
         end
 
-        client.ixCameraItem = item
+        client.wsCameraItem = item
         item:SetData("equipped", true)
 
         client:EmitSound(item.equipSound, 50)
@@ -297,7 +297,7 @@ ITEM.functions.Unequip = {
             client:StripWeapon(item.weaponClass)
         end
 
-        client.ixCameraItem = nil
+        client.wsCameraItem = nil
         item:SetData("equipped", nil)
 
         local pitch = item.unequipSound and 100 or 90
@@ -322,7 +322,7 @@ function ITEM.postHooks.drop(item, result)
             if IsValid(weapon) then
                 client:StripWeapon(item.weaponClass)
             end
-            client.ixCameraItem = nil
+            client.wsCameraItem = nil
         end
         item:SetData("equipped", nil)
     end
@@ -336,7 +336,7 @@ function ITEM:OnTransferred(oldInventory, newInventory)
             if IsValid(weapon) then
                 oldOwner:StripWeapon(self.weaponClass)
             end
-            oldOwner.ixCameraItem = nil
+            oldOwner.wsCameraItem = nil
         end
         self:SetData("equipped", nil)
     end
@@ -360,8 +360,8 @@ function ITEM:OnLoadout()
 
         local weapon = client:Give(self.weaponClass, true)
         if IsValid(weapon) then
-            weapon.ixItem = self
-            client.ixCameraItem = self
+            weapon.wsItem = self
+            client.wsCameraItem = self
         end
     end
 end

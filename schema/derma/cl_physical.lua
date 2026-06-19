@@ -7,13 +7,13 @@
     Note: Labels are handled externally by Helix's character creation system.
     These panels only contain the controls themselves.
 
-    Pattern follows ixNumSlider from Helix - no nested containers, direct docking.
+    Pattern follows wsNumSlider from Helix - no nested containers, direct docking.
 ]]--
 
 -- ============================================================================
 -- PHYSICAL SLIDER
 -- A slider with dual-unit display (e.g., height in cm + ft'in")
--- Follows ixNumSlider pattern from Helix
+-- Follows wsNumSlider pattern from Helix
 -- ============================================================================
 
 local PANEL = {}
@@ -25,27 +25,27 @@ function PANEL:Init()
     self.displayMode = "number" -- number, height, weight, age
     self.labelPadding = 8
 
-    surface.SetFont("ixMenuButtonFont")
+    surface.SetFont("wsMenuButtonFont")
     local totalWidth = surface.GetTextSize("000 lbs (000 kg)") + self.labelPadding
     local _, fontHeight = surface.GetTextSize("W@")
 
-    -- Set panel height based on font (like ixTextEntry does)
+    -- Set panel height based on font (like wsTextEntry does)
     self:SetTall(fontHeight)
 
-    -- Value display (right side) - follows ixNumSlider pattern
+    -- Value display (right side) - follows wsNumSlider pattern
     self.label = self:Add("DLabel")
     self.label:Dock(RIGHT)
     self.label:SetWide(totalWidth)
     self.label:SetContentAlignment(5)
-    self.label:SetFont("ixMenuButtonFont")
+    self.label:SetFont("wsMenuButtonFont")
     self.label:SetTextColor(color_white)
     self.label.Paint = function(panel, width, height)
         surface.SetDrawColor(derma.GetColor("DarkerBackground", self))
         surface.DrawRect(0, 0, width, height)
     end
 
-    -- Slider (fills remaining space) - follows ixNumSlider pattern
-    self.slider = self:Add("ixSlider")
+    -- Slider (fills remaining space) - follows wsNumSlider pattern
+    self.slider = self:Add("wsSlider")
     self.slider:Dock(FILL)
     self.slider:DockMargin(0, 0, 4, 0)
     self.slider.OnValueChanged = function(panel)
@@ -71,10 +71,10 @@ function PANEL:UpdateDisplay()
     local displayText = tostring(value)
 
     if self.displayMode == "height" then
-        local feet, inches = ix.physical.CmToImperial(value)
+        local feet, inches = ws.physical.CmToImperial(value)
         displayText = string.format("%d cm (%d'%d\")", value, feet, inches)
     elseif self.displayMode == "weight" then
-        local kg = ix.physical.LbsToKg(value)
+        local kg = ws.physical.LbsToKg(value)
         displayText = string.format("%d lbs (%d kg)", value, kg)
     elseif self.displayMode == "age" then
         displayText = string.format("%d years", value)
@@ -129,7 +129,7 @@ end
 function PANEL:OnValueUpdated()
 end
 
-vgui.Register("ixPhysicalSlider", PANEL, "Panel")
+vgui.Register("wsPhysicalSlider", PANEL, "Panel")
 
 -- ============================================================================
 -- PHYSICAL DROPDOWN
@@ -142,15 +142,15 @@ function PANEL:Init()
     self.options = {}
     self.currentValue = nil
 
-    -- Set panel height based on font (like ixTextEntry does)
-    surface.SetFont("ixMenuButtonFont")
+    -- Set panel height based on font (like wsTextEntry does)
+    surface.SetFont("wsMenuButtonFont")
     local _, fontHeight = surface.GetTextSize("W@")
     self:SetTall(fontHeight)
 
     -- Combo box - docks to fill entire panel
     self.combo = self:Add("DComboBox")
     self.combo:Dock(FILL)
-    self.combo:SetFont("ixMenuButtonFont")
+    self.combo:SetFont("wsMenuButtonFont")
     self.combo:SetTextColor(color_white)
     self.combo:SetSortItems(false) -- Keep original order, don't sort alphabetically
     self.combo.OnSelect = function(panel, index, value, data)
@@ -221,7 +221,7 @@ end
 function PANEL:OnValueChanged()
 end
 
-vgui.Register("ixPhysicalDropdown", PANEL, "Panel")
+vgui.Register("wsPhysicalDropdown", PANEL, "Panel")
 
 -- ============================================================================
 -- PHYSICAL BUILD DISPLAY
@@ -234,15 +234,15 @@ function PANEL:Init()
     self.build = "average"
     self.bmi = 22
 
-    -- Set panel height based on font (like ixTextEntry does)
-    surface.SetFont("ixMenuButtonFont")
+    -- Set panel height based on font (like wsTextEntry does)
+    surface.SetFont("wsMenuButtonFont")
     local _, fontHeight = surface.GetTextSize("W@")
     self:SetTall(fontHeight)
 
     -- Value display - fills entire panel
     self.valueLabel = self:Add("DLabel")
     self.valueLabel:Dock(FILL)
-    self.valueLabel:SetFont("ixMenuButtonFont")
+    self.valueLabel:SetFont("wsMenuButtonFont")
     self.valueLabel:SetTextColor(color_white)
     self.valueLabel:SetText("Average")
     self.valueLabel:SetContentAlignment(4) -- Left align
@@ -264,4 +264,4 @@ function PANEL:GetBuild()
     return self.build
 end
 
-vgui.Register("ixPhysicalBuildDisplay", PANEL, "Panel")
+vgui.Register("wsPhysicalBuildDisplay", PANEL, "Panel")

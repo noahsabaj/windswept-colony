@@ -16,7 +16,7 @@ ITEM.base = "base_equippable"
 
 -- Equippable configuration
 ITEM.equipWeaponClass = "ix_binoculars"
-ITEM.equipPlayerKey = "ixBinocularsItem"
+ITEM.equipPlayerKey = "wsBinocularsItem"
 ITEM.equipNotifyKey = "binocularsEquipped"
 ITEM.equipTip = "Hold the binoculars in your hands."
 ITEM.unequipTip = "Put the binoculars away."

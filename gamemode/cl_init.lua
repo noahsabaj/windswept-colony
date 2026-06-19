@@ -2,4 +2,4 @@
     Windswept Colony RP - Client
 ]]--
 
-DeriveGamemode("helix")
+DeriveGamemode("windswept")

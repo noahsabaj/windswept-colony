@@ -45,9 +45,9 @@ ITEM.viewSuffix = nil
 -- ============================================================================
 
 function ITEM:OnInstanced(invID, x, y)
-    local inventory = ix.item.inventories[invID]
+    local inventory = ws.item.inventories[invID]
 
-    ix.inventory.New(inventory and inventory.owner or 0, self.uniqueID, function(inv)
+    ws.inventory.New(inventory and inventory.owner or 0, self.uniqueID, function(inv)
         local client = inv:GetOwner()
 
         inv.vars.isBag = self.uniqueID
@@ -63,7 +63,7 @@ end
 function ITEM:GetInventory()
     local index = self:GetData("id")
     if index then
-        return ix.item.inventories[index]
+        return ws.item.inventories[index]
     end
 end
 
@@ -73,7 +73,7 @@ function ITEM:OnSendData()
     local index = self:GetData("id")
 
     if index then
-        local inventory = ix.item.inventories[index]
+        local inventory = ws.item.inventories[index]
 
         if inventory then
             inventory.vars.isBag = self.uniqueID
@@ -83,7 +83,7 @@ function ITEM:OnSendData()
         else
             local owner = self.player:GetCharacter():GetID()
 
-            ix.inventory.Restore(self:GetData("id"), self.invWidth, self.invHeight, function(inv)
+            ws.inventory.Restore(self:GetData("id"), self.invWidth, self.invHeight, function(inv)
                 inv.vars.isBag = self.uniqueID
                 inv.vars[self.inventoryFlag] = true
                 inv:SetOwner(owner, true)
@@ -92,7 +92,7 @@ function ITEM:OnSendData()
                     return
                 end
 
-                for client, character in ix.util.GetCharacters() do
+                for client, character in ws.util.GetCharacters() do
                     if character:GetID() == inv.owner then
                         inv:AddReceiver(client)
                         break
@@ -101,7 +101,7 @@ function ITEM:OnSendData()
             end)
         end
     else
-        ix.inventory.New(self.player:GetCharacter():GetID(), self.uniqueID, function(inv)
+        ws.inventory.New(self.player:GetCharacter():GetID(), self.uniqueID, function(inv)
             inv.vars[self.inventoryFlag] = true
             self:SetData("id", inv:GetID())
         end)
@@ -117,7 +117,7 @@ function ITEM.postHooks.drop(item, result)
     query:Execute()
 
     if SERVER then
-        net.Start("ixBagDrop")
+        net.Start("wsBagDrop")
             net.WriteUInt(index, 32)
         net.Send(item.player)
     end
@@ -132,7 +132,7 @@ function ITEM:OnRemoved()
 
     if index then
         if self.OnRemoveContents then
-            local inv = ix.item.inventories[index]
+            local inv = ws.item.inventories[index]
             if inv then
                 self:OnRemoveContents(inv)
             end
@@ -206,11 +206,11 @@ function ITEM:OnTransferred(curInv, inventory)
 end
 
 function ITEM:OnRegistered()
-    ix.inventory.Register(self.uniqueID, self.invWidth, self.invHeight, true)
+    ws.inventory.Register(self.uniqueID, self.invWidth, self.invHeight, true)
 
     -- Auto-register container item type restriction
     if self.inventoryFlag and self.allowedItemType then
-        ix.containerRestrictions[self.inventoryFlag] = self.allowedItemType
+        ws.containerRestrictions[self.inventoryFlag] = self.allowedItemType
     end
 end
 
@@ -222,8 +222,8 @@ ITEM.functions.View = {
     name = "Open",
     tip = "View the contents.",
     icon = "icon16/folder.png",
-    OnClick = ix.constants.OpenContainerPanel,
-    OnCanRun = ix.constants.CanOpenContainerPanel
+    OnClick = ws.constants.OpenContainerPanel,
+    OnCanRun = ws.constants.CanOpenContainerPanel
 }
 
 -- ============================================================================
@@ -234,7 +234,7 @@ ITEM.functions.combine = {
     OnRun = function(item, data)
         if not item.allowedItemType then return false end
 
-        local targetItem = ix.item.instances[data[1]]
+        local targetItem = ws.item.instances[data[1]]
         if not targetItem then return false end
 
         if targetItem.uniqueID ~= item.allowedItemType then
@@ -252,7 +252,7 @@ ITEM.functions.combine = {
 
         local index = item:GetData("id", "")
         if index then
-            local inventory = ix.item.inventories[index]
+            local inventory = ws.item.inventories[index]
             if inventory then return true end
         end
         return false
@@ -265,7 +265,7 @@ ITEM.functions.combine = {
 
 if CLIENT then
     function ITEM:PaintOver(item, w, h)
-        local panel = ix.gui["inv" .. item:GetData("id", "")]
+        local panel = ws.gui["inv" .. item:GetData("id", "")]
 
         if IsValid(panel) and vgui.GetHoveredPanel() == self then
             panel:SetHighlighted(true)
@@ -278,9 +278,9 @@ if CLIENT then
         end
     end
 
-    net.Receive("ixBagDrop", function()
+    net.Receive("wsBagDrop", function()
         local index = net.ReadUInt(32)
-        local panel = ix.gui["inv"..index]
+        local panel = ws.gui["inv"..index]
 
         if panel and panel:IsVisible() then
             panel:Close()
@@ -293,12 +293,12 @@ end
 -- ============================================================================
 
 -- Centralized container item type restrictions (replaces per-item hooks)
-ix.containerRestrictions = ix.containerRestrictions or {}
+ws.containerRestrictions = ws.containerRestrictions or {}
 
-hook.Add("CanTransferItem", "ixContainerRestriction", function(item, curInv, inventory)
+hook.Add("CanTransferItem", "wsContainerRestriction", function(item, curInv, inventory)
     if not inventory or not inventory.vars then return end
 
-    for flag, allowedType in pairs(ix.containerRestrictions) do
+    for flag, allowedType in pairs(ws.containerRestrictions) do
         if inventory.vars[flag] then
             if item.uniqueID ~= allowedType then
                 return false

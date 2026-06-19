@@ -38,7 +38,7 @@ function ENT:Use(activator, caller)
     end
 
     local holdTime = CurTime() - self.holdEStart[activator]
-    local pickupTime = ix.config.Get("itemPickupTime", 0.5)
+    local pickupTime = ws.config.Get("itemPickupTime", 0.5)
 
     -- Check if held long enough for pickup
     if holdTime >= pickupTime then
@@ -59,7 +59,7 @@ function ENT:Think()
         -- Check if player released E
         if not ply:KeyDown(IN_USE) then
             local holdTime = CurTime() - startTime
-            local pickupTime = ix.config.Get("itemPickupTime", 0.5)
+            local pickupTime = ws.config.Get("itemPickupTime", 0.5)
 
             -- Short press (released before pickup time) = open UI
             if holdTime < pickupTime then
@@ -70,7 +70,7 @@ function ENT:Think()
                     self:SetInUse(true)
                     self:SetUser(ply)
 
-                    net.Start("ixLocksmithOpen")
+                    net.Start("wsLocksmithOpen")
                         net.WriteEntity(self)
                     net.Send(ply)
                 end
@@ -85,7 +85,7 @@ end
 function ENT:PickupByPlayer(client)
     if not IsValid(client) then return end
 
-    local character, inventory = ix.constants.GetCharacterInventory(client)
+    local character, inventory = ws.constants.GetCharacterInventory(client)
     if not character or not inventory then return end
 
     -- Check if there's room in inventory (locksmith_station is 2x1)
@@ -117,7 +117,21 @@ end
 -- NETWORKING - Operations
 -- ============================================================================
 
-net.Receive("ixLocksmithClose", function(len, ply)
+-- Shared guard for every locksmith operation: correct machine, the player who
+-- opened it, and still within interaction range. Re-checking range each op stops
+-- a player from opening the UI then operating it from across the map (the UI
+-- closes itself client-side past 200u, but the server must not trust that).
+local function ValidateLocksmithUser(ent, ply)
+    if not IsValid(ent) or ent:GetClass() ~= "ix_auto_locksmith" then return false end
+    if ent:GetUser() ~= ply then return false end
+    if ply:GetPos():DistToSqr(ent:GetPos()) > (200 * 200) then
+        ent:CloseForUser(ply)
+        return false
+    end
+    return true
+end
+
+net.Receive("wsLocksmithClose", function(len, ply)
     local ent = net.ReadEntity()
     if not IsValid(ent) or ent:GetClass() ~= "ix_auto_locksmith" then return end
 
@@ -125,20 +139,19 @@ net.Receive("ixLocksmithClose", function(len, ply)
 end)
 
 -- Program a blank lock
-net.Receive("ixLocksmithProgramLock", function(len, ply)
+net.Receive("wsLocksmithProgramLock", function(len, ply)
     local ent = net.ReadEntity()
     local lockItemID = net.ReadUInt(32)
 
-    if not IsValid(ent) or ent:GetClass() ~= "ix_auto_locksmith" then return end
-    if ent:GetUser() ~= ply then return end
+    if not ValidateLocksmithUser(ent, ply) then return end
 
-    local lockItem = ix.constants.VerifyItemOwnership(ply, lockItemID, "lock_blank")
+    local lockItem = ws.constants.VerifyItemOwnership(ply, lockItemID, "lock_blank")
     if not lockItem then
         ply:NotifyLocalized("locksmithInvalidItem")
         return
     end
 
-    local _, inventory = ix.constants.GetCharacterInventory(ply)
+    local _, inventory = ws.constants.GetCharacterInventory(ply)
     if not inventory then return end
 
     -- Generate keying
@@ -163,35 +176,34 @@ net.Receive("ixLocksmithProgramLock", function(len, ply)
     ply:NotifyLocalized("locksmithLockProgrammed", keying)
 
     -- Send result back
-    net.Start("ixLocksmithResult")
+    net.Start("wsLocksmithResult")
         net.WriteString("programLock")
         net.WriteString(keying)
     net.Send(ply)
 end)
 
 -- Program a blank key from a lock or key
-net.Receive("ixLocksmithProgramKey", function(len, ply)
+net.Receive("wsLocksmithProgramKey", function(len, ply)
     local ent = net.ReadEntity()
     local blankKeyID = net.ReadUInt(32)
     local sourceID = net.ReadUInt(32)
 
-    if not IsValid(ent) or ent:GetClass() ~= "ix_auto_locksmith" then return end
-    if ent:GetUser() ~= ply then return end
+    if not ValidateLocksmithUser(ent, ply) then return end
 
-    local blankKey = ix.constants.VerifyItemOwnership(ply, blankKeyID, "key_blank")
+    local blankKey = ws.constants.VerifyItemOwnership(ply, blankKeyID, "key_blank")
     if not blankKey then
         ply:NotifyLocalized("locksmithInvalidItem")
         return
     end
 
     -- Source can be a lock or key (no uniqueID filter)
-    local sourceItem = ix.constants.VerifyItemOwnership(ply, sourceID)
+    local sourceItem = ws.constants.VerifyItemOwnership(ply, sourceID)
     if not sourceItem then
         ply:NotifyLocalized("locksmithNotYourItem")
         return
     end
 
-    local _, inventory = ix.constants.GetCharacterInventory(ply)
+    local _, inventory = ws.constants.GetCharacterInventory(ply)
     if not inventory then return end
 
     -- Source must be a lock or key
@@ -231,28 +243,27 @@ net.Receive("ixLocksmithProgramKey", function(len, ply)
     ply:EmitSound("buttons/button14.wav", 50)
     ply:NotifyLocalized("locksmithKeyProgrammed", keying)
 
-    net.Start("ixLocksmithResult")
+    net.Start("wsLocksmithResult")
         net.WriteString("programKey")
         net.WriteString(keying)
     net.Send(ply)
 end)
 
 -- Add a keying to a lock (using a key)
-net.Receive("ixLocksmithAddKeying", function(len, ply)
+net.Receive("wsLocksmithAddKeying", function(len, ply)
     local ent = net.ReadEntity()
     local lockID = net.ReadUInt(32)
     local keyID = net.ReadUInt(32)
 
-    if not IsValid(ent) or ent:GetClass() ~= "ix_auto_locksmith" then return end
-    if ent:GetUser() ~= ply then return end
+    if not ValidateLocksmithUser(ent, ply) then return end
 
-    local lockItem = ix.constants.VerifyItemOwnership(ply, lockID, "lock")
+    local lockItem = ws.constants.VerifyItemOwnership(ply, lockID, "lock")
     if not lockItem then
         ply:NotifyLocalized("locksmithInvalidItem")
         return
     end
 
-    local keyItem = ix.constants.VerifyItemOwnership(ply, keyID, "key")
+    local keyItem = ws.constants.VerifyItemOwnership(ply, keyID, "key")
     if not keyItem then
         ply:NotifyLocalized("locksmithNeedKey")
         return
@@ -287,23 +298,22 @@ net.Receive("ixLocksmithAddKeying", function(len, ply)
     ply:EmitSound("buttons/button14.wav", 50)
     ply:NotifyLocalized("locksmithKeyingAdded", keyKeying)
 
-    net.Start("ixLocksmithResult")
+    net.Start("wsLocksmithResult")
         net.WriteString("addKeying")
         net.WriteString(keyKeying)
     net.Send(ply)
 end)
 
 -- Rename a lock or key
-net.Receive("ixLocksmithRename", function(len, ply)
+net.Receive("wsLocksmithRename", function(len, ply)
     local ent = net.ReadEntity()
     local itemID = net.ReadUInt(32)
     local newName = net.ReadString()
 
-    if not IsValid(ent) or ent:GetClass() ~= "ix_auto_locksmith" then return end
-    if ent:GetUser() ~= ply then return end
+    if not ValidateLocksmithUser(ent, ply) then return end
 
     -- No uniqueID filter - rename works on both locks and keys
-    local item = ix.constants.VerifyItemOwnership(ply, itemID)
+    local item = ws.constants.VerifyItemOwnership(ply, itemID)
     if not item then
         ply:NotifyLocalized("locksmithInvalidItem")
         return
@@ -342,21 +352,20 @@ net.Receive("ixLocksmithRename", function(len, ply)
 
     ply:EmitSound("buttons/button14.wav", 50)
 
-    net.Start("ixLocksmithResult")
+    net.Start("wsLocksmithResult")
         net.WriteString("rename")
         net.WriteString(newName)
     net.Send(ply)
 end)
 
 -- View lock keyings
-net.Receive("ixLocksmithViewKeyings", function(len, ply)
+net.Receive("wsLocksmithViewKeyings", function(len, ply)
     local ent = net.ReadEntity()
     local lockID = net.ReadUInt(32)
 
-    if not IsValid(ent) or ent:GetClass() ~= "ix_auto_locksmith" then return end
-    if ent:GetUser() ~= ply then return end
+    if not ValidateLocksmithUser(ent, ply) then return end
 
-    local lockItem = ix.constants.VerifyItemOwnership(ply, lockID, "lock")
+    local lockItem = ws.constants.VerifyItemOwnership(ply, lockID, "lock")
     if not lockItem then
         ply:NotifyLocalized("locksmithInvalidItem")
         return
@@ -364,7 +373,7 @@ net.Receive("ixLocksmithViewKeyings", function(len, ply)
 
     local keyings = lockItem:GetData("keyings", {})
 
-    net.Start("ixLocksmithResult")
+    net.Start("wsLocksmithResult")
         net.WriteString("viewKeyings")
         net.WriteUInt(#keyings, 8)
         for _, k in ipairs(keyings) do

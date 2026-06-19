@@ -1,0 +1,7 @@
+"windsweptrp"
+{
+	"base"		"windswept"
+	"title"		"Windswept Colony RP"
+	"author"	"Noah Sabaj"
+	"menusystem"	"1"
+}

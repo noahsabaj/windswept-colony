@@ -68,7 +68,7 @@ ITEM.functions.Browse = {
         return false
     end,
     OnClick = function(item)
-        net.Start("ixPhotoAlbumView")
+        net.Start("wsPhotoAlbumView")
             net.WriteUInt(item:GetID(), 32)
         net.SendToServer()
 
@@ -84,8 +84,8 @@ ITEM.functions.View = {
     name = "Manage Photos",
     tip = "Add or remove photographs from the album.",
     icon = "icon16/folder.png",
-    OnClick = ix.constants.OpenContainerPanel,
-    OnCanRun = ix.constants.CanOpenContainerPanel
+    OnClick = ws.constants.OpenContainerPanel,
+    OnCanRun = ws.constants.CanOpenContainerPanel
 }
 
 -- Rename album (can rename multiple times)
@@ -105,7 +105,7 @@ ITEM.functions.Rename = {
             currentTitle,
             function(text)
                 if text then
-                    net.Start("ixPhotoAlbumRename")
+                    net.Start("wsPhotoAlbumRename")
                         net.WriteUInt(item:GetID(), 32)
                         net.WriteString(string.sub(text, 1, 64))
                     net.SendToServer()
@@ -133,7 +133,7 @@ if CLIENT then
 
         if count > 0 then
             local text = tostring(count)
-            surface.SetFont("ixSmallFont")
+            surface.SetFont("wsSmallFont")
             local textW, textH = surface.GetTextSize(text)
 
             surface.SetDrawColor(50, 100, 150, 200)
@@ -149,7 +149,7 @@ if CLIENT then
         local photos = self:GetPhotos()
 
         local bgColor = #photos >= 45 and Color(150, 100, 50) or (#photos > 0 and Color(50, 100, 100) or Color(100, 100, 100))
-        ix.constants.AddTooltipRow(tooltip, "photos", string.format("Photos: %d / 50", #photos), bgColor)
+        ws.constants.AddTooltipRow(tooltip, "photos", string.format("Photos: %d / 50", #photos), bgColor)
     end
 end
 
@@ -158,11 +158,11 @@ end
 -- ============================================================================
 
 if SERVER then
-    net.Receive("ixPhotoAlbumRename", function(len, client)
+    net.Receive("wsPhotoAlbumRename", function(len, client)
         local itemID = net.ReadUInt(32)
         local title = net.ReadString()
 
-        local item = ix.photo.VerifyOwnership(client, itemID, "photo_album")
+        local item = ws.photo.VerifyOwnership(client, itemID, "photo_album")
         if not item then return end
 
         title = string.sub(title, 1, 64)
@@ -171,16 +171,23 @@ if SERVER then
         client:NotifyLocalized("albumRenamed", title)
     end)
 
-    net.Receive("ixPhotoAlbumView", function(len, client)
+    net.Receive("wsPhotoAlbumView", function(len, client)
         local itemID = net.ReadUInt(32)
 
-        local item = ix.photo.VerifyOwnership(client, itemID, "photo_album")
+        local item = ws.photo.VerifyOwnership(client, itemID, "photo_album")
         if not item then return end
 
         local photos = item:GetPhotos()
         local title = item:GetName()
 
-        net.Start("ixPhotoAlbumViewData")
+        -- Grant short-lived access so the client can fetch these photos' images.
+        local ids = {}
+        for _, photo in ipairs(photos) do
+            ids[#ids + 1] = photo:GetData("photoID", "")
+        end
+        ws.photo.GrantPhotoAccess(client, ids)
+
+        net.Start("wsPhotoAlbumViewData")
             net.WriteString(title)
             net.WriteUInt(#photos, 8)
             for _, photo in ipairs(photos) do
@@ -192,12 +199,12 @@ if SERVER then
 end
 
 -- ============================================================================
--- CLIENT: Album Viewer (inherits ixPhotoViewerBase)
+-- CLIENT: Album Viewer (inherits wsPhotoViewerBase)
 -- ============================================================================
 
 if CLIENT then
-    ix.albumPhotoCache = ix.albumPhotoCache or {}
-    ix.albumPhotoLoading = ix.albumPhotoLoading or {}
+    ws.albumPhotoCache = ws.albumPhotoCache or {}
+    ws.albumPhotoLoading = ws.albumPhotoLoading or {}
 
     local PANEL = {}
 
@@ -227,12 +234,12 @@ if CLIENT then
     end
 
     function PANEL:RequestPhoto(photoID)
-        if ix.albumPhotoCache[photoID] then return end
-        if ix.albumPhotoLoading[photoID] then return end
+        if ws.albumPhotoCache[photoID] then return end
+        if ws.albumPhotoLoading[photoID] then return end
 
-        ix.albumPhotoLoading[photoID] = true
+        ws.albumPhotoLoading[photoID] = true
 
-        net.Start("ixPhotoRequest")
+        net.Start("wsPhotoRequest")
             net.WriteString(photoID)
         net.SendToServer()
     end
@@ -250,7 +257,7 @@ if CLIENT then
             return nil
         end
 
-        local cached = ix.albumPhotoCache[metadata.photoID]
+        local cached = ws.albumPhotoCache[metadata.photoID]
         if cached and cached ~= false and not cached:IsError() then
             return cached
         end
@@ -271,7 +278,7 @@ if CLIENT then
     function PANEL:IsPhotoLoading()
         local metadata = self.photoMetadata[self.currentIndex]
         if metadata and metadata.photoID then
-            return ix.albumPhotoLoading[metadata.photoID] == true
+            return ws.albumPhotoLoading[metadata.photoID] == true
         end
         return false
     end
@@ -288,20 +295,20 @@ if CLIENT then
     end
 
     function PANEL:DrawExtraContent(w, h, imgSize, imgX, imgY)
-        draw.SimpleText(self.albumTitle, "ixMediumFont", w / 2, 30, ix.constants.COLOR_UI_NEUTRAL, TEXT_ALIGN_CENTER)
+        draw.SimpleText(self.albumTitle, "wsMediumFont", w / 2, 30, ws.constants.COLOR_UI_NEUTRAL, TEXT_ALIGN_CENTER)
 
         local arrowY = h / 2
         local arrowColor = Color(255, 255, 255, 150)
         local arrowDisabledColor = Color(100, 100, 100, 80)
 
         local leftColor = self.currentIndex > 1 and arrowColor or arrowDisabledColor
-        draw.SimpleText("\xE2\x97\x84", "ixMediumFont", imgX - 60, arrowY, leftColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+        draw.SimpleText("\xE2\x97\x84", "wsMediumFont", imgX - 60, arrowY, leftColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 
         local rightColor = self.currentIndex < self.totalPhotos and arrowColor or arrowDisabledColor
-        draw.SimpleText("\xE2\x96\xBA", "ixMediumFont", imgX + imgSize + 60, arrowY, rightColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+        draw.SimpleText("\xE2\x96\xBA", "wsMediumFont", imgX + imgSize + 60, arrowY, rightColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 
         if self.totalPhotos > 0 then
-            draw.SimpleText(string.format("Photo %d of %d", self.currentIndex, self.totalPhotos), "ixSmallFont", w / 2, imgY + imgSize + 60, Color(150, 150, 150), TEXT_ALIGN_CENTER)
+            draw.SimpleText(string.format("Photo %d of %d", self.currentIndex, self.totalPhotos), "wsSmallFont", w / 2, imgY + imgSize + 60, Color(150, 150, 150), TEXT_ALIGN_CENTER)
         end
     end
 
@@ -317,19 +324,19 @@ if CLIENT then
     end
 
     function PANEL:OnCleanup()
-        for photoID, _ in pairs(ix.albumPhotoCache) do
-            ix.photo.CleanupTempFile("ixphoto_album_" .. photoID .. ".jpg")
+        for photoID, _ in pairs(ws.albumPhotoCache) do
+            ws.photo.CleanupTempFile("ixphoto_album_" .. photoID .. ".jpg")
         end
 
-        ix.albumPhotoCache = {}
-        ix.albumPhotoLoading = {}
-        ix.gui.photoAlbumViewer = nil
+        ws.albumPhotoCache = {}
+        ws.albumPhotoLoading = {}
+        ws.gui.photoAlbumViewer = nil
     end
 
-    vgui.Register("ixPhotoAlbumViewer", PANEL, "ixPhotoViewerBase")
+    vgui.Register("wsPhotoAlbumViewer", PANEL, "wsPhotoViewerBase")
 
     -- Receive album metadata from server
-    net.Receive("ixPhotoAlbumViewData", function()
+    net.Receive("wsPhotoAlbumViewData", function()
         local title = net.ReadString()
         local photoCount = net.ReadUInt(8)
 
@@ -343,27 +350,27 @@ if CLIENT then
             })
         end
 
-        if IsValid(ix.gui.photoAlbumViewer) then
-            ix.gui.photoAlbumViewer:Remove()
+        if IsValid(ws.gui.photoAlbumViewer) then
+            ws.gui.photoAlbumViewer:Remove()
         end
 
-        ix.gui.photoAlbumViewer = vgui.Create("ixPhotoAlbumViewer")
-        ix.gui.photoAlbumViewer:SetAlbumMetadata(title, metadata)
+        ws.gui.photoAlbumViewer = vgui.Create("wsPhotoAlbumViewer")
+        ws.gui.photoAlbumViewer:SetAlbumMetadata(title, metadata)
     end)
 
-    -- Hook into existing ixPhotoData to update album cache
-    hook.Add("ixPhotoDataReceived", "ixPhotoAlbumCache", function(photoID, imageData)
-        ix.albumPhotoLoading[photoID] = nil
+    -- Hook into existing wsPhotoData to update album cache
+    hook.Add("wsPhotoDataReceived", "wsPhotoAlbumCache", function(photoID, imageData)
+        ws.albumPhotoLoading[photoID] = nil
 
         if imageData and imageData ~= "" then
-            local mat, tempPath = ix.photo.LoadMaterial(imageData, "album_" .. photoID)
+            local mat, tempPath = ws.photo.LoadMaterial(imageData, "album_" .. photoID)
             if mat then
-                ix.albumPhotoCache[photoID] = mat
+                ws.albumPhotoCache[photoID] = mat
             else
-                ix.albumPhotoCache[photoID] = false
+                ws.albumPhotoCache[photoID] = false
             end
         else
-            ix.albumPhotoCache[photoID] = false
+            ws.albumPhotoCache[photoID] = false
         end
     end)
 end
@@ -373,17 +380,24 @@ end
 -- ============================================================================
 
 if SERVER then
-    hook.Add("PlayerUse", "ixPhotoAlbumGroundView", function(client, entity)
+    hook.Add("PlayerUse", "wsPhotoAlbumGroundView", function(client, entity)
         if not IsValid(entity) then return end
 
-        local item = entity.ixItem
+        local item = entity.wsItem
         if not item then return end
         if item.uniqueID ~= "photo_album" then return end
 
         local photos = item:GetPhotos()
         local title = item:GetName()
 
-        net.Start("ixPhotoAlbumViewFromGround")
+        -- Proximity ground view: grant short-lived access to fetch these images.
+        local ids = {}
+        for _, photo in ipairs(photos) do
+            ids[#ids + 1] = photo:GetData("photoID", "")
+        end
+        ws.photo.GrantPhotoAccess(client, ids)
+
+        net.Start("wsPhotoAlbumViewFromGround")
             net.WriteString(title)
             net.WriteUInt(#photos, 8)
             for _, photo in ipairs(photos) do
@@ -395,7 +409,7 @@ if SERVER then
 end
 
 if CLIENT then
-    net.Receive("ixPhotoAlbumViewFromGround", function()
+    net.Receive("wsPhotoAlbumViewFromGround", function()
         local title = net.ReadString()
         local photoCount = net.ReadUInt(8)
 
@@ -409,11 +423,11 @@ if CLIENT then
             })
         end
 
-        if IsValid(ix.gui.photoAlbumViewer) then
-            ix.gui.photoAlbumViewer:Remove()
+        if IsValid(ws.gui.photoAlbumViewer) then
+            ws.gui.photoAlbumViewer:Remove()
         end
 
-        ix.gui.photoAlbumViewer = vgui.Create("ixPhotoAlbumViewer")
-        ix.gui.photoAlbumViewer:SetAlbumMetadata(title, metadata)
+        ws.gui.photoAlbumViewer = vgui.Create("wsPhotoAlbumViewer")
+        ws.gui.photoAlbumViewer:SetAlbumMetadata(title, metadata)
     end)
 end

@@ -29,7 +29,7 @@ ITEM.base = "base_equippable"
 
 -- Equippable configuration
 ITEM.equipWeaponClass = "ix_lockpick"
-ITEM.equipPlayerKey = "ixLockpickItem"
+ITEM.equipPlayerKey = "wsLockpickItem"
 ITEM.equipNotifyKey = "lockpickEquipped"
 ITEM.equipSound = "physics/metal/metal_solid_impact_soft1.wav"
 ITEM.equipTip = "Hold the lockpick to pick locks."
@@ -121,7 +121,7 @@ if CLIENT then
     function ITEM:PaintOver(item, w, h)
         -- Draw equipped indicator (green dot)
         if item:GetData("equipped") then
-            ix.constants.DrawEquippedIndicator(w, h)
+            ws.constants.DrawEquippedIndicator(w, h)
         end
 
         -- Draw quality indicator color
@@ -148,7 +148,7 @@ if CLIENT then
             quality = Color(60, 100, 150),
             master = Color(150, 130, 60)
         }
-        ix.constants.AddTooltipRow(tooltip, "quality", "Quality: " .. config.name, qualityColors[quality] or qualityColors.regular)
-        ix.constants.AddTooltipRow(tooltip, "attempts", "Attempts: " .. config.maxAttempts, Color(60, 60, 80))
+        ws.constants.AddTooltipRow(tooltip, "quality", "Quality: " .. config.name, qualityColors[quality] or qualityColors.regular)
+        ws.constants.AddTooltipRow(tooltip, "attempts", "Attempts: " .. config.maxAttempts, Color(60, 60, 80))
     end
 end

@@ -48,7 +48,7 @@ end
 
 if CLIENT then
     function SWEP:DrawWorldModel()
-        ix.constants.DrawWorldModelBone(self, {3, 3, -5}, {{"Forward", -90}, {"Up", 180}}, true)
+        ws.constants.DrawWorldModelBone(self, {3, 3, -5}, {{"Forward", -90}, {"Up", 180}}, true)
     end
 
     -- Simple crosshair

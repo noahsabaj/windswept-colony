@@ -90,11 +90,14 @@ end
 function SWEP:PrimaryAttack()
     self:SetNextPrimaryFire(CurTime() + 0.5)
 
+    local owner = self:GetOwner()
+    if not IsValid(owner) then return end
+
     -- Still charging? Can't shock yet
     if self:GetCharging() then
         if SERVER then
-            self:GetOwner():EmitSound("HL2Player.UseDeny")
-            self:GetOwner():NotifyLocalized("defibStillCharging")
+            owner:EmitSound("HL2Player.UseDeny")
+            owner:NotifyLocalized("defibStillCharging")
         end
         return
     end
@@ -102,14 +105,14 @@ function SWEP:PrimaryAttack()
     -- Not ready? Can't shock
     if not self:GetReady() then
         if SERVER then
-            self:GetOwner():EmitSound("HL2Player.UseDeny")
-            self:GetOwner():NotifyLocalized("defibNotReady")
+            owner:EmitSound("HL2Player.UseDeny")
+            owner:NotifyLocalized("defibNotReady")
         end
         return
     end
 
     -- Must have battery
-    local item = self.ixItem
+    local item = self.wsItem
     if not item then
         self:ExitAllStates()
         return
@@ -118,7 +121,7 @@ function SWEP:PrimaryAttack()
     local batteries = item:GetData("batteries", {})
     if #batteries == 0 then
         if SERVER then
-            self:GetOwner():NotifyLocalized("defibNoBattery")
+            owner:NotifyLocalized("defibNoBattery")
         end
         self:ExitAllStates()
         return
@@ -145,7 +148,7 @@ function SWEP:SecondaryAttack()
     end
 
     -- Check battery
-    local item = self.ixItem
+    local item = self.wsItem
     if not item then return end
 
     local batteries = item:GetData("batteries", {})
@@ -266,10 +269,10 @@ end
 if SERVER then
     function SWEP:DoShock()
         local owner = self:GetOwner()
-        local item = self.ixItem
+        local item = self.wsItem
 
         -- Consume battery first (even on miss)
-        local permadeathPlugin = ix.plugin.Get("permadeath")
+        local permadeathPlugin = ws.plugin.Get("permadeath")
         if permadeathPlugin and permadeathPlugin.ConsumeDefibCharge then
             permadeathPlugin:ConsumeDefibCharge(item, owner)
         end
@@ -313,8 +316,8 @@ if SERVER then
         end
 
         -- Handle prop_ragdoll linked to ix_knocked (the visible body)
-        if target:GetClass() == "prop_ragdoll" and IsValid(target.ixKnockedEntity) then
-            self:ShockKnockedPlayer(target.ixKnockedEntity)
+        if target:GetClass() == "prop_ragdoll" and IsValid(target.wsKnockedEntity) then
+            self:ShockKnockedPlayer(target.wsKnockedEntity)
             return
         end
 
@@ -336,7 +339,7 @@ if SERVER then
 
     function SWEP:ShockKnockedPlayer(knockedEntity)
         local owner = self:GetOwner()
-        local permadeathPlugin = ix.plugin.Get("permadeath")
+        local permadeathPlugin = ws.plugin.Get("permadeath")
 
         if not permadeathPlugin then return end
 
@@ -347,7 +350,7 @@ if SERVER then
         end
 
         -- Check if owner is online (can't revive disconnected)
-        if not IsValid(knockedEntity.ixOwner) then
+        if not IsValid(knockedEntity.wsOwner) then
             owner:NotifyLocalized("knockedPlayerDisconnected")
             return
         end
@@ -366,7 +369,7 @@ if SERVER then
 
     function SWEP:ShockAlivePlayer(target)
         local owner = self:GetOwner()
-        local permadeathPlugin = ix.plugin.Get("permadeath")
+        local permadeathPlugin = ws.plugin.Get("permadeath")
 
         if not permadeathPlugin then return end
 
@@ -392,7 +395,7 @@ if SERVER then
         target:ViewPunch(Angle(20, 0, 20))
 
         -- Log
-        ix.log.Add(owner, "defibKnockout", target:GetCharacter():GetName())
+        ws.log.Add(owner, "defibKnockout", target:GetCharacter():GetName())
     end
 
     function SWEP:PlayShockEffects(hitPos)
@@ -479,7 +482,7 @@ if CLIENT then
         local progress = math.Clamp((CurTime() - self:GetChargeStartTime()) / self.ChargeDuration, 0, 1)
         if progress <= 0 or progress >= 1 then return end
 
-        ix.constants.DrawProgressBar("CHARGING", progress, Color(60, 150, 255))
+        ws.constants.DrawProgressBar("CHARGING", progress, Color(60, 150, 255))
     end
 end
 
@@ -487,6 +490,6 @@ end
 -- HOOKS
 -- ============================================================================
 
-ix.weapon.RegisterCleanupHooks("ix_defibrillator", "ixDefib", function(weapon)
+ws.weapon.RegisterCleanupHooks("ix_defibrillator", "wsDefib", function(weapon)
     if weapon.ExitAllStates then weapon:ExitAllStates() end
 end)
