@@ -1,91 +1,34 @@
 --[[
-    Windswept Doors Plugin
+    Windswept Doors (Colony bridge)
 
-    Overrides Windswept's default door system with the physical lock & key system.
-    - Removes door ownership (buying/selling)
-    - Removes faction/class door access
-    - Uses prop_door_rotating entities with wsIsWindsweptDoor marker
+    The physical door/lock/key ENGINE now lives in the framework `doors` plugin. This
+    Colony bridge enables that engine and wires in the Colony content through the
+    engine's seams (which weapons damage doors, which SWEP reveals empty frames). It
+    also carries the Colony-only door admin/test commands (sv) and the door SWEP UI (cl).
 ]]--
 
 local PLUGIN = PLUGIN
 
 PLUGIN.name = "Windswept Doors"
 PLUGIN.author = "Windswept"
-PLUGIN.description = "Physical lock and key door system."
+PLUGIN.description = "Colony door content: enables the framework door engine and wires in Colony doors, locks, and keys."
 
--- Include plugin files
 ws.util.Include("sv_plugin.lua")
 ws.util.Include("cl_plugin.lua")
 
--- ============================================================================
--- DISABLE WINDSWEPT DOOR SYSTEM
--- ============================================================================
+-- Register the Colony's door-damage sources with the framework engine (which carries no
+-- weapon class names of its own): fists do 1 HP gated by the door's fistDamageable, and
+-- the battering ram does damage scaled by the door's ramResistance.
+ws.doors.RegisterDamageSource("ws_hands", { fist = true })
+ws.doors.RegisterDamageSource("ws_batteringram", { ram = true })
 
--- Override Windswept door access to always return false (use physical keys instead)
-hook.Add("CanPlayerAccessDoor", "wsWindsweptDoors", function(client, door, access)
-    -- If it's a map door that's been hidden by our system, deny access
-    -- Our managed doors have their own access system
-    if door:IsDoor() and door:GetNoDraw() then
-        return false
-    end
+-- The door-install SWEP whose empty-frame pulse the engine draws.
+ws.doors.installToolClass = "ws_door"
 
-    -- For our managed doors, access is determined by having the right key
-    if door.wsIsWindsweptDoor then
-        -- Lock/unlock is handled by keys, not by this hook
-        -- Use is allowed if door is unlocked
-        return not door:IsLocked()
-    end
-end)
-
--- Prevent Windswept door buying
-hook.Add("CanPlayerBuyDoor", "wsWindsweptDoors", function(client, door)
-    return false, "Door ownership has been disabled."
-end)
-
--- Prevent Windswept door selling
-hook.Add("CanPlayerSellDoor", "wsWindsweptDoors", function(client, door)
-    return false, "Door ownership has been disabled."
-end)
-
--- ============================================================================
--- ENTITY METHODS
--- ============================================================================
-
--- Override CheckDoorAccess for our system
-local entityMeta = FindMetaTable("Entity")
-
--- Store original function
-local originalCheckDoorAccess = entityMeta.CheckDoorAccess
-
-function entityMeta:CheckDoorAccess(client, access)
-    -- For our managed doors, use lock state
-    if self.wsIsWindsweptDoor then
-        if self:IsLocked() then
-            return false  -- Need key to access locked door
-        end
-        return true  -- Unlocked doors are accessible
-    end
-
-    -- For hidden map doors (our frames), deny access
-    if self:IsDoor() and self:GetNoDraw() then
-        return false
-    end
-
-    -- Fall back to original for any other doors
-    if originalCheckDoorAccess then
-        return originalCheckDoorAccess(self, client, access)
-    end
-
-    return false
-end
-
--- ============================================================================
--- CONFIG OVERRIDES
--- ============================================================================
-
--- Set door cost to 0 and hide from config menu
-hook.Add("InitializedConfig", "wsWindsweptDoorConfig", function()
-    -- These configs still exist but are unused in our system
-    ws.config.Set("doorCost", 0)
-    ws.config.Set("doorSellRatio", 0)
+-- Enable the physical door system for Colony RP (the framework ships it off by default).
+-- InitializedConfig fires during config load (before the engine's InitPostEntity) and
+-- re-fires after the saved config loads, so this both lands in time and wins over any
+-- persisted value -- the same timing the old doorCost override relied on. (layer-doors)
+hook.Add("InitializedConfig", "wsColonyEnableDoors", function()
+    ws.config.Set("doorsEnabled", true)
 end)
