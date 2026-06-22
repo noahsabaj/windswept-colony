@@ -443,26 +443,17 @@ net.Receive("wsRadioVoiceStop", function(len, client)
     end
 end)
 
--- Net receiver: Set radio volume
-net.Receive("wsRadioVolumeSet", function(len, client)
-    if not IsValid(client) then return end
-
-    local itemID = net.ReadUInt(32)
-    local volume = net.ReadUInt(7)
-
-    local item = ws.item.instances[itemID]
-    if not item or item.uniqueID ~= "handheld_radio" then return end
-
-    -- Verify ownership
-    local character, inventory = ws.constants.GetCharacterInventory(client)
-    if not character or not inventory then return end
-
-    if item.invID ~= inventory:GetID() then return end
-
-    -- Set volume
-    item:SetData("volume", math.Clamp(volume, 0, 100))
-    client:NotifyLocalized("radioVolumeSet", volume)
-end)
+-- Set radio volume. Migrated to ws.action: item = "handheld_radio" + access = "owned"
+-- reproduces the original ownership check (uniqueID == handheld_radio + held in the main inventory).
+ws.action.Register("wsRadioVolumeSet", {
+    item = "handheld_radio",
+    access = "owned",
+    read = function() return net.ReadUInt(7) end,  -- volume (UInt7 wire; clamped in run)
+    run = function(client, ctx)
+        ctx.item:SetData("volume", math.Clamp(ctx.data, 0, 100))
+        client:NotifyLocalized("radioVolumeSet", ctx.data)
+    end
+})
 
 -- Clean up transmitter on disconnect
 hook.Add("PlayerDisconnected", "wsRadioTransmitCleanup", function(client)

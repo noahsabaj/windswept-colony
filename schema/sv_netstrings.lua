@@ -16,7 +16,6 @@
 -- wsMoneyGive, wsMoneyDestroy, wsCurrencySplit, wsCurrencySplitConfirm
 -- are now registered in windswept/gamemode/core/libs/sh_currency.lua
 -- =============================================================================
-util.AddNetworkString("wsWalletGive")
 util.AddNetworkString("wsBagDrop")  -- Wallet/bag drop functionality
 
 -- =============================================================================
@@ -118,7 +117,6 @@ util.AddNetworkString("wsCameraFlashEffect")
 -- RADIO SYSTEM (schema/items/equipment/sh_handheld_radio.lua)
 -- =============================================================================
 util.AddNetworkString("wsRadioVolume")        -- Server->Client: open volume slider
-util.AddNetworkString("wsRadioVolumeSet")     -- Client->Server: set volume value
 util.AddNetworkString("wsRadioVoiceStart")    -- Client->Server: started transmitting
 util.AddNetworkString("wsRadioVoiceStop")     -- Client->Server: stopped transmitting
 util.AddNetworkString("wsVoiceAmplitude")     -- Client->Server: voice amplitude update
@@ -133,12 +131,10 @@ util.AddNetworkString("wsStationaryRadioOpen")      -- Server->Client: open UI f
 -- =============================================================================
 -- DOCUMENT SYSTEM (schema/libs/sh_documents.lua, schema/sv_documents.lua)
 -- =============================================================================
-util.AddNetworkString("wsDocumentWrite")       -- Client->Server: write content to paper
 util.AddNetworkString("wsDocumentRead")        -- Client->Server: request document content
 util.AddNetworkString("wsDocumentData")        -- Server->Client: send document content
 util.AddNetworkString("wsDocumentErase")       -- Client->Server: erase pencil content
 util.AddNetworkString("wsDocumentDestroy")     -- Client->Server: destroy paper item
-util.AddNetworkString("wsContainerRename")     -- Client->Server: rename envelope/folder
 util.AddNetworkString("wsSignatureSave")       -- Client->Server: save signature to character
 util.AddNetworkString("wsTypewriterOpen")      -- Server->Client: open typewriter UI
 -- wsTypewriterWrite/Close are now registered by ws.action.Register (session shape) in the

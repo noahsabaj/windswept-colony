@@ -94,10 +94,9 @@ ITEM.functions.Rename = {
             currentName,
             function(text)
                 if text then
-                    net.Start("wsContainerRename")
-                        net.WriteUInt(item:GetID(), 32)
+                    ws.action.Send("wsContainerRename", item:GetID(), nil, function()
                         net.WriteString(string.sub(text, 1, 32))
-                    net.SendToServer()
+                    end)
                 end
             end,
             function() end,

@@ -190,10 +190,9 @@ net.Receive("wsRadioVolume", function()
         0,
         100,
         function(value)
-            net.Start("wsRadioVolumeSet")
-            net.WriteUInt(itemID, 32)
-            net.WriteUInt(math.floor(value), 7)
-            net.SendToServer()
+            ws.action.Send("wsRadioVolumeSet", itemID, nil, function()
+                net.WriteUInt(math.floor(value), 7)
+            end)
         end
     )
 end)

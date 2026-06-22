@@ -377,11 +377,9 @@ ITEM.functions.Give = {
                 -- 4.10 * 100 = 409.9999994 which floors to 409 cents.
                 local cents = math.floor(amount * 100 + 0.5)
 
-                net.Start("wsWalletGive")
-                    net.WriteUInt(item:GetID(), 32)
+                ws.action.Send("wsWalletGive", item:GetID(), target, function()
                     net.WriteUInt(cents, 32)
-                    net.WriteEntity(target)
-                net.SendToServer()
+                end)
             end,
             nil,
             "Give",

@@ -1022,43 +1022,53 @@ end)
 -- KNOCKED BODY INTERACTION (E tap = Loot, E hold = Revive)
 -- ============================================================================
 
--- E tap: Search/loot body (works on both knocked and dead)
-net.Receive("wsKnockoutLoot", function(len, client)
-    if not IsValid(client) then return end
+-- E tap: Search/loot body (works on both knocked and dead). Migrated to ws.action: target +
+-- targetClass = "ws_knocked" gives an early class reject; range = "none" because the authoritative
+-- distance is measured against the DRAGGED ragdoll inside ValidateKnockedInteraction, not the entity.
+ws.action.Register("wsKnockoutLoot", {
+    target = true,
+    targetClass = "ws_knocked",
+    range = "none",
+    run = function(client, ctx)
+        local plugin = ws.plugin.Get("permadeath")
+        if not plugin then return end
 
-    local plugin = ws.plugin.Get("permadeath")
-    if not plugin then return end
+        local entity = plugin:ValidateKnockedInteraction(client, ctx.target)
+        if not entity then return end
 
-    local entity = plugin:ValidateKnockedInteraction(client, net.ReadEntity())
-    if not entity then return end
+        -- Block searching while CPR is in progress on this body, by anyone -- looting a
+        -- patient mid-revival is not intended regardless of who the reviver is. (sc-permadeath-7)
+        if IsValid(entity:GetCurrentReviver()) then
+            client:NotifyLocalized("cprCannotSearchDuring")
+            return
+        end
 
-    -- Block searching while CPR is in progress on this body, by anyone -- looting a
-    -- patient mid-revival is not intended regardless of who the reviver is. (sc-permadeath-7)
-    if IsValid(entity:GetCurrentReviver()) then
-        client:NotifyLocalized("cprCannotSearchDuring")
-        return
+        entity:OpenInventory(client)
     end
+})
 
-    entity:OpenInventory(client)
-end)
+-- E hold: Attempt revival (only works on knocked, not dead). Migrated to ws.action: target +
+-- targetClass = "ws_knocked"; range = "none" (distance is validated against the dragged ragdoll
+-- inside ValidateKnockedInteraction, not the entity).
+ws.action.Register("wsKnockoutRevive", {
+    target = true,
+    targetClass = "ws_knocked",
+    range = "none",
+    run = function(client, ctx)
+        local plugin = ws.plugin.Get("permadeath")
+        if not plugin then return end
 
--- E hold: Attempt revival (only works on knocked, not dead)
-net.Receive("wsKnockoutRevive", function(len, client)
-    if not IsValid(client) then return end
+        local entity = plugin:ValidateKnockedInteraction(client, ctx.target)
+        if not entity then return end
 
-    local plugin = ws.plugin.Get("permadeath")
-    if not plugin then return end
+        if entity:GetPermadead() then
+            client:NotifyLocalized("knockedAlreadyDead")
+            return
+        end
 
-    local entity = plugin:ValidateKnockedInteraction(client, net.ReadEntity())
-    if not entity then return end
-
-    if entity:GetPermadead() then
-        client:NotifyLocalized("knockedAlreadyDead")
-        return
+        plugin:AttemptRevival(client, entity)
     end
-
-    plugin:AttemptRevival(client, entity)
-end)
+})
 
 -- ============================================================================
 -- MEMORIAL ACKNOWLEDGMENT

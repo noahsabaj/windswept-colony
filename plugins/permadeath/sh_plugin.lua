@@ -47,8 +47,6 @@ if SERVER then
     util.AddNetworkString("wsKnockoutTimerSync")
     util.AddNetworkString("wsKnockoutEnd")
     util.AddNetworkString("wsKnockoutGiveUp")
-    util.AddNetworkString("wsKnockoutLoot")    -- E tap: search/loot body
-    util.AddNetworkString("wsKnockoutRevive")  -- E hold: attempt revival
     util.AddNetworkString("wsRevivalProgress")
     util.AddNetworkString("wsSuicideExecute")  -- Suicide with gun
     util.AddNetworkString("wsPermadeathScreen")  -- Server → Client: show memorial

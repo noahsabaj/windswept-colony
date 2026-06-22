@@ -239,16 +239,15 @@ function PANEL:SaveDocument()
         return
     end
 
-    -- Send to server (include tool item ID for resource consumption)
-    net.Start("wsDocumentWrite")
-        net.WriteUInt(self.paperItem:GetID(), 32)
+    -- Send to server (paper id via the item arg; tool id + content + signature follow)
+    ws.action.Send("wsDocumentWrite", self.paperItem:GetID(), nil, function()
         net.WriteUInt(self.toolItem and self.toolItem:GetID() or 0, 32)  -- Tool item ID
         net.WriteString(content)
         net.WriteBool(self.signatureData ~= nil)
         if self.signatureData then
             net.WriteString(util.TableToJSON(self.signatureData))
         end
-    net.SendToServer()
+    end)
 
     self:Remove()
 end

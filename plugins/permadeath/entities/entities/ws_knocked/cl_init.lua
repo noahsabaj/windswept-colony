@@ -247,9 +247,7 @@ hook.Add("Think", "wsKnockedCPR", function()
             -- Check if held long enough
             if heldDuration >= holdTime and not cprSent then
                 -- Threshold reached, send revive request
-                net.Start("wsKnockoutRevive")
-                    net.WriteEntity(knockedEnt)
-                net.SendToServer()
+                ws.action.Send("wsKnockoutRevive", nil, knockedEnt)
 
                 cprSent = true
                 reviveSent = true
@@ -316,9 +314,7 @@ hook.Add("Think", "wsKnockedLoot", function()
 
         if IsValid(knockedEnt) then
             -- Send loot request
-            net.Start("wsKnockoutLoot")
-                net.WriteEntity(knockedEnt)
-            net.SendToServer()
+            ws.action.Send("wsKnockoutLoot", nil, knockedEnt)
             lastLootTime = RealTime()
         end
     end
