@@ -138,7 +138,7 @@ function Schema:AdjustCreationPayload(client, payload, newPayload)
     local modelPath = newPayload.model
 
     -- Calculate build from height and weight
-    local build, bmi = ws.physical.CalculateBuild(height, weight)
+    local build, bmi = ws.appearance.CalculateBuild(height, weight)
 
     -- Get birth data
     local birthMonth = tonumber(payload.physBirthMonth) or 1
@@ -165,7 +165,7 @@ function Schema:AdjustCreationPayload(client, payload, newPayload)
     }
 
     -- Generate the description
-    local description = ws.physical.GenerateDescription(physicalData)
+    local description = ws.appearance.GenerateDescription(physicalData)
 
     -- Set the generated description
     newPayload.description = description
