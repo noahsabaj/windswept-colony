@@ -3,6 +3,24 @@ max_line_length = 128
 std = "luajit+gmod+windswept"
 ignore = {
 	"212", -- unused argument
+	"213", -- unused loop variable (cosmetic: index-only `for i`/`for _, x` loops)
+	"611", -- line contains only whitespace
+	"612", -- line contains trailing whitespace
+	"631", -- line too long (schema entity/render code runs long; the framework engine keeps the 128 limit)
+	-- Dead-code style nags, relaxed for this large existing schema's first CI pass (glualint also
+	-- flags these locally). Bug-class checks stay on (undefined globals, shadowing, empty branches,
+	-- syntax). Tightening 211/631 with a dedicated cleanup pass is good follow-up work.
+	"211", -- unused variable / function
+	"221", -- variable is never accessed
+	"311", -- value assigned to a variable is never used
+}
+
+-- Schema-specific globals beyond the framework's `windswept` std:
+globals = {
+	"HOOKS_CACHE", -- framework hook cache; the photography plugin writes a field on it
+}
+read_globals = {
+	"ws_fire", -- the optional fire addon's API (referenced by the permadeath plugin)
 }
 
 -- windswept

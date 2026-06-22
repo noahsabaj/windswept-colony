@@ -344,10 +344,8 @@ function PANEL:Think()
     -- Keep panel on top
     self:MoveToFront()
 
-    -- Check if timer expired (server will handle permadeath)
-    if self:GetRemainingTime() <= 0 then
-        -- Timer expired - wait for server to send wsKnockoutEnd
-    end
+    -- Timer expired (GetRemainingTime() <= 0): nothing to do client-side here;
+    -- the server handles permadeath and sends wsKnockoutEnd.
 end
 
 vgui.Register("wsKnockoutScreen", PANEL, "DPanel")
@@ -545,7 +543,6 @@ net.Receive("wsKnockoutStart", function()
     knockoutPanel = vgui.Create("wsKnockoutScreen")
     if IsValid(knockoutPanel) then
         knockoutPanel:SetKnockoutData(duration, count)
-    else
     end
 end)
 

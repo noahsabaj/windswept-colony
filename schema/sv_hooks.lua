@@ -599,7 +599,7 @@ function Schema:PlayerCanHearPlayersVoice(listener, speaker)
         end
 
         -- Check if listener is at a stationary radio receiving on any broadcast frequency
-        local atStationary, volume = IsListenerAtStationaryRadioReceiving(listener, allBroadcastFrequencies)
+        local atStationary = IsListenerAtStationaryRadioReceiving(listener, allBroadcastFrequencies)
         if atStationary then
             return true, false  -- Receiving via stationary radio
         end
