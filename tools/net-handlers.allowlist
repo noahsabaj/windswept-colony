@@ -1,0 +1,48 @@
+# net-handlers.allowlist — baseline for the Windswept Colony net-handler gate (tools/check-net-handlers.sh)
+#
+# Every raw net.Receive("LITERAL") site in this schema (excluding thirdparty) must be listed here,
+# or the gate fails. This is a RATCHET: new client->server handlers should go through the framework's
+# ws.action.Register (the SWEP analogue is ws.weapon.NetReceive) — those wrappers use a variable
+# netstring, so they never appear as net.Receive("LITERAL") and never need listing. A raw net.Receive
+# only belongs here when it genuinely can't use a primitive (server->client receivers, player-field
+# sessions, two-phase approval tokens, intrinsic-guard SWEPs, and pre-existing handlers not yet migrated).
+#
+# To add a handler: prefer ws.action.Register. If a raw net.Receive is genuinely correct, add its
+# netstring below (keep sorted) so the addition is a conscious, reviewable line in the diff.
+# Generated baseline: 2026-06-22. One netstring per line; '#' comments and blank lines ignored.
+
+wsBagDrop
+wsCameraApprovePhoto
+wsCameraFlashEffect
+wsCameraFlashToggled
+wsCameraPhotoData
+wsContainerRename
+wsCurrencySplit
+wsDocumentData
+wsDocumentWrite
+wsDoorsSync
+wsKnockoutEnd
+wsKnockoutGiveUp
+wsKnockoutLoot
+wsKnockoutRevive
+wsKnockoutStart
+wsKnockoutTimerSync
+wsLocksmithOpen
+wsLocksmithResult
+wsPermadeathReady
+wsPermadeathScreen
+wsPhotoAlbumViewData
+wsPhotoAlbumViewFromGround
+wsPhotoData
+wsPhotoViewFromGround
+wsRadioVoiceStart
+wsRadioVoiceStop
+wsRadioVolume
+wsRadioVolumeSet
+wsSignatureSave
+wsStationaryRadioOpen
+wsSuicideExecute
+wsTypewriterOpen
+wsVoiceAmplitude
+wsWalletGive
+wsZipTieUse
