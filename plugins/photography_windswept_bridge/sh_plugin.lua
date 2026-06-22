@@ -17,7 +17,12 @@ ws.util.Include("sv_plugin.lua")
 -- We must wait for items to load before mutating the camera item
 function PLUGIN:InitializedPlugins()
     local ITEM = ws.item.list["camera"]
-    if not ITEM then return end
+    -- Fail loudly: the standalone camera must be loaded before this bridge can
+    -- inject battery mechanics. (sc-photography-10)
+    if not ITEM then
+        ErrorNoHalt("[photography bridge] camera item not found; battery injection skipped.\n")
+        return
+    end
 
     -- 1. Inject Battery Base properties
     ITEM.base = "base_battery_device"
@@ -29,6 +34,13 @@ function PLUGIN:InitializedPlugins()
     -- 2. Steal functions from the battery base and insert them into the camera
     -- (We have to do this manually because ws.item.Register has already run)
     local batteryBase = ws.item.base["base_battery_device"]
+    -- Fail loudly rather than leaving the camera in a half-injected state (base set
+    -- to base_battery_device but with no battery methods). (sc-photography-10)
+    if not batteryBase then
+        ErrorNoHalt("[photography bridge] base_battery_device missing; camera battery methods not injected.\n")
+        return
+    end
+
     if batteryBase then
         -- Copy over battery functions
         ITEM.GetBatteries = batteryBase.GetBatteries

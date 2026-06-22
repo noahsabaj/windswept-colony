@@ -73,7 +73,7 @@ end
 
 function SWEP:PrimaryAttack()
     -- Photo capture is handled in Think() using input.IsMouseDown(MOUSE_LEFT)
-    -- because Helix's weapon system doesn't call PrimaryAttack on CLIENT
+    -- because Windswept's weapon system doesn't call PrimaryAttack on CLIENT
     -- This stub prevents default weapon behavior
     if self:GetAiming() then
         self:SetNextPrimaryFire(CurTime() + 1)
@@ -121,7 +121,7 @@ function SWEP:Think()
         end
 
         -- Handle photo capture (LMB) - only when aiming
-        -- NOTE: We handle this in Think() instead of PrimaryAttack because Helix's
+        -- NOTE: We handle this in Think() instead of PrimaryAttack because Windswept's
         -- weapon system doesn't call PrimaryAttack on CLIENT (only SERVER)
         if self:GetAiming() then
             local lmbDown = input.IsMouseDown(MOUSE_LEFT)
@@ -185,7 +185,7 @@ if CLIENT then
         if not IsValid(ply) then return end
 
         local weapon = ply:GetActiveWeapon()
-        if not IsValid(weapon) or weapon:GetClass() ~= "ix_camera" then return end
+        if not IsValid(weapon) or weapon:GetClass() ~= "ws_camera" then return end
 
         local wheel = cmd:GetMouseWheel()
         if wheel == 0 then return end
@@ -205,12 +205,12 @@ if CLIENT then
 end
 
 -- Block weapon select from consuming scroll wheel while aiming
--- Must inject into HOOKS_CACHE to run BEFORE Helix's wepselect plugin
+-- Must inject into HOOKS_CACHE to run BEFORE Windswept's wepselect plugin
 if CLIENT then
     local function SetupCameraScrollBlock()
         -- Create a fake plugin entry to insert into HOOKS_CACHE
         local cameraInputPlugin = {
-            uniqueID = "ix_camera_input",
+            uniqueID = "ws_camera_input",
             name = "Camera Input Handler"
         }
 
@@ -219,7 +219,7 @@ if CLIENT then
 
         -- Check if already added
         for plugin, _ in pairs(HOOKS_CACHE["PlayerBindPress"]) do
-            if plugin.uniqueID == "ix_camera_input" then
+            if plugin.uniqueID == "ws_camera_input" then
                 return
             end
         end
@@ -227,7 +227,7 @@ if CLIENT then
         -- Insert our hook into the plugin-level cache
         HOOKS_CACHE["PlayerBindPress"][cameraInputPlugin] = function(self, client, bind, pressed)
             local weapon = client:GetActiveWeapon()
-            if not IsValid(weapon) or weapon:GetClass() ~= "ix_camera" then return end
+            if not IsValid(weapon) or weapon:GetClass() ~= "ws_camera" then return end
             if not weapon:GetAiming() then return end
 
             bind = bind:lower()
@@ -417,7 +417,7 @@ if CLIENT then
 
     net.Receive("wsCameraApprovePhoto", function()
         local weapon = LocalPlayer():GetActiveWeapon()
-        if not IsValid(weapon) or weapon:GetClass() ~= "ix_camera" then return end
+        if not IsValid(weapon) or weapon:GetClass() ~= "ws_camera" then return end
 
         -- Capture the photo
         weapon:CapturePhoto()
@@ -521,7 +521,7 @@ if CLIENT then
     net.Receive("wsCameraFlashToggled", function()
         local enabled = net.ReadBool()
         local weapon = LocalPlayer():GetActiveWeapon()
-        if IsValid(weapon) and weapon:GetClass() == "ix_camera" then
+        if IsValid(weapon) and weapon:GetClass() == "ws_camera" then
             weapon:SetFlashEnabled(enabled)
         end
 
@@ -543,10 +543,16 @@ if SERVER then
     -- Forward declaration for ProcessCompletePhoto (defined below)
     local ProcessCompletePhoto
 
-    -- Handle photo request
-    net.Receive("wsCameraRequestPhoto", function(len, client)
-        local weapon = client:GetActiveWeapon()
-        if not IsValid(weapon) or weapon:GetClass() ~= "ix_camera" then return end
+    -- Handle photo request. ws.weapon.NetReceive supplies the active-weapon class check + a
+    -- 0.5s rate limit (each request triggers a flash light_dynamic + net broadcast); the
+    -- aiming / film / approval logic stays in the method. (sc-photography-2)
+    ws.weapon.NetReceive("wsCameraRequestPhoto", "ws_camera", "NetRequestPhoto", { rateLimit = 0.5 })
+
+    function SWEP:NetRequestPhoto()
+        local weapon = self
+        local client = self:GetOwner()
+        if not IsValid(client) then return end
+
         if not weapon:GetAiming() then return end
 
         local item = weapon.wsItem
@@ -605,7 +611,7 @@ if SERVER then
             net.Start("wsCameraApprovePhoto")
             net.Send(client)
         end
-    end)
+    end
 
     -- Handle photo data from client
     -- Raw JPEG binary with adaptive quality, fits in single message (<64KB)
@@ -627,7 +633,7 @@ if SERVER then
     -- Shared function to process complete photo data
     ProcessCompletePhoto = function(client, imageData)
         local weapon = client:GetActiveWeapon()
-        if not IsValid(weapon) or weapon:GetClass() ~= "ix_camera" then return end
+        if not IsValid(weapon) or weapon:GetClass() ~= "ws_camera" then return end
 
         local item = weapon.wsItem
         if not item then return end
@@ -684,7 +690,14 @@ if SERVER then
 
         -- Generate unique photo ID and save image to file
         -- This prevents inventory sync overflow (storing ~25KB per photo in item data would crash)
-        local photoID = os.time() .. "_" .. math.random(10000, 99999)
+        -- Regenerate on the small chance the timestamp+random pair collides with an existing
+        -- file, so a new photo can't overwrite/leak another's image. Keeps the "%d+_%d+"
+        -- format the ReadPhotoFile path-traversal guard relies on. (sc-photography-6)
+        local photoID
+        for _ = 1, 8 do
+            photoID = os.time() .. "_" .. math.random(10000, 99999)
+            if ws.photo.ReadPhotoFile(photoID) == nil then break end
+        end
 
         -- Save raw JPEG binary to file (centralized so disk usage stays tracked)
         ws.photo.WritePhotoFile(photoID, imageData)
@@ -714,49 +727,44 @@ if SERVER then
         client:EmitSound("buttons/lightswitch2.wav", 60)
     end
 
-    -- Handle aiming state
-    net.Receive("wsCameraSetAiming", function(len, client)
-        local weapon = client:GetActiveWeapon()
-        if not IsValid(weapon) or weapon:GetClass() ~= "ix_camera" then return end
-        -- Light rate-limit: normal play only sends on state change; this caps a
-        -- spamming/modified client without affecting legitimate use.
-        if weapon.nextAimNet and weapon.nextAimNet > CurTime() then return end
-        weapon.nextAimNet = CurTime() + 0.05
+    -- Handle aiming state. Light rate-limit (0.05s): normal play only sends on state change;
+    -- this caps a spamming/modified client. ws.weapon.NetReceive does the class check + limit,
+    -- then calls SetAiming(bool) (the networked-var setter).
+    ws.weapon.NetReceive("wsCameraSetAiming", "ws_camera", "SetAiming", {
+        rateLimit = 0.05,
+        read = function() return net.ReadBool() end,
+    })
 
-        local aiming = net.ReadBool()
-        weapon:SetAiming(aiming)
-    end)
+    -- Handle zoom (0.05s rate-limit). The FOV clamp moves into NetSetZoom so the wrapper only
+    -- needs the class check + limit + payload. ws.weapon.NetReceive supplies those.
+    ws.weapon.NetReceive("wsCameraSetZoom", "ws_camera", "NetSetZoom", {
+        rateLimit = 0.05,
+        read = function() return net.ReadFloat() end,
+    })
 
-    -- Handle zoom
-    net.Receive("wsCameraSetZoom", function(len, client)
-        local weapon = client:GetActiveWeapon()
-        if not IsValid(weapon) or weapon:GetClass() ~= "ix_camera" then return end
-        if weapon.nextZoomNet and weapon.nextZoomNet > CurTime() then return end
-        weapon.nextZoomNet = CurTime() + 0.05
+    function SWEP:NetSetZoom(fov)
+        fov = math.Clamp(fov, self.MinFOV, self.MaxFOV)
+        self:SetCurrentFOV(fov)
+    end
 
-        local fov = net.ReadFloat()
-        fov = math.Clamp(fov, weapon.MinFOV, weapon.MaxFOV)
-        weapon:SetCurrentFOV(fov)
-    end)
+    -- Handle flash toggle. ws.weapon.NetReceive does the active-weapon class check; the toggle
+    -- + ack move into NetToggleFlash.
+    ws.weapon.NetReceive("wsCameraToggleFlash", "ws_camera", "NetToggleFlash")
 
-    -- Handle flash toggle
-    net.Receive("wsCameraToggleFlash", function(len, client)
-        local weapon = client:GetActiveWeapon()
-        if not IsValid(weapon) or weapon:GetClass() ~= "ix_camera" then return end
-
-        local enabled = not weapon:GetFlashEnabled()
-        weapon:SetFlashEnabled(enabled)
+    function SWEP:NetToggleFlash()
+        local enabled = not self:GetFlashEnabled()
+        self:SetFlashEnabled(enabled)
 
         net.Start("wsCameraFlashToggled")
             net.WriteBool(enabled)
-        net.Send(client)
-    end)
+        net.Send(self:GetOwner())
+    end
 end
 
 -- ============================================================================
 -- HOOKS
 -- ============================================================================
 
-ws.weapon.RegisterCleanupHooks("ix_camera", "wsCamera", function(weapon)
+ws.weapon.RegisterCleanupHooks("ws_camera", "wsCamera", function(weapon)
     weapon:SetAiming(false)
 end)

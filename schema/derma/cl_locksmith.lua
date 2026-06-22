@@ -42,10 +42,9 @@ local function CreateNetButton(parent, text, x, y, w, h, panelRef, netMsg, getIt
         local itemID = getItemIDFn()
         if not itemID then return end
 
-        net.Start(netMsg)
-            net.WriteEntity(panelRef.station)
+        ws.action.Send(netMsg, nil, panelRef.station, function()
             net.WriteUInt(itemID, 32)
-        net.SendToServer()
+        end)
 
         if refreshFn then
             timer.Simple(0.5, function()
@@ -184,11 +183,10 @@ function PANEL:CreateProgramKeyTab()
 
         if not blankItemID or not sourceItemID then return end
 
-        net.Start("wsLocksmithProgramKey")
-            net.WriteEntity(self.station)
+        ws.action.Send("wsLocksmithProgramKey", nil, self.station, function()
             net.WriteUInt(blankItemID, 32)
             net.WriteUInt(sourceItemID, 32)
-        net.SendToServer()
+        end)
 
         timer.Simple(0.5, function()
             if IsValid(self) then
@@ -274,11 +272,10 @@ function PANEL:CreateAddKeyingTab()
 
         if not lockItemID or not keyItemID then return end
 
-        net.Start("wsLocksmithAddKeying")
-            net.WriteEntity(self.station)
+        ws.action.Send("wsLocksmithAddKeying", nil, self.station, function()
             net.WriteUInt(lockItemID, 32)
             net.WriteUInt(keyItemID, 32)
-        net.SendToServer()
+        end)
 
         timer.Simple(0.5, function()
             if IsValid(self) then
@@ -362,11 +359,10 @@ function PANEL:CreateRenameTab()
         local newName = self.renameEntry:GetValue()
         if newName == "" then return end
 
-        net.Start("wsLocksmithRename")
-            net.WriteEntity(self.station)
+        ws.action.Send("wsLocksmithRename", nil, self.station, function()
             net.WriteUInt(itemID, 32)
             net.WriteString(newName)
-        net.SendToServer()
+        end)
 
         self.renameEntry:SetValue("")
 
@@ -439,9 +435,7 @@ end
 
 function PANEL:OnRemove()
     if IsValid(self.station) then
-        net.Start("wsLocksmithClose")
-            net.WriteEntity(self.station)
-        net.SendToServer()
+        ws.action.Send("wsLocksmithClose", nil, self.station)
     end
 end
 

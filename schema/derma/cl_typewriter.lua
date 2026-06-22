@@ -139,11 +139,10 @@ function PANEL:TypeDocument()
     end
 
     -- Send to server
-    net.Start("wsTypewriterWrite")
-        net.WriteEntity(self.typewriter)
+    ws.action.Send("wsTypewriterWrite", nil, self.typewriter, function()
         net.WriteUInt(self.selectedPaper, 32)
         net.WriteString(content)
-    net.SendToServer()
+    end)
 
     self:Close()
 end
@@ -155,9 +154,7 @@ end
 function PANEL:OnRemove()
     -- Make sure we notify server
     if IsValid(self.typewriter) then
-        net.Start("wsTypewriterClose")
-            net.WriteEntity(self.typewriter)
-        net.SendToServer()
+        ws.action.Send("wsTypewriterClose", nil, self.typewriter)
     end
 end
 

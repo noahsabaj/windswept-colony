@@ -23,15 +23,22 @@ PLUGIN.activeDrags = PLUGIN.activeDrags or {}
 
 -- Give Hands Up weapon to all players on spawn
 function PLUGIN:PostPlayerLoadout(client)
-    client:Give("ix_handsup")
+    client:Give("ws_handsup")
 end
 
 -- Handle untying when using a restricted player
+-- Note: untie/unleash is an intentionally communal action -- any nearby,
+-- unrestricted player can free a restrained prisoner (no authority/faction gate).
+-- The CanInteractClose check below bounds it to arm's reach for symmetry with the
+-- gag/drag/leash handlers. (sc-prisoner-restraints-6)
 function PLUGIN:PlayerUse(client, entity)
     if not IsValid(entity) or not entity:IsPlayer() then return end
     if client:IsRestricted() then return end
     if not entity:IsRestricted() then return end
     if entity:GetNetVar("untying") then return end
+
+    -- Explicit range re-check (PlayerUse already implies proximity). (sc-prisoner-restraints-6)
+    if not ws.constants.CanInteractClose(client, entity) then return end
 
     -- Check if target is leashed - offer unleash instead
     if entity:GetNetVar("leashed") then
@@ -54,11 +61,18 @@ function PLUGIN:PlayerUse(client, entity)
         entity:SetNetVar("gagged", nil)
         entity:NotifyLocalized("unrestrained")
 
-        -- Give the zip tie to the untier
+        -- Give the zip tie to the untier; if their inventory has no room, drop it
+        -- to the ground so the recovered ziptie is never silently lost. (sc-prisoner-restraints-5)
         local _, inventory = ws.constants.GetCharacterInventory(client)
         if inventory then
-            inventory:Add("ziptie", 1)
-            client:NotifyLocalized("zipTieRecovered")
+            local bSuccess = inventory:Add("ziptie", 1)
+
+            if (bSuccess) then
+                client:NotifyLocalized("zipTieRecovered")
+            elseif IsValid(client) then
+                ws.item.Spawn("ziptie", client:GetItemDropPos())
+                client:NotifyLocalized("noFit")
+            end
         end
     end, 5, function()
         -- Cancelled
@@ -83,6 +97,10 @@ function PLUGIN:KeyPress(client, key)
 
     -- Must be within interaction range
     if not ws.constants.CanInteractClose(client, target) then return end
+
+    -- Rate limit gag toggling to stop sound/notify spam. (sc-prisoner-restraints-4)
+    if (target.wsNextGagToggle or 0) > CurTime() then return end
+    target.wsNextGagToggle = CurTime() + 1
 
     -- Toggle gag state
     local gagged = target:GetNetVar("gagged", false)
@@ -149,9 +167,9 @@ function PLUGIN:StartDrag(dragger, target)
         return false
     end
 
-    -- Must be holding ix_hands weapon
+    -- Must be holding ws_hands weapon
     local weapon = dragger:GetActiveWeapon()
-    if not IsValid(weapon) or weapon:GetClass() ~= "ix_hands" then return false end
+    if not IsValid(weapon) or weapon:GetClass() ~= "ws_hands" then return false end
 
     -- Hands must be lowered (not raised)
     if dragger:IsWepRaised() then return false end
@@ -235,7 +253,7 @@ function PLUGIN:Think()
         elseif not IsValid(target) or not target:IsPlayer() or not target:IsRestricted() then
             self:StopDrag(dragger)
         -- Check dragger still has hands equipped and lowered
-        elseif not IsValid(dragger:GetActiveWeapon()) or dragger:GetActiveWeapon():GetClass() ~= "ix_hands" then
+        elseif not IsValid(dragger:GetActiveWeapon()) or dragger:GetActiveWeapon():GetClass() ~= "ws_hands" then
             self:StopDrag(dragger)
         elseif dragger:IsWepRaised() then
             self:StopDrag(dragger)
@@ -246,9 +264,13 @@ function PLUGIN:Think()
             if distance > 150 then
                 self:StopDrag(dragger)
                 dragger:Notify("You lost your grip.")
-            elseif distance > 48 then
-                -- Pull target toward dragger
-                local direction = (dragger:GetPos() - target:GetPos()):GetNormalized()
+            elseif distance > 48 and target:IsOnGround() then
+                -- Pull target toward dragger. Flatten the pull to the horizontal
+                -- plane and only apply while grounded so the drag can't be used as
+                -- a launch/clip exploit. (sc-prisoner-restraints-8)
+                local direction = (dragger:GetPos() - target:GetPos())
+                direction.z = 0
+                direction:Normalize()
                 local pullStrength = math.Clamp((distance - 48) * 3, 50, 200)
                 target:SetVelocity(direction * pullStrength)
             end
@@ -340,59 +362,73 @@ end)
 -- NETWORK RECEIVERS
 -- ============================================================================
 
-net.Receive("wsDragStart", function(len, client)
-    local target = net.ReadEntity()
-    if restraintPlugin then
-        restraintPlugin:StartDrag(client, target)
+-- Rate limit drag initiation. (sc-prisoner-restraints-1)
+-- target=true + range="close" replaces the inline ReadEntity + range checks inside
+-- StartDrag (which still re-validates as defense-in-depth).
+ws.action.Register("wsDragStart", {
+    target = true,
+    range = "close",
+    rateLimit = 0.3,
+    run = function(client, ctx)
+        if restraintPlugin then
+            restraintPlugin:StartDrag(client, ctx.target)
+        end
     end
-end)
+})
 
-net.Receive("wsDragStop", function(len, client)
-    if restraintPlugin then
-        restraintPlugin:StopDrag(client)
+-- Stop drag operates on the dragger's own netvar; no target is sent over the wire.
+ws.action.Register("wsDragStop", {
+    run = function(client, ctx)
+        if restraintPlugin then
+            restraintPlugin:StopDrag(client)
+        end
     end
-end)
+})
 
-net.Receive("wsLeashStart", function(len, client)
-    if not IsValid(client) then return end
-    if client:IsRestricted() then return end
+ws.action.Register("wsLeashStart", {
+    target = true,
+    range = "close",
+    -- Rate limit: prevents spam-leashing a target. (sc-prisoner-restraints-1)
+    rateLimit = 0.5,
+    onValidate = function(client, ctx)
+        if client:IsRestricted() then return false end
+        if not ctx.target:IsPlayer() then return false end
+    end,
+    run = function(client, ctx)
+        local target = ctx.target
 
-    local target = net.ReadEntity()
-    if not IsValid(target) or not target:IsPlayer() then return end
+        -- Trace from client to find surface
+        local tr = util.TraceLine({
+            start = client:EyePos(),
+            endpos = client:EyePos() + client:GetAimVector() * 200,
+            filter = {client, target}
+        })
 
-    -- Range check
-    if not ws.constants.CanInteractClose(client, target) then return end
+        if not tr.Hit then
+            client:Notify("No surface found to leash to.")
+            return
+        end
 
-    -- Trace from client to find surface
-    local tr = util.TraceLine({
-        start = client:EyePos(),
-        endpos = client:EyePos() + client:GetAimVector() * 200,
-        filter = {client, target}
-    })
-
-    if not tr.Hit then
-        client:Notify("No surface found to leash to.")
-        return
+        if restraintPlugin:LeashPlayer(client, target, tr.HitPos, tr.HitNormal) then
+            client:Notify("You have leashed " .. target:Name() .. " to the surface.")
+            target:Notify("You have been leashed to a surface.")
+        end
     end
+})
 
-    if restraintPlugin:LeashPlayer(client, target, tr.HitPos, tr.HitNormal) then
-        client:Notify("You have leashed " .. target:Name() .. " to the surface.")
-        target:Notify("You have been leashed to a surface.")
+ws.action.Register("wsLeashStop", {
+    target = true,
+    range = "close",
+    onValidate = function(client, ctx)
+        if client:IsRestricted() then return false end
+        if not ctx.target:IsPlayer() then return false end
+    end,
+    run = function(client, ctx)
+        local target = ctx.target
+
+        if restraintPlugin:UnleashPlayer(target) then
+            client:Notify("You have unleashed " .. target:Name() .. ".")
+            target:Notify("You have been unleashed.")
+        end
     end
-end)
-
-net.Receive("wsLeashStop", function(len, client)
-    if not IsValid(client) then return end
-    if client:IsRestricted() then return end
-
-    local target = net.ReadEntity()
-    if not IsValid(target) or not target:IsPlayer() then return end
-
-    -- Range check
-    if not ws.constants.CanInteractClose(client, target) then return end
-
-    if restraintPlugin:UnleashPlayer(target) then
-        client:Notify("You have unleashed " .. target:Name() .. ".")
-        target:Notify("You have been unleashed.")
-    end
-end)
+})

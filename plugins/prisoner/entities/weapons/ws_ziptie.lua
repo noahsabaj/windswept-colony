@@ -76,7 +76,7 @@ if SERVER then
 
     net.Receive("wsZipTieUse", function(len, client)
         local weapon = client:GetActiveWeapon()
-        if not IsValid(weapon) or weapon:GetClass() ~= "ix_ziptie" then return end
+        if not IsValid(weapon) or weapon:GetClass() ~= "ws_ziptie" then return end
 
         -- Must be raised
         if not client:IsWepRaised() then
@@ -143,7 +143,7 @@ if SERVER then
             -- Success - restrain the target
             target:SetRestricted(true)
             target:SetNetVar("tying", nil)
-            target:SetNetVar("tiedBy", client:GetCharacter():GetID())
+            -- ("tiedBy" netvar removed: transient, never persisted, never read) (sc-prisoner-restraints-7)
             target:NotifyLocalized("restrained")
 
             -- Remove the item and strip the weapon
@@ -154,11 +154,18 @@ if SERVER then
 
             client.wsZipTieItem = nil
 
-            if client:HasWeapon("ix_ziptie") then
-                client:StripWeapon("ix_ziptie")
+            if client:HasWeapon("ws_ziptie") then
+                client:StripWeapon("ws_ziptie")
             end
 
-            item:Remove()
+            -- Re-validate that this is still the actor's ziptie before consuming it,
+            -- so a swapped/dropped item can't be silently destroyed. (sc-prisoner-restraints-5)
+            local inv = ws.item.inventories[item.invID]
+            local actorChar = IsValid(client) and client:GetCharacter()
+
+            if (item.uniqueID == "ziptie" and actorChar and inv and inv.owner == actorChar:GetID()) then
+                item:Remove()
+            end
         end, 5, function()
             -- Stop tying sound timer
             timer.Remove(timerName)

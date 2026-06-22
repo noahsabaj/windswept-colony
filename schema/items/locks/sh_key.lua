@@ -21,12 +21,12 @@ ITEM.width = 1
 ITEM.height = 1
 ITEM.category = "Keys & Locks"
 ITEM.noBusiness = true
-ITEM.class = "ix_key"
+ITEM.class = "ws_key"
 ITEM.weaponCategory = "key"
 ITEM.base = "base_equippable"
 
 -- Equippable configuration
-ITEM.equipWeaponClass = "ix_key"
+ITEM.equipWeaponClass = "ws_key"
 ITEM.equipPlayerKey = "wsKeyItem"
 ITEM.equipNotifyKey = "keyEquipped"
 ITEM.equipSound = "physics/metal/metal_solid_impact_soft2.wav"

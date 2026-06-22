@@ -61,7 +61,7 @@ hook.Add("HUDDrawTargetID", "wsRestrainedTargetID", function()
     -- Must be looking at a valid player
     if not IsValid(target) or not target:IsPlayer() then return end
 
-    -- Must be within interaction range (96 units like Helix default)
+    -- Must be within interaction range (96 units like Windswept default)
     if trace.HitPos:Distance(client:GetShootPos()) > 96 then return end
 
     -- Must be restrained
@@ -113,7 +113,7 @@ hook.Add("HUDDrawTargetID", "wsRestrainedTargetID", function()
 
         -- Show drag/leash hint only if holding hands and lowered
         local weapon = client:GetActiveWeapon()
-        if IsValid(weapon) and weapon:GetClass() == "ix_hands" and not client:IsWepRaised() then
+        if IsValid(weapon) and weapon:GetClass() == "ws_hands" and not client:IsWepRaised() then
             draw.SimpleTextOutlined("Hold LMB: Drag | Hold RMB: Leash", "wsSmallFont", pos.x, pos.y + yOffset, ws.constants.COLOR_UI_NEUTRAL, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
         end
     end
@@ -174,9 +174,9 @@ hook.Add("Think", "wsDragInput", function()
         return
     end
 
-    -- Must be holding ix_hands weapon
+    -- Must be holding ws_hands weapon
     local weapon = client:GetActiveWeapon()
-    if not IsValid(weapon) or weapon:GetClass() ~= "ix_hands" then
+    if not IsValid(weapon) or weapon:GetClass() ~= "ws_hands" then
         wasLMBDown = false
         wasRMBDown = false
         leashHoldStart = nil
@@ -214,9 +214,7 @@ hook.Add("Think", "wsDragInput", function()
                     if not target:GetNetVar("leashed") then
                         -- Start dragging
                         currentDragTarget = target
-                        net.Start("wsDragStart")
-                        net.WriteEntity(target)
-                        net.SendToServer()
+                        ws.action.Send("wsDragStart", nil, target)
                         cachedDraggingState = target:EntIndex()  -- Optimistic update
                     end
                 end
@@ -225,8 +223,7 @@ hook.Add("Think", "wsDragInput", function()
     else
         if wasLMBDown and cachedDraggingState then
             -- Released LMB while dragging - stop
-            net.Start("wsDragStop")
-            net.SendToServer()
+            ws.action.Send("wsDragStop")
             currentDragTarget = nil
             cachedDraggingState = nil  -- Optimistic update
         end
@@ -255,9 +252,7 @@ hook.Add("Think", "wsDragInput", function()
                 local target = trace.Entity
 
                 if IsValid(target) and target:IsPlayer() and target:IsRestricted() then
-                    net.Start("wsLeashStart")
-                    net.WriteEntity(target)
-                    net.SendToServer()
+                    ws.action.Send("wsLeashStart", nil, target)
                 end
 
                 leashHoldStart = nil  -- Reset so we don't spam
@@ -280,7 +275,7 @@ hook.Add("HUDPaint", "wsLeashProgress", function()
 
     local client = LocalPlayer()
     local weapon = client:GetActiveWeapon()
-    if not IsValid(weapon) or weapon:GetClass() ~= "ix_hands" then return end
+    if not IsValid(weapon) or weapon:GetClass() ~= "ws_hands" then return end
     if client:IsWepRaised() then return end
 
     local progress = (CurTime() - leashHoldStart) / LEASH_HOLD_TIME

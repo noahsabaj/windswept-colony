@@ -1,5 +1,5 @@
 --[[
-    ix_knocked Entity - Client
+    ws_knocked Entity - Client
 
     Handles rendering and tooltip display.
     Timer is hidden from non-owners.
@@ -78,17 +78,17 @@ function ENT:OnShouldDrawEntityInfo()
     return true
 end
 
--- Helper to get the ix_knocked entity from a trace entity
--- Could be the ix_knocked entity directly or a prop_ragdoll linked to it
+-- Helper to get the ws_knocked entity from a trace entity
+-- Could be the ws_knocked entity directly or a prop_ragdoll linked to it
 local function GetKnockedEntity(ent)
     if not IsValid(ent) then return nil end
 
-    -- Direct ix_knocked entity
-    if ent:GetClass() == "ix_knocked" then
+    -- Direct ws_knocked entity
+    if ent:GetClass() == "ws_knocked" then
         return ent
     end
 
-    -- prop_ragdoll linked to ix_knocked (via networked variable)
+    -- prop_ragdoll linked to ws_knocked (via networked variable)
     if ent:GetClass() == "prop_ragdoll" then
         local knockedEnt = ent:GetNetVar("wsKnockedEntity")
         if IsValid(knockedEnt) then
@@ -154,7 +154,7 @@ hook.Add("HUDDrawTargetID", "wsKnockedTargetID", function()
         -- Show CPR hint only if not dead and holding hands lowered
         if not knockedEnt:GetPermadead() then
             local weapon = client:GetActiveWeapon()
-            if IsValid(weapon) and weapon:GetClass() == "ix_hands" and not client:IsWepRaised() then
+            if IsValid(weapon) and weapon:GetClass() == "ws_hands" and not client:IsWepRaised() then
                 draw.SimpleTextOutlined("Hold LMB: Attempt CPR", "wsSmallFont", pos.x, pos.y + yOffset + 30, Color(100, 200, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0))
             end
         end
@@ -222,9 +222,9 @@ hook.Add("Think", "wsKnockedCPR", function()
     -- Check if looking at valid target within range
     local validTarget = IsValid(knockedEnt) and not knockedEnt:GetPermadead()
 
-    -- Must be holding ix_hands weapon and lowered for CPR
+    -- Must be holding ws_hands weapon and lowered for CPR
     local weapon = client:GetActiveWeapon()
-    local hasHandsLowered = IsValid(weapon) and weapon:GetClass() == "ix_hands" and not client:IsWepRaised()
+    local hasHandsLowered = IsValid(weapon) and weapon:GetClass() == "ws_hands" and not client:IsWepRaised()
 
     local lmbDown = input.IsMouseDown(MOUSE_LEFT)
 
@@ -279,7 +279,7 @@ hook.Add("Think", "wsKnockedCPR", function()
 end)
 
 -- ============================================================================
--- E KEY FOR LOOTING (via net message, since Helix blocks PlayerUse for entities with GetEntityMenu)
+-- E KEY FOR LOOTING (via net message, since Windswept blocks PlayerUse for entities with GetEntityMenu)
 -- ============================================================================
 
 local wasUseDown = false

@@ -1,5 +1,5 @@
 --[[
-    ix_knocked Entity - Server
+    ws_knocked Entity - Server
 
     Handles timer management, damage (execution),
     revival triggering, and inventory looting.
@@ -69,14 +69,14 @@ function ENT:CreateRagdoll(model, skin, bodygroups, submaterials)
     timer.Simple(0, function()
         -- Validate both entities still exist
         if not IsValid(ragdoll) or not IsValid(knockedEntity) then
-            -- Clean up orphaned ragdoll if ix_knocked was removed
+            -- Clean up orphaned ragdoll if ws_knocked was removed
             if IsValid(ragdoll) and not IsValid(knockedEntity) then
                 ragdoll:Remove()
             end
             return
         end
 
-        -- Network the link to clients using Helix's SetNetVar
+        -- Network the link to clients using Windswept's SetNetVar
         ragdoll:SetNetVar("wsKnockedEntity", knockedEntity)
     end)
 
@@ -273,12 +273,12 @@ function ENT:CompleteCremation()
         ws.item.inventories[invID] = nil
 
         -- Delete items from database
-        local itemQuery = mysql:Delete("ix_items")
+        local itemQuery = mysql:Delete("ws_items")
             itemQuery:Where("inventory_id", invID)
         itemQuery:Execute()
 
         -- Delete inventory from database
-        local invQuery = mysql:Delete("ix_inventories")
+        local invQuery = mysql:Delete("ws_inventories")
             invQuery:Where("inventory_id", invID)
         invQuery:Execute()
     end
@@ -552,8 +552,8 @@ function ENT:OpenInventory(client)
         name = "Unknown"
     end
 
-    -- Use Helix storage system
-    -- IMPORTANT: Pass the ragdoll as the entity, not self (ix_knocked is invisible)
+    -- Use Windswept storage system
+    -- IMPORTANT: Pass the ragdoll as the entity, not self (ws_knocked is invisible)
     -- DoStaredAction traces to check if player is looking at the entity,
     -- so we need to pass the visible ragdoll they're actually looking at
     local stareEntity = IsValid(ragdoll) and ragdoll or self
@@ -603,12 +603,12 @@ function ENT:OnRemove()
             ws.item.inventories[invID] = nil
 
             -- Delete items from database
-            local itemQuery = mysql:Delete("ix_items")
+            local itemQuery = mysql:Delete("ws_items")
                 itemQuery:Where("inventory_id", invID)
             itemQuery:Execute()
 
             -- Delete inventory from database
-            local invQuery = mysql:Delete("ix_inventories")
+            local invQuery = mysql:Delete("ws_inventories")
                 invQuery:Where("inventory_id", invID)
             invQuery:Execute()
         end

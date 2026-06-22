@@ -15,7 +15,7 @@ ITEM.functions = {
         OnRun = function(item)
             local client = item.player
             -- Add hunger restoration here when you implement a hunger system
-            client:notify("You eat the bland rations.")
+            client:Notify("You eat the bland rations.")
             return true -- Removes item after use
         end
     }

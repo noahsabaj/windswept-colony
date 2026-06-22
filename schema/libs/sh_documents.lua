@@ -2,7 +2,7 @@
     Document Library
 
     File-based storage for document content (like the photo system).
-    Documents are stored in data/ix_documents/ as JSON files.
+    Documents are stored in data/ws_documents/ as JSON files.
     Items only store reference IDs, preventing inventory sync overflow.
 
     Document data structure:
@@ -10,10 +10,10 @@
         content = "Text content of the document",
         entries = {
             {
-                author = "Character Name",
+                -- fog-of-war: entries carry NO author identity (sc-schema-glue-2)
                 timestamp = 1234567890,
                 type = "handwritten" | "pencil" | "typed",
-                content = "Entry content"
+                length = 42
             },
             ...
         },
@@ -32,10 +32,15 @@
 ws.documents = ws.documents or {}
 
 -- Document storage directory
-ws.documents.STORAGE_DIR = "ix_documents"
+ws.documents.STORAGE_DIR = "ws_documents"
 
 -- Maximum content length per write (prevents abuse)
 ws.documents.MAX_CONTENT_LENGTH = 10000
+
+-- Maximum total accumulated content per document. Without this, a player can grow a single
+-- document file without bound by writing repeatedly to the same paperID (disk + net DoS).
+-- (sc-schema-glue-1)
+ws.documents.MAX_DOCUMENT_LENGTH = 100000
 
 -- ============================================================================
 -- ID GENERATION AND VALIDATION

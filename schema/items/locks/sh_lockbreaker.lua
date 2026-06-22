@@ -18,12 +18,12 @@ ITEM.width = 2
 ITEM.height = 1
 ITEM.category = "Tools"
 ITEM.noBusiness = true
-ITEM.class = "ix_lockbreaker"
+ITEM.class = "ws_lockbreaker"
 ITEM.weaponCategory = "lockbreaker"
 ITEM.base = "base_equippable"
 
 -- Equippable configuration
-ITEM.equipWeaponClass = "ix_lockbreaker"
+ITEM.equipWeaponClass = "ws_lockbreaker"
 ITEM.equipPlayerKey = "wsLockbreakerItem"
 ITEM.equipNotifyKey = "lockbreakerEquipped"
 ITEM.equipSound = "physics/metal/metal_box_impact_hard1.wav"

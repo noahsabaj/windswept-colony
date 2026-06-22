@@ -2,7 +2,7 @@
     Paper
 
     A sheet of paper that can be written on with pen or pencil.
-    Content is stored in server files (data/ix_documents/), item only holds reference ID.
+    Content is stored in server files (data/ws_documents/), item only holds reference ID.
     This prevents inventory sync overflow from large text data.
 
     Data structure (stored on item):
@@ -139,10 +139,7 @@ ITEM.functions.Read = {
     tip = "Read the contents of this paper.",
     icon = "icon16/page_white_text.png",
     OnClick = function(item)
-        net.Start("wsDocumentRead")
-            net.WriteUInt(item:GetID(), 32)
-            net.WriteBool(false)  -- Not for editor
-        net.SendToServer()
+        ws.action.Send("wsDocumentRead", item:GetID(), nil, function() net.WriteBool(false) end)  -- not for editor
         return false
     end,
     OnCanRun = function(item)
@@ -263,9 +260,7 @@ ITEM.functions.Erase = {
             "Erase Paper",
             "Yes, Erase",
             function()
-                net.Start("wsDocumentErase")
-                    net.WriteUInt(item:GetID(), 32)
-                net.SendToServer()
+                ws.action.Send("wsDocumentErase", item:GetID())
             end,
             "Cancel",
             function() end
@@ -313,9 +308,7 @@ ITEM.functions.Destroy = {
             "Destroy Paper",
             "Yes, Destroy",
             function()
-                net.Start("wsDocumentDestroy")
-                    net.WriteUInt(item:GetID(), 32)
-                net.SendToServer()
+                ws.action.Send("wsDocumentDestroy", item:GetID())
             end,
             "Cancel",
             function() end
@@ -373,9 +366,9 @@ hook.Add("PlayerUse", "wsPaperGroundView", function(client, entity)
     local docData = ws.documents.Load(paperID)
     if not docData then return end
 
+    -- Fog-of-war: no author identity in the response; signatures / typed name only. (sc-schema-glue-2)
     local response = {
         content = docData.content or "",
-        author = item:GetAuthor(),
         documentType = item:GetDocumentType(),
         wordCount = item:GetWordCount(),
         signatures = docData.signatures or {},

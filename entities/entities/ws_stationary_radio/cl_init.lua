@@ -20,9 +20,7 @@ local function ClosePanel()
     activePanel = nil
 
     if IsValid(activeEntity) then
-        net.Start("wsStationaryRadioClose")
-        net.WriteEntity(activeEntity)
-        net.SendToServer()
+        ws.action.Send("wsStationaryRadioClose", nil, activeEntity)
     end
     activeEntity = nil
 end
@@ -60,12 +58,11 @@ local function CreateChannelRow(parent, channelNum, ent)
         local currentFreq = getter(ent) or "100.0"
         local newFreq = ws.radio.DecrementFrequency(currentFreq)
 
-        net.Start("wsStationaryRadioConfig")
-        net.WriteEntity(ent)
-        net.WriteUInt(channelNum, 3)
-        net.WriteString("freq")
-        net.WriteString(newFreq)
-        net.SendToServer()
+        ws.action.Send("wsStationaryRadioConfig", nil, ent, function()
+            net.WriteUInt(channelNum, 3)
+            net.WriteString("freq")
+            net.WriteString(newFreq)
+        end)
     end
 
     local freqLabel = vgui.Create("DLabel", freqPanel)
@@ -86,12 +83,11 @@ local function CreateChannelRow(parent, channelNum, ent)
         local currentFreq = getter(ent) or "100.0"
         local newFreq = ws.radio.IncrementFrequency(currentFreq)
 
-        net.Start("wsStationaryRadioConfig")
-        net.WriteEntity(ent)
-        net.WriteUInt(channelNum, 3)
-        net.WriteString("freq")
-        net.WriteString(newFreq)
-        net.SendToServer()
+        ws.action.Send("wsStationaryRadioConfig", nil, ent, function()
+            net.WriteUInt(channelNum, 3)
+            net.WriteString("freq")
+            net.WriteString(newFreq)
+        end)
     end
 
     -- TX toggle
@@ -105,12 +101,11 @@ local function CreateChannelRow(parent, channelNum, ent)
 
         local newValue = not getter(ent)
 
-        net.Start("wsStationaryRadioConfig")
-        net.WriteEntity(ent)
-        net.WriteUInt(channelNum, 3)
-        net.WriteString("tx")
-        net.WriteBool(newValue)
-        net.SendToServer()
+        ws.action.Send("wsStationaryRadioConfig", nil, ent, function()
+            net.WriteUInt(channelNum, 3)
+            net.WriteString("tx")
+            net.WriteBool(newValue)
+        end)
     end
 
     -- RX toggle
@@ -124,12 +119,11 @@ local function CreateChannelRow(parent, channelNum, ent)
 
         local newValue = not getter(ent)
 
-        net.Start("wsStationaryRadioConfig")
-        net.WriteEntity(ent)
-        net.WriteUInt(channelNum, 3)
-        net.WriteString("rx")
-        net.WriteBool(newValue)
-        net.SendToServer()
+        ws.action.Send("wsStationaryRadioConfig", nil, ent, function()
+            net.WriteUInt(channelNum, 3)
+            net.WriteString("rx")
+            net.WriteBool(newValue)
+        end)
     end
 
     -- Volume label
@@ -148,12 +142,11 @@ local function CreateChannelRow(parent, channelNum, ent)
     volSlider.OnValueChanged = function(self, x, y)
         local vol = math.floor(x * 100)
 
-        net.Start("wsStationaryRadioConfig")
-        net.WriteEntity(ent)
-        net.WriteUInt(channelNum, 3)
-        net.WriteString("vol")
-        net.WriteUInt(vol, 7)
-        net.SendToServer()
+        ws.action.Send("wsStationaryRadioConfig", nil, ent, function()
+            net.WriteUInt(channelNum, 3)
+            net.WriteString("vol")
+            net.WriteUInt(vol, 7)
+        end)
     end
 
     -- Think function to update display
@@ -254,10 +247,9 @@ local function OpenStationaryRadioUI(ent)
     textEntry.OnEnter = function(self)
         local msg = self:GetValue()
         if msg and msg ~= "" then
-            net.Start("wsStationaryRadioTransmit")
-            net.WriteEntity(ent)
-            net.WriteString(msg)
-            net.SendToServer()
+            ws.action.Send("wsStationaryRadioTransmit", nil, ent, function()
+                net.WriteString(msg)
+            end)
 
             self:SetValue("")
         end
@@ -272,10 +264,9 @@ local function OpenStationaryRadioUI(ent)
     btnTransmit.DoClick = function()
         local msg = textEntry:GetValue()
         if msg and msg ~= "" then
-            net.Start("wsStationaryRadioTransmit")
-            net.WriteEntity(ent)
-            net.WriteString(msg)
-            net.SendToServer()
+            ws.action.Send("wsStationaryRadioTransmit", nil, ent, function()
+                net.WriteString(msg)
+            end)
 
             textEntry:SetValue("")
         end
@@ -292,10 +283,9 @@ local function OpenStationaryRadioUI(ent)
 
         local newState = not ent:GetMicOn()
 
-        net.Start("wsStationaryRadioMic")
-        net.WriteEntity(ent)
-        net.WriteBool(newState)
-        net.SendToServer()
+        ws.action.Send("wsStationaryRadioMic", nil, ent, function()
+            net.WriteBool(newState)
+        end)
     end
 
     btnMic.Think = function(self)

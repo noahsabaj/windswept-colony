@@ -85,8 +85,8 @@ end
 -- ============================================================================
 
 if SERVER then
-    ws.weapon.NetReceive("wsLockbreakerStart", "ix_lockbreaker", "StartBreaking")
-    ws.weapon.NetReceive("wsLockbreakerCancel", "ix_lockbreaker", "CancelBreaking")
+    ws.weapon.NetReceive("wsLockbreakerStart", "ws_lockbreaker", "StartBreaking")
+    ws.weapon.NetReceive("wsLockbreakerCancel", "ws_lockbreaker", "CancelBreaking")
 end
 
 function SWEP:StartBreaking()

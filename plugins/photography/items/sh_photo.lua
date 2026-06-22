@@ -2,7 +2,7 @@
     Photograph
 
     A photograph captured with a camera.
-    Image data stored in server files (data/ix_photos/), item only holds reference ID.
+    Image data stored in server files (data/ws_photos/), item only holds reference ID.
     This prevents inventory sync overflow from large image data.
     Can be renamed ONCE by anyone who possesses it.
     Can be destroyed with confirmation.
@@ -97,9 +97,9 @@ ITEM.functions.View = {
         ws.photoRequestTitles[photoID] = title
 
         -- Request photo data from server
-        net.Start("wsPhotoRequest")
+        ws.action.Send("wsPhotoRequest", nil, nil, function()
             net.WriteString(photoID)
-        net.SendToServer()
+        end)
 
         return false
     end,
@@ -125,10 +125,9 @@ ITEM.functions.Rename = {
             function(text)
                 if text and text ~= "" then
                     -- Send to server
-                    net.Start("wsPhotoRename")
-                        net.WriteUInt(item:GetID(), 32)
+                    ws.action.Send("wsPhotoRename", item:GetID(), nil, function()
                         net.WriteString(string.sub(text, 1, 64))
-                    net.SendToServer()
+                    end)
                 end
             end,
             function() end,
@@ -164,9 +163,7 @@ ITEM.functions.Destroy = {
             "Yes, Destroy",
             function()
                 -- Send destroy request to server
-                net.Start("wsPhotoDestroy")
-                    net.WriteUInt(item:GetID(), 32)
-                net.SendToServer()
+                ws.action.Send("wsPhotoDestroy", item:GetID())
             end,
             "Cancel",
             function() end
@@ -227,7 +224,8 @@ if CLIENT then
     -- Receive photo data from server (raw JPEG binary)
     net.Receive("wsPhotoData", function()
         local photoID = net.ReadString()
-        local dataLen = net.ReadUInt(32)
+        -- Clamp length to the server's hard cap before allocating (defense-in-depth). (sc-photography-8)
+        local dataLen = math.min(net.ReadUInt(32), ws.photo.MAX_PHOTO_BYTES)
         local imageData = net.ReadData(dataLen)
 
         -- Fire hook for album viewer cache (and any other listeners)
@@ -253,7 +251,8 @@ if CLIENT then
 
     -- Receive photo from ground viewing (raw JPEG binary)
     net.Receive("wsPhotoViewFromGround", function()
-        local dataLen = net.ReadUInt(32)
+        -- Clamp length to the server's hard cap before allocating (defense-in-depth). (sc-photography-8)
+        local dataLen = math.min(net.ReadUInt(32), ws.photo.MAX_PHOTO_BYTES)
         local imageData = net.ReadData(dataLen)
         local title = net.ReadString()
 
@@ -271,62 +270,78 @@ end
 -- ============================================================================
 
 if SERVER then
-    -- Client requests photo data by ID (sends raw JPEG binary)
-    net.Receive("wsPhotoRequest", function(len, client)
-        local photoID = net.ReadString()
-
+    -- Client requests photo data by ID (sends raw JPEG binary).
+    -- Not an item= action: the client sends a String photoID with custom access
+    -- (CanAccessPhoto), so we read it via read() and gate it via onValidate().
+    ws.action.Register("wsPhotoRequest", {
+        -- Light per-client rate limit so an owner can't spam disk reads + ~60KB sends. (sc-photography-7)
+        rateLimit = 0.5,
+        read = function() return net.ReadString() end,
         -- Only serve photos the client owns or was legitimately shown (album browse
         -- / ground view grant). Prevents fetching arbitrary photos by ID.
-        if not ws.photo.CanAccessPhoto(client, photoID) then return end
+        onValidate = function(client, ctx)
+            return ws.photo.CanAccessPhoto(client, ctx.data)
+        end,
+        run = function(client, ctx)
+            local photoID = ctx.data
 
-        local imageData = ws.photo.ReadPhotoFile(photoID)
+            local imageData = ws.photo.ReadPhotoFile(photoID)
 
-        if imageData then
-            net.Start("wsPhotoData")
-                net.WriteString(photoID)
-                net.WriteUInt(#imageData, 32)
-                net.WriteData(imageData, #imageData)
-            net.Send(client)
+            if imageData then
+                net.Start("wsPhotoData")
+                    net.WriteString(photoID)
+                    net.WriteUInt(#imageData, 32)
+                    net.WriteData(imageData, #imageData)
+                net.Send(client)
+            end
         end
-    end)
+    })
 
-    net.Receive("wsPhotoRename", function(len, client)
-        local itemID = net.ReadUInt(32)
-        local title = net.ReadString()
+    -- Allow renaming photos held in main inventory or one level of owned bags
+    -- (e.g. inside an album), consistent with viewing/access. (sc-photography-4)
+    ws.action.Register("wsPhotoRename", {
+        item = "photo",
+        read = function() return net.ReadString() end,
+        run = function(client, ctx)
+            local item = ctx.item
+            local title = ctx.data
 
-        local item = ws.photo.VerifyOwnership(client, itemID, "photo")
-        if not item then return end
+            -- Reject implausibly long titles outright (truncated to 64 below anyway). (sc-photography-11)
+            if #title > 256 then return end
 
-        -- Check if already named
-        if item:GetData("titleSet", false) then
-            client:NotifyLocalized("photoAlreadyNamed")
-            return
+            -- Check if already named
+            if item:GetData("titleSet", false) then
+                client:NotifyLocalized("photoAlreadyNamed")
+                return
+            end
+
+            -- Set the title
+            title = string.sub(title, 1, 64)
+            item:SetData("title", title)
+            item:SetData("titleSet", true)
+
+            client:NotifyLocalized("photoRenamed", title)
         end
+    })
 
-        -- Set the title
-        title = string.sub(title, 1, 64)
-        item:SetData("title", title)
-        item:SetData("titleSet", true)
+    -- Allow destroying photos held in main inventory or one level of owned bags
+    -- (e.g. inside an album), consistent with viewing/access. (sc-photography-4)
+    ws.action.Register("wsPhotoDestroy", {
+        item = "photo",
+        run = function(client, ctx)
+            local item = ctx.item
 
-        client:NotifyLocalized("photoRenamed", title)
-    end)
+            -- Delete the photo file
+            local photoID = item:GetData("photoID", "")
+            if photoID ~= "" then
+                ws.photo.DeletePhotoFile(photoID)
+            end
 
-    net.Receive("wsPhotoDestroy", function(len, client)
-        local itemID = net.ReadUInt(32)
-
-        local item = ws.photo.VerifyOwnership(client, itemID, "photo")
-        if not item then return end
-
-        -- Delete the photo file
-        local photoID = item:GetData("photoID", "")
-        if photoID ~= "" then
-            ws.photo.DeletePhotoFile(photoID)
+            -- Destroy the item
+            item:Remove()
+            client:NotifyLocalized("photoDestroyed")
         end
-
-        -- Destroy the item
-        item:Remove()
-        client:NotifyLocalized("photoDestroyed")
-    end)
+    })
 end
 
 -- ============================================================================

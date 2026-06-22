@@ -23,12 +23,12 @@ ITEM.width = 1
 ITEM.height = 1
 ITEM.category = "Tools"
 ITEM.noBusiness = true
-ITEM.class = "ix_lockpick"
+ITEM.class = "ws_lockpick"
 ITEM.weaponCategory = "lockpick"
 ITEM.base = "base_equippable"
 
 -- Equippable configuration
-ITEM.equipWeaponClass = "ix_lockpick"
+ITEM.equipWeaponClass = "ws_lockpick"
 ITEM.equipPlayerKey = "wsLockpickItem"
 ITEM.equipNotifyKey = "lockpickEquipped"
 ITEM.equipSound = "physics/metal/metal_solid_impact_soft1.wav"

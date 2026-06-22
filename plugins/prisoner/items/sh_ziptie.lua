@@ -48,15 +48,15 @@ ITEM.functions.Equip = {
         end
 
         -- Strip existing zip tie SWEP if any
-        if client:HasWeapon("ix_ziptie") then
-            client:StripWeapon("ix_ziptie")
+        if client:HasWeapon("ws_ziptie") then
+            client:StripWeapon("ws_ziptie")
         end
 
         -- Give the SWEP
-        local weapon = client:Give("ix_ziptie")
+        local weapon = client:Give("ws_ziptie")
         if IsValid(weapon) then
             weapon.wsItem = item
-            client:SelectWeapon("ix_ziptie")
+            client:SelectWeapon("ws_ziptie")
         end
 
         client.wsZipTieItem = item
@@ -82,8 +82,8 @@ ITEM.functions.Unequip = {
         local client = item.player
 
         -- Remove SWEP
-        if client:HasWeapon("ix_ziptie") then
-            client:StripWeapon("ix_ziptie")
+        if client:HasWeapon("ws_ziptie") then
+            client:StripWeapon("ws_ziptie")
         end
 
         client.wsZipTieItem = nil
@@ -105,8 +105,8 @@ function ITEM.postHooks.drop(item, result)
     if item:GetData("equipped") then
         local client = item:GetOwner()
         if IsValid(client) then
-            if client:HasWeapon("ix_ziptie") then
-                client:StripWeapon("ix_ziptie")
+            if client:HasWeapon("ws_ziptie") then
+                client:StripWeapon("ws_ziptie")
             end
             client.wsZipTieItem = nil
         end
@@ -119,8 +119,8 @@ function ITEM:OnTransferred(oldInventory, newInventory)
     if self:GetData("equipped") then
         local oldOwner = oldInventory and oldInventory.GetOwner and oldInventory:GetOwner()
         if IsValid(oldOwner) then
-            if oldOwner:HasWeapon("ix_ziptie") then
-                oldOwner:StripWeapon("ix_ziptie")
+            if oldOwner:HasWeapon("ws_ziptie") then
+                oldOwner:StripWeapon("ws_ziptie")
             end
             oldOwner.wsZipTieItem = nil
         end
@@ -142,7 +142,7 @@ function ITEM:OnLoadout()
         local client = self.player
         if not IsValid(client) then return end
 
-        local weapon = client:Give("ix_ziptie", true)
+        local weapon = client:Give("ws_ziptie", true)
         if IsValid(weapon) then
             weapon.wsItem = self
             client.wsZipTieItem = self

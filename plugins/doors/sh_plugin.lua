@@ -1,7 +1,7 @@
 --[[
     Windswept Doors Plugin
 
-    Overrides Helix's default door system with the physical lock & key system.
+    Overrides Windswept's default door system with the physical lock & key system.
     - Removes door ownership (buying/selling)
     - Removes faction/class door access
     - Uses prop_door_rotating entities with wsIsWindsweptDoor marker
@@ -18,10 +18,10 @@ ws.util.Include("sv_plugin.lua")
 ws.util.Include("cl_plugin.lua")
 
 -- ============================================================================
--- DISABLE HELIX DOOR SYSTEM
+-- DISABLE WINDSWEPT DOOR SYSTEM
 -- ============================================================================
 
--- Override Helix door access to always return false (use physical keys instead)
+-- Override Windswept door access to always return false (use physical keys instead)
 hook.Add("CanPlayerAccessDoor", "wsWindsweptDoors", function(client, door, access)
     -- If it's a map door that's been hidden by our system, deny access
     -- Our managed doors have their own access system
@@ -37,12 +37,12 @@ hook.Add("CanPlayerAccessDoor", "wsWindsweptDoors", function(client, door, acces
     end
 end)
 
--- Prevent Helix door buying
+-- Prevent Windswept door buying
 hook.Add("CanPlayerBuyDoor", "wsWindsweptDoors", function(client, door)
     return false, "Door ownership has been disabled."
 end)
 
--- Prevent Helix door selling
+-- Prevent Windswept door selling
 hook.Add("CanPlayerSellDoor", "wsWindsweptDoors", function(client, door)
     return false, "Door ownership has been disabled."
 end)

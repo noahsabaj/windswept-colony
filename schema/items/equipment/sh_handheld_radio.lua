@@ -135,7 +135,7 @@ function ITEM:DrainBattery(amount)
         if IsValid(owner) then
             local character = owner:GetCharacter()
             if character then
-                character:SetData("ixHasActiveRadio", false)
+                character:SetData("wsHasActiveRadio", false)
             end
             owner:NotifyLocalized("radioBatteryDepleted")
         end
@@ -207,7 +207,7 @@ ITEM.functions.Toggle = {
         client:EmitSound("buttons/lever7.wav", 50, math.random(170, 180), 0.25)
 
         -- Update cache for radio CanHear optimization
-        character:SetData("ixHasActiveRadio", newState)
+        character:SetData("wsHasActiveRadio", newState)
 
         -- Sync frequency to character data when turning ON (prevents stale data)
         if newState then
@@ -289,7 +289,7 @@ function ITEM.postHooks.drop(item, status)
         if IsValid(owner) then
             local character = owner:GetCharacter()
             if character then
-                character:SetData("ixHasActiveRadio", false)
+                character:SetData("wsHasActiveRadio", false)
             end
         end
     end

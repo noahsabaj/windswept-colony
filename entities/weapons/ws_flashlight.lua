@@ -102,21 +102,25 @@ function SWEP:SetLight(value)
     else
         -- SERVER handles the decision
         if value then
+            -- Guard the owner before notifying: SetLight is also called from cleanup
+            -- hooks (death/knockout) where GetOwner() may be invalid. (sc-weapons-tools-6)
+            local owner = self:GetOwner()
+
             -- Check battery before allowing turn-on
             local item = self.wsItem
             if not item then
-                self:GetOwner():NotifyLocalized("flashlightNoBattery")
+                if IsValid(owner) then owner:NotifyLocalized("flashlightNoBattery") end
                 return
             end
 
             local batteries = item:GetData("batteries", {})
             if #batteries == 0 then
-                self:GetOwner():NotifyLocalized("flashlightNoBattery")
+                if IsValid(owner) then owner:NotifyLocalized("flashlightNoBattery") end
                 return
             end
 
             if batteries[1] <= 0 then
-                self:GetOwner():NotifyLocalized("flashlightNoCharge")
+                if IsValid(owner) then owner:NotifyLocalized("flashlightNoCharge") end
                 return
             end
         end
@@ -132,15 +136,13 @@ end
 -- ============================================================================
 
 if SERVER then
-    net.Receive("wsFlashlightSetLight", function(len, ply)
-        local weapon = ply:GetWeapon("ix_flashlight")
-        if not IsValid(weapon) then return end
-        if weapon.ratelimit and weapon.ratelimit > CurTime() then return end
-
-        local value = net.ReadBool()
-        weapon:SetLight(value)
-        weapon.ratelimit = CurTime() + 0.2
-    end)
+    -- The toggle acts only on the flashlight the player currently holds, rate-limited to 0.2s.
+    -- ws.weapon.NetReceive supplies the active-weapon class check + rate limit, then calls
+    -- SetLight(value) (the server branch does the battery check). (sc-weapons-tools-6)
+    ws.weapon.NetReceive("wsFlashlightSetLight", "ws_flashlight", "SetLight", {
+        rateLimit = 0.2,
+        read = function() return net.ReadBool() end,
+    })
 end
 
 -- ============================================================================
@@ -178,16 +180,20 @@ function SWEP:Think()
         batteries[1] = 0
         item:SetData("batteries", batteries)
         self:SetLight(false)
-        self:GetOwner():NotifyLocalized("flashlightBatteryDead")
 
-        -- Auto-eject depleted battery if enabled
+        -- Guard the owner before notify/option lookups (sc-weapons-tools-6)
         local owner = self:GetOwner()
-        if ws.option.Get(owner, "batteryAutoEject", true) then
-            item:AutoEjectDepleted(owner)
-        end
-        -- Auto-load new battery from inventory if enabled
-        if ws.option.Get(owner, "batteryAutoLoad", true) then
-            item:AutoLoadFromInventory(owner)
+        if IsValid(owner) then
+            owner:NotifyLocalized("flashlightBatteryDead")
+
+            -- Auto-eject depleted battery if enabled
+            if ws.option.Get(owner, "batteryAutoEject", true) then
+                item:AutoEjectDepleted(owner)
+            end
+            -- Auto-load new battery from inventory if enabled
+            if ws.option.Get(owner, "batteryAutoLoad", true) then
+                item:AutoLoadFromInventory(owner)
+            end
         end
     else
         item:SetData("batteries", batteries)
@@ -198,6 +204,6 @@ end
 -- HOOKS - Turn Off Light on Death/Knockout
 -- ============================================================================
 
-ws.weapon.RegisterCleanupHooks("ix_flashlight", "wsFlashlight", function(weapon)
+ws.weapon.RegisterCleanupHooks("ws_flashlight", "wsFlashlight", function(weapon)
     if weapon.SetLight then weapon:SetLight(false) end
 end)

@@ -26,7 +26,7 @@ if SERVER then
         local pos = trace.HitPos + trace.HitNormal * 5
 
         -- Create the locksmith entity
-        local ent = ents.Create("ix_auto_locksmith")
+        local ent = ents.Create("ws_auto_locksmith")
 
         if not IsValid(ent) then
             return -- Allow default behavior as fallback
@@ -50,6 +50,6 @@ if SERVER then
             inventory:Remove(self:GetID())
         end
 
-        return false -- Prevent default ix_item spawn
+        return false -- Prevent default ws_item spawn
     end
 end

@@ -197,110 +197,147 @@ function ENT:OnRemove()
     end
 end
 
--- Network receivers
-net.Receive("wsStationaryRadioClose", function(len, client)
-    local ent = net.ReadEntity()
+-- Network receivers. Client->server config/mic/transmit/close go through ws.action with the
+-- session shape: target = this entity, session = true requires ent:GetUser() == client (the
+-- open-UI authority), so the wrapper enforces validity/class/session before run(). (session shape)
+ws.action.Register("wsStationaryRadioClose", {
+    target = true,
+    targetClass = "ws_stationary_radio",
+    session = true,
+    range = "none",
+    run = function(client, ctx)
+        ctx.target:CloseForUser(client)
+    end,
+})
 
-    if not IsValid(ent) or ent:GetClass() ~= "ix_stationary_radio" then return end
-    if ent:GetUser() ~= client then return end
+ws.action.Register("wsStationaryRadioConfig", {
+    target = true,
+    targetClass = "ws_stationary_radio",
+    session = true,
+    range = "none",
+    -- Light rate limit on config churn. (sc-entities-interactive-2)
+    rateLimit = 0.2,
+    read = function()
+        local channel = net.ReadUInt(3) -- 1-4
+        local field = net.ReadString()
+        local value
 
-    ent:CloseForUser(client)
-end)
-
-net.Receive("wsStationaryRadioConfig", function(len, client)
-    local ent = net.ReadEntity()
-    local channel = net.ReadUInt(3) -- 1-4
-    local field = net.ReadString()
-    local value
-
-    if field == "freq" then
-        value = net.ReadString()
-        -- Validate frequency
-        if not ws.radio.ValidateFrequency(value) then return end
-    elseif field == "tx" or field == "rx" then
-        value = net.ReadBool()
-    elseif field == "vol" then
-        value = net.ReadUInt(7) -- 0-100
-    else
-        return
-    end
-
-    if not IsValid(ent) or ent:GetClass() ~= "ix_stationary_radio" then return end
-    if ent:GetUser() ~= client then return end
-    if channel < 1 or channel > 4 then return end
-
-    -- Set the value using the appropriate setter
-    if field == "freq" then
-        ent["SetCh" .. channel .. "Freq"](ent, value)
-    elseif field == "tx" then
-        ent["SetCh" .. channel .. "TX"](ent, value)
-    elseif field == "rx" then
-        ent["SetCh" .. channel .. "RX"](ent, value)
-    elseif field == "vol" then
-        ent["SetCh" .. channel .. "Vol"](ent, value)
-    end
-
-    -- Update transmitter registration if TX changed
-    if field == "tx" then
-        if ent:GetMicOn() then
-            ent:RegisterTransmitter()
+        if field == "freq" then
+            value = net.ReadString()
+            -- Validate frequency
+            if not ws.radio.ValidateFrequency(value) then return nil end
+        elseif field == "tx" or field == "rx" then
+            value = net.ReadBool()
+        elseif field == "vol" then
+            -- UInt7 carries 0-127; clamp to the valid 0-100 range. (sc-entities-interactive-4)
+            value = math.Clamp(net.ReadUInt(7), 0, 100)
+        else
+            return nil
         end
-    end
-end)
 
-net.Receive("wsStationaryRadioMic", function(len, client)
-    local ent = net.ReadEntity()
-    local micOn = net.ReadBool()
+        return { channel = channel, field = field, value = value }
+    end,
+    onValidate = function(client, ctx)
+        local data = ctx.data
+        return data ~= nil and data.channel >= 1 and data.channel <= 4
+    end,
+    run = function(client, ctx)
+        local ent = ctx.target
+        local channel, field, value = ctx.data.channel, ctx.data.field, ctx.data.value
 
-    if not IsValid(ent) or ent:GetClass() ~= "ix_stationary_radio" then return end
-    if ent:GetUser() ~= client then return end
+        -- Set the value using the appropriate setter
+        if field == "freq" then
+            ent["SetCh" .. channel .. "Freq"](ent, value)
+        elseif field == "tx" then
+            ent["SetCh" .. channel .. "TX"](ent, value)
+        elseif field == "rx" then
+            ent["SetCh" .. channel .. "RX"](ent, value)
+        elseif field == "vol" then
+            ent["SetCh" .. channel .. "Vol"](ent, value)
+        end
 
-    ent:SetMicOn(micOn)
+        -- Update transmitter registration if TX changed
+        if field == "tx" then
+            if ent:GetMicOn() then
+                ent:RegisterTransmitter()
+            end
+        end
+    end,
+})
 
-    if micOn then
-        ent:RegisterTransmitter()
-    else
-        ent:UnregisterTransmitter()
-    end
-end)
+ws.action.Register("wsStationaryRadioMic", {
+    target = true,
+    targetClass = "ws_stationary_radio",
+    session = true,
+    range = "none",
+    -- Rate limit mic-toggle (transmitter register/unregister churn). (sc-entities-interactive-2)
+    rateLimit = 0.5,
+    read = function()
+        return net.ReadBool()
+    end,
+    run = function(client, ctx)
+        local ent = ctx.target
+        local micOn = ctx.data
 
-net.Receive("wsStationaryRadioTransmit", function(len, client)
-    local ent = net.ReadEntity()
-    local message = net.ReadString()
+        ent:SetMicOn(micOn)
 
-    if not IsValid(ent) or ent:GetClass() ~= "ix_stationary_radio" then return end
-    if ent:GetUser() ~= client then return end
+        if micOn then
+            ent:RegisterTransmitter()
+        else
+            ent:UnregisterTransmitter()
+        end
+    end,
+})
 
-    -- Get TX frequencies
-    local txFreqs = ent:GetTXFrequencies()
-    if table.IsEmpty(txFreqs) then
-        client:NotifyLocalized("stationaryRadioNoTx")
-        return
-    end
+ws.action.Register("wsStationaryRadioTransmit", {
+    target = true,
+    targetClass = "ws_stationary_radio",
+    session = true,
+    range = "none",
+    -- Rate limit: this broadcasts chat to every TX frequency; cap like normal chat. (sc-entities-interactive-2)
+    rateLimit = 1,
+    read = function()
+        return net.ReadString()
+    end,
+    run = function(client, ctx)
+        local ent = ctx.target
+        local message = ctx.data
 
-    -- Sanitize message
-    message = string.sub(message, 1, 256)
-    if message == "" then return end
+        -- Get TX frequencies
+        local txFreqs = ent:GetTXFrequencies()
+        if table.IsEmpty(txFreqs) then
+            client:NotifyLocalized("stationaryRadioNoTx")
+            return
+        end
 
-    -- Store original frequency
-    local character = client:GetCharacter()
-    if not character then return end
+        -- Sanitize message
+        message = string.sub(message, 1, 256)
+        if message == "" then return end
 
-    local originalFreq = character:GetData("frequency", "100.0")
+        -- Store original frequency
+        local character = client:GetCharacter()
+        if not character then return end
 
-    -- Transmit on each TX frequency
-    for freq, _ in pairs(txFreqs) do
-        character:SetData("frequency", freq)
-        ws.chat.Send(client, "radio", message)
-    end
+        local originalFreq = character:GetData("frequency", "100.0")
 
-    -- Restore original frequency
-    character:SetData("frequency", originalFreq)
-end)
+        -- Transmit on each TX frequency. frequency is mutated as a side channel into ws.chat.Send,
+        -- so wrap in pcall and ALWAYS restore originalFreq even if Send errors mid-loop - otherwise
+        -- the character is left stuck on a TX frequency. (sc-entities-interactive-3)
+        pcall(function()
+            for freq, _ in pairs(txFreqs) do
+                character:SetData("frequency", freq)
+                ws.chat.Send(client, "radio", message)
+            end
+        end)
+
+        -- Restore original frequency
+        character:SetData("frequency", originalFreq)
+    end,
+})
 
 -- Clean up when player dies while using console
 hook.Add("PlayerDeath", "wsStationaryRadioPlayerDeath", function(victim)
-    for _, ent in ipairs(ents.FindByClass("ix_stationary_radio")) do
+    for _, ent in ipairs(ents.FindByClass("ws_stationary_radio")) do
         if ent:GetUser() == victim then
             ent:CloseForUser(victim)
         end
@@ -309,7 +346,7 @@ end)
 
 -- Clean up when player disconnects while using console
 hook.Add("PlayerDisconnected", "wsStationaryRadioPlayerDisconnect", function(client)
-    for _, ent in ipairs(ents.FindByClass("ix_stationary_radio")) do
+    for _, ent in ipairs(ents.FindByClass("ws_stationary_radio")) do
         if ent:GetUser() == client then
             ent:SetUser(nil)
             ent:SetMicOn(false)

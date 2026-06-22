@@ -133,12 +133,6 @@ LANGUAGE = {
     invalidBirthDay = "Invalid day for selected month.",
     invalidBirthLocation = "Please select a valid birth location.",
 
-    -- Personal ID Card
-    idCardShown = "You showed your ID to %s.",
-    idCardNotValid = "No valid player in front of you.",
-    idCardEquipped = "You must unequip your ID card first.",
-    idCardMustRaise = "Raise your ID card first (hold R).",
-
     -- Ladder
     ladderEquipped = "You must unequip the ladder first.",
     ladderNoRoom = "No room in inventory for the ladder.",
@@ -306,6 +300,7 @@ LANGUAGE = {
     documentRenamed = "Document renamed: %s",
     documentAlreadyNamed = "This document has already been named.",
     documentSaveFailed = "Failed to save document.",
+    documentFull = "This document is full.",
     cannotErasePen = "Pen writing cannot be erased.",
     notEnoughInk = "Not enough ink!",
     notEnoughLead = "Not enough lead!",

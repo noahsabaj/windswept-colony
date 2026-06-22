@@ -1,5 +1,5 @@
 --[[
-    ix_knocked Entity - Shared
+    ws_knocked Entity - Shared
 
     Represents a knocked out player's body.
     Can be revived, looted, dragged, and executed.
@@ -49,17 +49,17 @@ end
 
 -- Add to holdable classes for hands dragging
 hook.Add("InitPostEntity", "wsKnockedHoldable", function()
-    if ix and ws.allowedHoldableClasses then
-        ws.allowedHoldableClasses["ix_knocked"] = true
+    if ws and ws.allowedHoldableClasses then
+        ws.allowedHoldableClasses["ws_knocked"] = true
     end
 end)
 
 -- Also add on entity creation in case InitPostEntity already fired
 hook.Add("OnEntityCreated", "wsKnockedHoldableCheck", function(ent)
-    if ent:GetClass() == "ix_knocked" then
+    if ent:GetClass() == "ws_knocked" then
         timer.Simple(0, function()
-            if ix and ws.allowedHoldableClasses then
-                ws.allowedHoldableClasses["ix_knocked"] = true
+            if ws and ws.allowedHoldableClasses then
+                ws.allowedHoldableClasses["ws_knocked"] = true
             end
         end)
     end

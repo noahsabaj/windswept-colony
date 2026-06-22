@@ -22,7 +22,7 @@ ITEM.noBusiness = true
 
 function ITEM:OnDrop(dropPos)
     -- Create typewriter entity instead of default item drop
-    local typewriter = ents.Create("ix_typewriter")
+    local typewriter = ents.Create("ws_typewriter")
 
     if IsValid(typewriter) then
         -- Position slightly above ground
@@ -61,7 +61,7 @@ ITEM.functions.Drop = {
         local dropPos = trace.HitPos
 
         -- Create typewriter entity
-        local typewriter = ents.Create("ix_typewriter")
+        local typewriter = ents.Create("ws_typewriter")
 
         if IsValid(typewriter) then
             typewriter:SetPos(dropPos + Vector(0, 0, 5))
@@ -76,7 +76,10 @@ ITEM.functions.Drop = {
             -- Move item to "placed" state (remove from inventory but keep instance)
             local inv = client:GetCharacter():GetInventory()
             if inv then
-                item:Transfer(nil, nil, nil, client)  -- Remove from inventory
+                -- isLogical=true: remove from inventory WITHOUT spawning a default ws_item
+                -- world entity. The ws_typewriter prop is the world representation, so the
+                -- default Transfer (which calls Spawn) produced a duplicate. (sc-items-currency-battery-3)
+                item:Transfer(nil, nil, nil, client, false, true)
             end
 
             client:NotifyLocalized("typewriterPlaced")

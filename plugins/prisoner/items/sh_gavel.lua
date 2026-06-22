@@ -44,15 +44,15 @@ ITEM.functions.Equip = {
         end
 
         -- Strip existing gavel SWEP if any
-        if client:HasWeapon("ix_gavel") then
-            client:StripWeapon("ix_gavel")
+        if client:HasWeapon("ws_gavel") then
+            client:StripWeapon("ws_gavel")
         end
 
         -- Give the SWEP
-        local weapon = client:Give("ix_gavel")
+        local weapon = client:Give("ws_gavel")
         if IsValid(weapon) then
             weapon.wsItem = item
-            client:SelectWeapon("ix_gavel")
+            client:SelectWeapon("ws_gavel")
         end
 
         client.wsGavelItem = item
@@ -78,8 +78,8 @@ ITEM.functions.Unequip = {
         local client = item.player
 
         -- Remove SWEP
-        if client:HasWeapon("ix_gavel") then
-            client:StripWeapon("ix_gavel")
+        if client:HasWeapon("ws_gavel") then
+            client:StripWeapon("ws_gavel")
         end
 
         client.wsGavelItem = nil
@@ -101,8 +101,8 @@ function ITEM.postHooks.drop(item, result)
     if item:GetData("equipped") then
         local client = item:GetOwner()
         if IsValid(client) then
-            if client:HasWeapon("ix_gavel") then
-                client:StripWeapon("ix_gavel")
+            if client:HasWeapon("ws_gavel") then
+                client:StripWeapon("ws_gavel")
             end
             client.wsGavelItem = nil
         end
@@ -115,8 +115,8 @@ function ITEM:OnTransferred(oldInventory, newInventory)
     if self:GetData("equipped") then
         local oldOwner = oldInventory and oldInventory.GetOwner and oldInventory:GetOwner()
         if IsValid(oldOwner) then
-            if oldOwner:HasWeapon("ix_gavel") then
-                oldOwner:StripWeapon("ix_gavel")
+            if oldOwner:HasWeapon("ws_gavel") then
+                oldOwner:StripWeapon("ws_gavel")
             end
             oldOwner.wsGavelItem = nil
         end
@@ -138,7 +138,7 @@ function ITEM:OnLoadout()
         local client = self.player
         if not IsValid(client) then return end
 
-        local weapon = client:Give("ix_gavel", true)
+        local weapon = client:Give("ws_gavel", true)
         if IsValid(weapon) then
             weapon.wsItem = self
             client.wsGavelItem = self

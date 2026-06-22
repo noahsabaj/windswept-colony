@@ -22,7 +22,7 @@ ITEM.allowedItemType = "key"
 ITEM.allowedItemNotify = "keyringOnlyKeys"
 ITEM.viewSuffix = " - Keys"
 
-ITEM.class = "ix_keyring"
+ITEM.class = "ws_keyring"
 ITEM.weaponCategory = "keyring"
 
 -- ============================================================================
@@ -145,17 +145,17 @@ ITEM.functions.Equip = {
             oldItem:SetData("equipped", nil)
         end
 
-        if client:HasWeapon("ix_keyring") then
-            client:StripWeapon("ix_keyring")
+        if client:HasWeapon("ws_keyring") then
+            client:StripWeapon("ws_keyring")
         end
 
         client.wsKeyringItem = item
         item:SetData("equipped", true)
 
-        local weapon = client:Give("ix_keyring")
+        local weapon = client:Give("ws_keyring")
         if IsValid(weapon) then
             weapon.wsItem = item
-            client:SelectWeapon("ix_keyring")
+            client:SelectWeapon("ws_keyring")
         end
 
         client:EmitSound("physics/metal/metal_solid_impact_soft2.wav", 50)
@@ -178,8 +178,8 @@ ITEM.functions.Unequip = {
     OnRun = function(item)
         local client = item.player
 
-        if client:HasWeapon("ix_keyring") then
-            client:StripWeapon("ix_keyring")
+        if client:HasWeapon("ws_keyring") then
+            client:StripWeapon("ws_keyring")
         end
 
         client.wsKeyringItem = nil
@@ -202,8 +202,8 @@ function ITEM:OnDropExtra()
     if self:GetData("equipped") then
         local client = self:GetOwner()
         if IsValid(client) then
-            if client:HasWeapon("ix_keyring") then
-                client:StripWeapon("ix_keyring")
+            if client:HasWeapon("ws_keyring") then
+                client:StripWeapon("ws_keyring")
             end
             client.wsKeyringItem = nil
         end
@@ -225,8 +225,8 @@ function ITEM:OnTransferExtra(curInv, inventory)
     if self:GetData("equipped") then
         local oldOwner = curInv and curInv.GetOwner and curInv:GetOwner()
         if IsValid(oldOwner) then
-            if oldOwner:HasWeapon("ix_keyring") then
-                oldOwner:StripWeapon("ix_keyring")
+            if oldOwner:HasWeapon("ws_keyring") then
+                oldOwner:StripWeapon("ws_keyring")
             end
             oldOwner.wsKeyringItem = nil
         end
@@ -239,7 +239,7 @@ function ITEM:OnLoadout()
         local client = self.player
         if not IsValid(client) then return end
 
-        local weapon = client:Give("ix_keyring", true)
+        local weapon = client:Give("ws_keyring", true)
         if IsValid(weapon) then
             weapon.wsItem = self
             client.wsKeyringItem = self

@@ -43,7 +43,7 @@ hook.Add("HUDPaint", "wsLocksmithHint", function()
         local tr = ply:GetEyeTrace()
         local ent = tr.Entity
 
-        if not IsValid(ent) or ent:GetClass() ~= "ix_auto_locksmith" or ply:GetPos():DistToSqr(ent:GetPos()) > (150 * 150) then
+        if not IsValid(ent) or ent:GetClass() ~= "ws_auto_locksmith" or ply:GetPos():DistToSqr(ent:GetPos()) > (150 * 150) then
             locksmithHintCache.ent = nil
             locksmithHintCache.text1 = nil
             locksmithHintCache.text2 = nil
