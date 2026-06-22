@@ -1,264 +1,12 @@
 --[[
-    Physical Description System
+    The character appearance variables (ws.char.RegisterVar): age, height, weight,
+    skin tone, hair, eyes, facial hair, birth date/location, and the description.
 
-    Handles structured physical attributes for character creation.
-    Replaces free-form descriptions with objective, auto-generated text.
-
-    Physical attributes are set at character creation and cannot be changed.
+    Split from the former schema/libs/sh_physical.lua (PR-10 honesty rename);
+    ws.physical -> ws.appearance. Public API + the registered char vars unchanged.
 ]]--
 
-ws.physical = ws.physical or {}
-
--- ============================================================================
--- MODEL MAPPINGS
--- ============================================================================
-
--- Model name to skin tone options mapping
--- Black models get darker skin options
--- Asian models get specific options
--- White models get lighter skin options
-ws.physical.modelSkinTones = {
-    -- Black models
-    ["male_01"] = {"Brown", "Dark Brown", "Dark"},
-    ["male_03"] = {"Brown", "Dark Brown", "Dark"},
-    ["female_03"] = {"Brown", "Dark Brown", "Dark"},
-    ["female_05"] = {"Brown", "Dark Brown", "Dark"},
-
-    -- Asian models
-    ["male_05"] = {"Fair", "Light", "Medium", "Tan"},
-    ["female_04"] = {"Fair", "Light", "Medium", "Tan"},
-
-    -- Default (white models)
-    ["default"] = {"Pale", "Fair", "Light", "Medium", "Olive"}
-}
-
--- Models that are locked to bald
-ws.physical.baldModels = {
-    ["male_04"] = true
-}
-
--- ============================================================================
--- DROPDOWN OPTIONS
--- ============================================================================
-
-ws.physical.hairColors = {
-    "Black",
-    "Dark Brown",
-    "Brown",
-    "Light Brown",
-    "Blonde",
-    "Strawberry Blonde",
-    "Red/Auburn",
-    "Gray",
-    "White"
-}
-
-ws.physical.hairTypes = {
-    "Straight",
-    "Wavy",
-    "Curly",
-    "Coily"
-}
-
-ws.physical.hairLengths = {
-    "Bald",
-    "Very Short",
-    "Short",
-    "Medium",
-    "Long"
-}
-
-ws.physical.eyeColors = {
-    "Brown",
-    "Dark Brown",
-    "Blue",
-    "Green",
-    "Hazel",
-    "Gray",
-    "Amber"
-}
-
-ws.physical.facialHairOptions = {
-    "None",
-    "Stubble",
-    "Mustache",
-    "Goatee",
-    "Short Beard",
-    "Full Beard"
-}
-
--- ============================================================================
--- BUILD THRESHOLDS (BMI-based)
--- ============================================================================
-
-ws.physical.buildThresholds = {
-    {max = 18.5, name = "thin"},
-    {max = 25, name = "average"},
-    {max = 30, name = "stocky"},
-    {max = 999, name = "heavyset"}
-}
-
--- ============================================================================
--- AGE DESCRIPTORS
--- ============================================================================
-
-ws.physical.ageDescriptors = {
-    {max = 19, desc = "late teens"},
-    {max = 24, desc = "early twenties"},
-    {max = 29, desc = "late twenties"},
-    {max = 34, desc = "early thirties"},
-    {max = 39, desc = "late thirties"},
-    {max = 55, desc = "middle age"},
-    {max = 70, desc = "later years"},
-    {max = 999, desc = "twilight years"}
-}
-
--- ============================================================================
--- UTILITY FUNCTIONS
--- ============================================================================
-
--- Extract model name from full path (e.g., "male_01" from "models/player/group01/male_01.mdl")
-function ws.physical.GetModelName(modelPath)
-    if not modelPath then return nil end
-    return string.match(modelPath, "(male_%d%d)%.mdl") or
-           string.match(modelPath, "(female_%d%d)%.mdl")
-end
-
--- Get skin tone options for a given model path
-function ws.physical.GetSkinTonesForModel(modelPath)
-    local modelName = ws.physical.GetModelName(modelPath)
-
-    if modelName and ws.physical.modelSkinTones[modelName] then
-        return ws.physical.modelSkinTones[modelName]
-    end
-
-    return ws.physical.modelSkinTones["default"]
-end
-
--- Check if a model is female
-function ws.physical.IsFemaleModel(modelPath)
-    return modelPath and string.find(modelPath, "female") ~= nil
-end
-
--- Check if a model is locked to bald
-function ws.physical.IsBaldModel(modelPath)
-    local modelName = ws.physical.GetModelName(modelPath)
-    return modelName and ws.physical.baldModels[modelName] or false
-end
-
--- Convert height from cm to imperial (feet, inches)
-function ws.physical.CmToImperial(cm)
-    local totalInches = cm / 2.54
-    local feet = math.floor(totalInches / 12)
-    local inches = math.floor(totalInches % 12 + 0.5) -- Round to nearest inch
-
-    -- Handle edge case where rounding gives 12 inches
-    if inches >= 12 then
-        feet = feet + 1
-        inches = 0
-    end
-
-    return feet, inches
-end
-
--- Convert weight from lbs to kg
-function ws.physical.LbsToKg(lbs)
-    return math.floor(lbs * 0.453592 + 0.5) -- Round to nearest kg
-end
-
--- Calculate BMI and return build category
-function ws.physical.CalculateBuild(heightCm, weightLbs)
-    local heightM = heightCm / 100
-    local weightKg = weightLbs * 0.453592
-    local bmi = weightKg / (heightM * heightM)
-
-    for _, threshold in ipairs(ws.physical.buildThresholds) do
-        if bmi < threshold.max then
-            return threshold.name, bmi
-        end
-    end
-
-    return "heavyset", bmi
-end
-
--- Get age descriptor text
-function ws.physical.GetAgeDescriptor(age)
-    for _, entry in ipairs(ws.physical.ageDescriptors) do
-        if age <= entry.max then
-            return entry.desc
-        end
-    end
-    return "elderly"
-end
-
--- Get model path from model index
-function ws.physical.GetModelPath(modelIndex)
-    local models = ws.config.Get("factionlessModels") or {}
-    local model = models[modelIndex]
-
-    if istable(model) then
-        return model[1]
-    end
-
-    return model
-end
-
--- ============================================================================
--- DESCRIPTION GENERATION (SERVER ONLY)
--- ============================================================================
-
-if SERVER then
-    function ws.physical.GenerateDescription(data)
-        -- Determine article for build
-        local buildArticle = (data.build == "average") and "An" or "A"
-
-        -- Build hair description
-        local hairDesc
-        if data.hairLength == "Bald" then
-            hairDesc = "a bald head"
-        else
-            hairDesc = string.lower(data.hairLength) .. ", " ..
-                       string.lower(data.hairType) .. " " ..
-                       string.lower(data.hairColor) .. " hair"
-        end
-
-        -- Build facial hair description
-        local facialHairDesc = ""
-        if data.facialHair and data.facialHair ~= "None" then
-            if data.facialHair == "Stubble" then
-                facialHairDesc = " with stubble on their face"
-            else
-                facialHairDesc = " with a " .. string.lower(data.facialHair)
-            end
-        end
-
-        -- Convert height to imperial for description
-        local feet, inches = ws.physical.CmToImperial(data.height)
-        local heightStr = string.format("%d'%d\"", feet, inches)
-
-        -- Get age descriptor
-        local ageDesc = ws.physical.GetAgeDescriptor(data.age)
-
-        -- Determine article for skin tone
-        local skinArticle = string.sub(data.skinTone, 1, 1):match("[AEIOUaeiou]") and "an" or "a"
-
-        -- Generate the description (gender-neutral)
-        local description = string.format(
-            "%s %s-built person with %s and %s eyes. They have %s %s complexion%s. They stand around %s and appear to be in their %s.",
-            buildArticle,
-            data.build,
-            hairDesc,
-            string.lower(data.eyeColor),
-            skinArticle,
-            string.lower(data.skinTone),
-            facialHairDesc,
-            heightStr,
-            ageDesc
-        )
-
-        return description
-    end
-end
+ws.appearance = ws.appearance or {}
 
 -- ============================================================================
 -- CHARACTER VARIABLE REGISTRATION
@@ -381,8 +129,8 @@ ws.char.RegisterVar("physSkinTone", {
         panel:Dock(TOP)
 
         -- Get initial options based on current model
-        local modelPath = ws.physical.GetModelPath(payload.model or 1)
-        local options = ws.physical.GetSkinTonesForModel(modelPath)
+        local modelPath = ws.appearance.GetModelPath(payload.model or 1)
+        local options = ws.appearance.GetSkinTonesForModel(modelPath)
         panel:SetOptions(options)
 
         panel.OnValueChanged = function(this)
@@ -392,8 +140,8 @@ ws.char.RegisterVar("physSkinTone", {
         -- Update options when model changes
         payload:AddHook("model", function(modelIndex)
             if not IsValid(panel) then return end
-            local newModelPath = ws.physical.GetModelPath(modelIndex)
-            local newOptions = ws.physical.GetSkinTonesForModel(newModelPath)
+            local newModelPath = ws.appearance.GetModelPath(modelIndex)
+            local newOptions = ws.appearance.GetSkinTonesForModel(newModelPath)
             panel:SetOptions(newOptions)
             payload:Set("physSkinTone", panel:GetValue())
         end)
@@ -418,7 +166,7 @@ ws.char.RegisterVar("physHairColor", {
         if payload.physHairLength == "Bald" then
             return value or "Brown"
         end
-        if not value or not table.HasValue(ws.physical.hairColors, value) then
+        if not value or not table.HasValue(ws.appearance.hairColors, value) then
             return false, "invalidHairColor"
         end
         return value
@@ -426,7 +174,7 @@ ws.char.RegisterVar("physHairColor", {
     OnDisplay = function(self, container, payload)
         local panel = container:Add("wsPhysicalDropdown")
         panel:Dock(TOP)
-        panel:SetOptions(ws.physical.hairColors)
+        panel:SetOptions(ws.appearance.hairColors)
         panel:SetValue("Brown")
 
         panel.OnValueChanged = function(this)
@@ -444,8 +192,8 @@ ws.char.RegisterVar("physHairColor", {
     OnPostSetup = function(self, panel, payload)
         if not IsValid(panel) then return end
         -- Check if model is bald-locked
-        local modelPath = ws.physical.GetModelPath(payload.model or 1)
-        if ws.physical.IsBaldModel(modelPath) then
+        local modelPath = ws.appearance.GetModelPath(payload.model or 1)
+        if ws.appearance.IsBaldModel(modelPath) then
             ws.charCreate.SetFieldVisible(panel, false)
         end
         payload:Set("physHairColor", panel:GetValue())
@@ -464,7 +212,7 @@ ws.char.RegisterVar("physHairType", {
         if payload.physHairLength == "Bald" then
             return value or "Straight"
         end
-        if not value or not table.HasValue(ws.physical.hairTypes, value) then
+        if not value or not table.HasValue(ws.appearance.hairTypes, value) then
             return false, "invalidHairType"
         end
         return value
@@ -472,7 +220,7 @@ ws.char.RegisterVar("physHairType", {
     OnDisplay = function(self, container, payload)
         local panel = container:Add("wsPhysicalDropdown")
         panel:Dock(TOP)
-        panel:SetOptions(ws.physical.hairTypes)
+        panel:SetOptions(ws.appearance.hairTypes)
         panel:SetValue("Straight")
 
         panel.OnValueChanged = function(this)
@@ -490,8 +238,8 @@ ws.char.RegisterVar("physHairType", {
     OnPostSetup = function(self, panel, payload)
         if not IsValid(panel) then return end
         -- Check if model is bald-locked
-        local modelPath = ws.physical.GetModelPath(payload.model or 1)
-        if ws.physical.IsBaldModel(modelPath) then
+        local modelPath = ws.appearance.GetModelPath(payload.model or 1)
+        if ws.appearance.IsBaldModel(modelPath) then
             ws.charCreate.SetFieldVisible(panel, false)
         end
         payload:Set("physHairType", panel:GetValue())
@@ -506,7 +254,7 @@ ws.char.RegisterVar("physHairLength", {
     index = 16,
     category = "description",
     OnValidate = function(self, value, payload, client)
-        if not value or not table.HasValue(ws.physical.hairLengths, value) then
+        if not value or not table.HasValue(ws.appearance.hairLengths, value) then
             return false, "invalidHairLength"
         end
         return value
@@ -514,7 +262,7 @@ ws.char.RegisterVar("physHairLength", {
     OnDisplay = function(self, container, payload)
         local panel = container:Add("wsPhysicalDropdown")
         panel:Dock(TOP)
-        panel:SetOptions(ws.physical.hairLengths)
+        panel:SetOptions(ws.appearance.hairLengths)
         panel:SetValue("Medium")
 
         panel.OnValueChanged = function(this)
@@ -524,14 +272,14 @@ ws.char.RegisterVar("physHairLength", {
         -- Lock to bald for bald models
         payload:AddHook("model", function(modelIndex)
             if not IsValid(panel) then return end
-            local modelPath = ws.physical.GetModelPath(modelIndex)
-            if ws.physical.IsBaldModel(modelPath) then
+            local modelPath = ws.appearance.GetModelPath(modelIndex)
+            if ws.appearance.IsBaldModel(modelPath) then
                 panel:SetOptions({"Bald"})
                 panel:SetEnabled(false)
                 payload:Set("physHairLength", "Bald")
             else
                 local currentValue = panel:GetValue()
-                panel:SetOptions(ws.physical.hairLengths)
+                panel:SetOptions(ws.appearance.hairLengths)
                 panel:SetEnabled(true)
                 -- If was "Bald" (from bald model), default to "Medium", otherwise preserve
                 if currentValue == "Bald" then
@@ -547,8 +295,8 @@ ws.char.RegisterVar("physHairLength", {
     OnPostSetup = function(self, panel, payload)
         if not IsValid(panel) then return end
         -- Check if model is bald-locked
-        local modelPath = ws.physical.GetModelPath(payload.model or 1)
-        if ws.physical.IsBaldModel(modelPath) then
+        local modelPath = ws.appearance.GetModelPath(payload.model or 1)
+        if ws.appearance.IsBaldModel(modelPath) then
             panel:SetOptions({"Bald"})
             panel:SetEnabled(false)
             payload:Set("physHairLength", "Bald")
@@ -566,7 +314,7 @@ ws.char.RegisterVar("physEyeColor", {
     index = 17,
     category = "description",
     OnValidate = function(self, value, payload, client)
-        if not value or not table.HasValue(ws.physical.eyeColors, value) then
+        if not value or not table.HasValue(ws.appearance.eyeColors, value) then
             return false, "invalidEyeColor"
         end
         return value
@@ -574,7 +322,7 @@ ws.char.RegisterVar("physEyeColor", {
     OnDisplay = function(self, container, payload)
         local panel = container:Add("wsPhysicalDropdown")
         panel:Dock(TOP)
-        panel:SetOptions(ws.physical.eyeColors)
+        panel:SetOptions(ws.appearance.eyeColors)
         panel:SetValue("Brown")
 
         panel.OnValueChanged = function(this)
@@ -597,7 +345,7 @@ ws.char.RegisterVar("physFacialHair", {
     index = 18,
     category = "description",
     OnValidate = function(self, value, payload, client)
-        if not value or not table.HasValue(ws.physical.facialHairOptions, value) then
+        if not value or not table.HasValue(ws.appearance.facialHairOptions, value) then
             return false, "invalidFacialHair"
         end
         return value
@@ -605,7 +353,7 @@ ws.char.RegisterVar("physFacialHair", {
     OnDisplay = function(self, container, payload)
         local panel = container:Add("wsPhysicalDropdown")
         panel:Dock(TOP)
-        panel:SetOptions(ws.physical.facialHairOptions)
+        panel:SetOptions(ws.appearance.facialHairOptions)
         panel:SetValue("None")
 
         panel.OnValueChanged = function(this)

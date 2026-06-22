@@ -71,10 +71,10 @@ function PANEL:UpdateDisplay()
     local displayText = tostring(value)
 
     if self.displayMode == "height" then
-        local feet, inches = ws.physical.CmToImperial(value)
+        local feet, inches = ws.appearance.CmToImperial(value)
         displayText = string.format("%d cm (%d'%d\")", value, feet, inches)
     elseif self.displayMode == "weight" then
-        local kg = ws.physical.LbsToKg(value)
+        local kg = ws.appearance.LbsToKg(value)
         displayText = string.format("%d lbs (%d kg)", value, kg)
     elseif self.displayMode == "age" then
         displayText = string.format("%d years", value)
