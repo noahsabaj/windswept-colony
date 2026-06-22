@@ -12,10 +12,6 @@
 # Generated baseline: 2026-06-22. One netstring per line; '#' comments and blank lines ignored.
 
 wsBagDrop
-wsCameraApprovePhoto
-wsCameraFlashEffect
-wsCameraFlashToggled
-wsCameraPhotoData
 wsCurrencySplit
 wsDoorsSync
 wsKnockoutEnd
@@ -26,10 +22,6 @@ wsLocksmithOpen
 wsLocksmithResult
 wsPermadeathReady
 wsPermadeathScreen
-wsPhotoAlbumViewData
-wsPhotoAlbumViewFromGround
-wsPhotoData
-wsPhotoViewFromGround
 wsRadioVoiceStart
 wsRadioVoiceStop
 wsRadioVolume
