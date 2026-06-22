@@ -5,12 +5,13 @@
 -- Workshop content that clients must download
 resource.AddWorkshop("3582530445")  -- Prisoner Playermodels
 resource.AddWorkshop("2868046966")  -- Defibrillator Models/Sounds
-resource.AddWorkshop("2947598424")  -- Shaky Flashlight Models/Sounds
+resource.AddWorkshop("2947598424")  -- Extended Flashlight (VManip SWEP; provides the shaky_flashlight base)
 resource.AddWorkshop("2155366756")  -- VManip (Base) — required base of the Shaky Flashlight SWEP
 resource.AddWorkshop("3102372773")  -- Judge Gavel Models
 resource.AddWorkshop("764395035")   -- Binoculars Models
 resource.AddWorkshop("2840031720")  -- TFA Base (required for TFA weapons)
 resource.AddWorkshop("3478998917")  -- TFA INS2 Weapons Pack (Model 10 revolver, etc.)
+resource.AddWorkshop("2840032487")  -- TFA INS2 Shared Parts (required by the INS2 weapon pack)
 resource.AddWorkshop("1376312181")  -- TFA INS2 KA-BAR Combat Knife
 resource.AddWorkshop("3624686503")  -- Citizen Clothing Overhaul
 resource.AddWorkshop("741923773")   -- Assorted Coins

@@ -20,9 +20,10 @@ ITEM.height = 2
 ITEM.category = "Equipment"
 ITEM.noBusiness = true
 
--- Lantern model: https://steamcommunity.com/sharedfiles/filedetails/?id=3354246770
+-- Lantern model: Cry of Fear Lantern (provides models/weapons/cof/*)
+-- https://steamcommunity.com/sharedfiles/filedetails/?id=132470017
 if SERVER then
-    resource.AddWorkshop("3354246770")
+    resource.AddWorkshop("132470017")
 end
 
 -- Battery device configuration
