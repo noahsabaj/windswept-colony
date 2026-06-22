@@ -12,6 +12,7 @@ ignore = {
 	-- syntax). Tightening 211/631 with a dedicated cleanup pass is good follow-up work.
 	"211", -- unused variable / function
 	"221", -- variable is never accessed
+	"231", -- variable is set but never accessed (dead counters/flags)
 	"311", -- value assigned to a variable is never used
 }
 
