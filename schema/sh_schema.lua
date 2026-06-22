@@ -2,26 +2,12 @@ Schema.name = "Redrock City RP"
 Schema.author = "kwabaj"
 Schema.description = "A serious roleplay experience on the mining colony of Redrock."
 
--- Include netstream library (required for radio frequency dialog)
+-- netstream lives in libs/thirdparty/, which the schema's libs/ directory sweep does
+-- NOT recurse into, so it must be included explicitly (the radio frequency dialog needs it).
+-- Every other libs/*.lua (sh_birthdata, sh_physical, sh_doors, sh_wallet, sh_radio,
+-- sh_documents, sh_constants, cl_constants) is auto-loaded by that sweep before this file
+-- runs -- do NOT re-include them here, or they execute twice at boot.
 ws.util.Include("libs/thirdparty/sh_netstream2.lua")
-
--- Include birth data library (for Personal ID and character creation)
-ws.util.Include("libs/sh_birthdata.lua")
-
--- Include physical description system (for character creation and Personal ID)
-ws.util.Include("libs/sh_physical.lua")
-
--- Include door frame management library (for physical lock & key system)
-ws.util.Include("libs/sh_doors.lua")
-
--- Include wallet system library (for currency routing to wallets)
-ws.util.Include("libs/sh_wallet.lua")
-
--- Include radio utilities library (for handheld and stationary radios)
-ws.util.Include("libs/sh_radio.lua")
-
--- Include document system library (for paper, writing tools, document containers)
-ws.util.Include("libs/sh_documents.lua")
 
 
 
