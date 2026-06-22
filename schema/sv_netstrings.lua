@@ -32,7 +32,7 @@ util.AddNetworkString("wsPhotoAlbumRename")
 util.AddNetworkString("wsPhotoAlbumViewFromGround")
 
 -- =============================================================================
--- DOOR SYSTEM (schema/libs/sh_doors.lua)
+-- DOOR SYSTEM (schema/libs/doors/: sv_doors_sync.lua writes, cl_doors_frames.lua reads)
 -- =============================================================================
 util.AddNetworkString("wsDoorsSync")
 
