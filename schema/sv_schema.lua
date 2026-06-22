@@ -25,9 +25,6 @@ RunConsoleCommand("sv_tfa_cmenu", "0")
 -- Centralized network string registry (schema + entities)
 ws.util.Include("sv_netstrings.lua")
 
--- Document system server handlers
-ws.util.Include("sv_documents.lua")
-
 -- Validate a give target (valid player, in range, alive, not incapacitated)
 -- Returns targetChar on success, nil on failure (notifications sent to client)
 local function ValidateGiveTarget(client, target)
