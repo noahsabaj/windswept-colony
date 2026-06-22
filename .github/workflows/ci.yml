@@ -10,15 +10,6 @@ jobs:
       with:
         path: windswept-colony
 
-    # The net-handler gate + allowlist live in the framework and cover the whole
-    # product. Check the framework out as a sibling so the shared gate can scan
-    # this schema (the schema DeriveGamemode()s the framework anyway).
-    - name: Pull windswept framework (for the shared net-handler gate)
-      uses: actions/checkout@v2
-      with:
-        repository: noahsabaj/windswept
-        path: windswept
-
     - uses: leafo/gh-actions-lua@v8.0.0
       with:
         luaVersion: "5.2"
@@ -41,7 +32,7 @@ jobs:
       run: luacheck .
 
     # Ratchet: new client->server net.Receive must use ws.action / ws.weapon.NetReceive,
-    # or be justified in the framework's tools/net-handlers.allowlist. Scans this schema
-    # (with the framework sibling) against that shared allowlist.
+    # or be justified in tools/net-handlers.allowlist (this schema's self-contained gate).
     - name: Net-handler guard gate
-      run: bash windswept/tools/check-net-handlers.sh
+      working-directory: windswept-colony
+      run: bash tools/check-net-handlers.sh
