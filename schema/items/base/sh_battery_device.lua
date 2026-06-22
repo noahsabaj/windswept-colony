@@ -5,7 +5,7 @@
     Provides common battery management, equip/unequip, and UI rendering.
 
     Override these properties in child items:
-    - ITEM.weaponClass          (string)  SWEP class name, e.g., "ix_flashlight"
+    - ITEM.weaponClass          (string)  SWEP class name, e.g., "ws_flashlight"
     - ITEM.playerItemKey        (string)  Player variable, e.g., "wsFlashlightItem"
     - ITEM.maxBatteries         (number)  Battery slot count, default 1
     - ITEM.equipSound           (string)  Sound on equip
@@ -131,9 +131,14 @@ function ITEM:AutoEjectDepleted(client)
     for i = #batteries, 1, -1 do
         if batteries[i] < threshold or batteries[i] <= 0 then
             if inventory:FindEmptySlot(1, 1) then
-                inventory:Add("battery", 1, {charge = batteries[i]})
-                table.remove(batteries, i)
-                ejected = true
+                -- Verify the inventory Add committed before dropping the slot from the
+                -- array, so a full inventory / hook veto can't silently destroy the
+                -- battery (transactional eject). (sc-items-currency-battery-8)
+                local added = inventory:Add("battery", 1, {charge = batteries[i]})
+                if added ~= false then
+                    table.remove(batteries, i)
+                    ejected = true
+                end
             end
         end
     end
@@ -333,7 +338,7 @@ ITEM.functions.LoadBattery = {
         local batteryID = data and data.batteryID
         if not batteryID then return false end
 
-        -- Validate the battery belongs to the caller. Helix only ownership-checks
+        -- Validate the battery belongs to the caller. Windswept only ownership-checks
         -- the acting item (the device); arbitrary data fields like batteryID are
         -- attacker-controlled, so without this a crafted ID could consume another
         -- player's (or a dropped) battery.
@@ -424,12 +429,28 @@ ITEM.functions.EjectBattery = {
             end
         end
 
-        local charge = table.remove(batteries, ejectIndex)
-        item:SetBatteries(batteries)
-
+        -- Ensure the ejected battery has a free slot BEFORE removing it from the device;
+        -- otherwise a full inventory silently destroys the battery. (sc-items-currency-battery-1)
         local character = client:GetCharacter()
-        local inventory = character:GetInventory()
-        inventory:Add("battery", 1, {charge = charge})
+        local inventory = character and character:GetInventory()
+
+        if not inventory or not inventory:FindEmptySlot(1, 1) then
+            client:NotifyLocalized("inventoryFull")
+            return false
+        end
+
+        -- Add the ejected battery to the inventory FIRST and confirm it committed;
+        -- only then drop it from the device array, so a failed Add can't destroy the
+        -- charge (transactional eject). (sc-items-currency-battery-8)
+        local charge = batteries[ejectIndex]
+        local added = inventory:Add("battery", 1, {charge = charge})
+        if added == false then
+            client:NotifyLocalized("inventoryFull")
+            return false
+        end
+
+        table.remove(batteries, ejectIndex)
+        item:SetBatteries(batteries)
 
         client:NotifyLocalized(item.notifyPrefix .. "BatteryEjected")
         client:EmitSound("items/battery_pickup.wav", 50, 90)

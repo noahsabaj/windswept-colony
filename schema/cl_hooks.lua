@@ -16,27 +16,6 @@ end
 hook.Remove("CreateMenuButtons", "wsClasses")
 
 -- ============================================================================
--- PERSONAL ID NETWORKING
--- Receive ID card display from another player
--- ============================================================================
-
-net.Receive("wsShowPersonalID", function()
-    local data = net.ReadTable()
-
-    -- Remove any existing recipient ID cards
-    if IsValid(ws.gui.recipientIDCard) then
-        ws.gui.recipientIDCard:Remove()
-    end
-
-    -- Create new ID card in recipient mode
-    local card = vgui.Create("wsPersonalIDCard")
-    card:SetData(data)
-    card:SetRecipientMode()
-
-    ws.gui.recipientIDCard = card
-end)
-
--- ============================================================================
 -- VOICE HUD REMOVAL
 -- Anti-metagaming: Players don't magically know who is speaking
 -- ============================================================================
@@ -80,7 +59,7 @@ hook.Add("Think", "wsRadioVoiceTransmit", function()
     if hKeyDown and not wasHKeyDown then
         -- Check if we have an active radio
         local character = client:GetCharacter()
-        if character and character:GetData("ixHasActiveRadio") then
+        if character and character:GetData("wsHasActiveRadio") then
             -- Check we can transmit (not knocked, gagged, restrained, dead)
             local canTransmit = client:Alive()
                 and not client:GetNetVar("wsKnocked")

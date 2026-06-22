@@ -91,8 +91,8 @@ end
 -- ============================================================================
 
 if SERVER then
-    ws.weapon.NetReceive("wsLockInstall", "ix_lock", "StartInstall")
-    ws.weapon.NetReceive("wsLockCancel", "ix_lock", "CancelInstall")
+    ws.weapon.NetReceive("wsLockInstall", "ws_lock", "StartInstall")
+    ws.weapon.NetReceive("wsLockCancel", "ws_lock", "CancelInstall")
 end
 
 function SWEP:StartInstall()
@@ -174,7 +174,7 @@ function SWEP:CompleteInstall()
     end
 
     -- Strip weapon and clean up
-    owner:StripWeapon("ix_lock")
+    owner:StripWeapon("ws_lock")
     owner.wsLockItem = nil
 
     owner:EmitSound("buttons/button14.wav", 60)

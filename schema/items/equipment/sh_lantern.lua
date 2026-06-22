@@ -27,7 +27,7 @@ end
 
 -- Battery device configuration
 ITEM.maxBatteries = 1
-ITEM.weaponClass = "ix_lantern"
+ITEM.weaponClass = "ws_lantern"
 ITEM.playerItemKey = "wsLanternItem"
 ITEM.equipSound = "physics/metal/metal_canister_impact_soft1.wav"
 ITEM.notifyPrefix = "lantern"

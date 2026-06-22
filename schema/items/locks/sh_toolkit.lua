@@ -29,12 +29,12 @@ ITEM.width = 1
 ITEM.height = 1
 ITEM.category = "Tools"
 ITEM.noBusiness = true
-ITEM.class = "ix_toolkit"
+ITEM.class = "ws_toolkit"
 ITEM.weaponCategory = "toolkit"
 ITEM.base = "base_equippable"
 
 -- Equippable configuration
-ITEM.equipWeaponClass = "ix_toolkit"
+ITEM.equipWeaponClass = "ws_toolkit"
 ITEM.equipPlayerKey = "wsToolkitItem"
 ITEM.equipNotifyKey = "toolkitEquipped"
 ITEM.equipSound = "physics/metal/metal_box_impact_soft1.wav"

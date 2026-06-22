@@ -157,28 +157,24 @@ function SWEP:SetLight(value)
 end
 
 if SERVER then
-    net.Receive("wsLanternSetLight", function(len, ply)
-        local weapon = ply:GetWeapon("ix_lantern")
-        if not IsValid(weapon) then return end
-        if weapon.ratelimit and weapon.ratelimit > CurTime() then return end
-
-        local value = net.ReadBool()
-        weapon:SetLight(value)
-        weapon.ratelimit = CurTime() + 0.2
-    end)
+    -- Acts on the player's lantern (GetWeapon, not active — it stays lit while holstered),
+    -- rate-limited to 0.2s; SetLight's server branch does the battery check. (lookup = owned)
+    ws.weapon.NetReceive("wsLanternSetLight", "ws_lantern", "SetLight", {
+        lookup = "owned",
+        rateLimit = 0.2,
+        read = function() return net.ReadBool() end,
+    })
 end
 
--- PrimaryAttack/SecondaryAttack not used - input handled in Think() for Helix compatibility
+-- PrimaryAttack/SecondaryAttack not used - input handled in Think() for Windswept compatibility
 
 if SERVER then
-    net.Receive("wsLanternPlace", function(len, ply)
-        local weapon = ply:GetWeapon("ix_lantern")
-        if not IsValid(weapon) then return end
-        if weapon.ratelimit and weapon.ratelimit > CurTime() then return end
-        weapon.ratelimit = CurTime() + 0.2
-
-        weapon:PlaceLantern()
-    end)
+    -- RMB-hold place: acts on the player's lantern (GetWeapon), rate-limited to 0.2s.
+    -- PlaceLantern has its own wsPlacing idempotency guard. (lookup = owned)
+    ws.weapon.NetReceive("wsLanternPlace", "ws_lantern", "PlaceLantern", {
+        lookup = "owned",
+        rateLimit = 0.2,
+    })
 
     function SWEP:PlaceLantern()
         local owner = self:GetOwner()
@@ -213,7 +209,7 @@ if SERVER then
         local wasOn = self:GetLanternOn()
 
         -- Create world entity (using distinct name to avoid conflict with weapon class)
-        local ent = ents.Create("ix_lantern_dropped")
+        local ent = ents.Create("ws_lantern_dropped")
         if not IsValid(ent) then self.wsPlacing = nil return end
 
         ent:SetPos(tr.HitPos + tr.HitNormal * 2)
@@ -234,7 +230,7 @@ if SERVER then
 
         -- Strip weapon
         self.wsItem = nil
-        owner:StripWeapon("ix_lantern")
+        owner:StripWeapon("ws_lantern")
         owner.wsLanternItem = nil
 
         owner:EmitSound("weapons/slam/throw.wav", 60)
@@ -359,6 +355,6 @@ end
 -- HOOKS - Turn Off Light on Death/Knockout
 -- ============================================================================
 
-ws.weapon.RegisterCleanupHooks("ix_lantern", "wsLantern", function(weapon)
+ws.weapon.RegisterCleanupHooks("ws_lantern", "wsLantern", function(weapon)
     if weapon.SetLight then weapon:SetLight(false) end
 end)

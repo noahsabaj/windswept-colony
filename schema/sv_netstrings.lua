@@ -14,7 +14,7 @@
 -- =============================================================================
 -- CURRENCY SYSTEM
 -- wsMoneyGive, wsMoneyDestroy, wsCurrencySplit, wsCurrencySplitConfirm
--- are now registered in helix/gamemode/core/libs/sh_currency.lua
+-- are now registered in windswept/gamemode/core/libs/sh_currency.lua
 -- =============================================================================
 util.AddNetworkString("wsWalletGive")
 util.AddNetworkString("wsBagDrop")  -- Wallet/bag drop functionality
@@ -33,91 +33,77 @@ util.AddNetworkString("wsPhotoAlbumRename")
 util.AddNetworkString("wsPhotoAlbumViewFromGround")
 
 -- =============================================================================
--- PERSONAL ID (schema/items/documents/)
--- =============================================================================
-util.AddNetworkString("wsShowPersonalID")
-
--- =============================================================================
 -- DOOR SYSTEM (schema/libs/sh_doors.lua)
 -- =============================================================================
 util.AddNetworkString("wsDoorsSync")
 
 -- =============================================================================
--- DOOR INSTALLATION (entities/weapons/ix_door.lua)
+-- DOOR INSTALLATION (entities/weapons/ws_door.lua)
 -- =============================================================================
 util.AddNetworkString("wsDoorInstall")
 util.AddNetworkString("wsDoorCancel")
 
 -- =============================================================================
--- LOCK SYSTEM (entities/weapons/ix_lock.lua)
+-- LOCK SYSTEM (entities/weapons/ws_lock.lua)
 -- =============================================================================
 util.AddNetworkString("wsLockInstall")
 util.AddNetworkString("wsLockCancel")
 
 -- =============================================================================
--- LOCKPICKING (entities/weapons/ix_lockpick.lua)
+-- LOCKPICKING (entities/weapons/ws_lockpick.lua)
 -- =============================================================================
 util.AddNetworkString("wsLockpickStart")
 util.AddNetworkString("wsLockpickAttempt")
 util.AddNetworkString("wsLockpickCancel")
 
 -- =============================================================================
--- LOCK BREAKING (entities/weapons/ix_lockbreaker.lua)
+-- LOCK BREAKING (entities/weapons/ws_lockbreaker.lua)
 -- =============================================================================
 util.AddNetworkString("wsLockbreakerStart")
 util.AddNetworkString("wsLockbreakerCancel")
 
 -- =============================================================================
--- KEY SYSTEM (entities/weapons/ix_key.lua)
+-- KEY SYSTEM (entities/weapons/ws_key.lua)
 -- =============================================================================
 util.AddNetworkString("wsKeyStartLock")
 util.AddNetworkString("wsKeyStartUnlock")
 util.AddNetworkString("wsKeyCancel")
 
 -- =============================================================================
--- KEYRING (entities/weapons/ix_keyring.lua)
+-- KEYRING (entities/weapons/ws_keyring.lua)
 -- =============================================================================
 util.AddNetworkString("wsKeyringLock")
 util.AddNetworkString("wsKeyringUnlock")
 util.AddNetworkString("wsKeyringCycle")
 
 -- =============================================================================
--- TOOLKIT (entities/weapons/ix_toolkit.lua)
+-- TOOLKIT (entities/weapons/ws_toolkit.lua)
 -- =============================================================================
 util.AddNetworkString("wsToolkitStartRemove")
 util.AddNetworkString("wsToolkitStartRepair")
 util.AddNetworkString("wsToolkitCancel")
 
 -- =============================================================================
--- LOCKSMITH MACHINE (entities/entities/ix_auto_locksmith/)
+-- LOCKSMITH MACHINE (entities/entities/ws_auto_locksmith/)
 -- =============================================================================
-util.AddNetworkString("wsLocksmithOpen")
-util.AddNetworkString("wsLocksmithClose")
-util.AddNetworkString("wsLocksmithProgramLock")
-util.AddNetworkString("wsLocksmithProgramKey")
-util.AddNetworkString("wsLocksmithAddKeying")
-util.AddNetworkString("wsLocksmithRename")
-util.AddNetworkString("wsLocksmithViewKeyings")
-util.AddNetworkString("wsLocksmithResult")
+util.AddNetworkString("wsLocksmithOpen")    -- Server->Client: open UI
+util.AddNetworkString("wsLocksmithResult")  -- Server->Client: operation result
+-- wsLocksmithClose/ProgramLock/ProgramKey/AddKeying/Rename/ViewKeyings are now registered by
+-- ws.action.Register (session shape) in the entity's init.lua, which owns their AddNetworkString.
 
 -- =============================================================================
--- PERSONAL ID WEAPON (entities/weapons/ix_personalid.lua)
+-- FLASHLIGHT (entities/weapons/ws_flashlight.lua)
 -- =============================================================================
-util.AddNetworkString("wsPersonalIDShowForward")
+util.AddNetworkString("wsFlashlightSetLight")
 
 -- =============================================================================
--- FLASHLIGHT (entities/weapons/ix_flashlight.lua)
--- =============================================================================
-util.AddNetworkString("wsFlashlightSetLight")  -- Renamed from ix_flashlight_SetLight for consistency
-
--- =============================================================================
--- LANTERN (entities/weapons/ix_lantern.lua)
+-- LANTERN (entities/weapons/ws_lantern.lua)
 -- =============================================================================
 util.AddNetworkString("wsLanternSetLight")
 util.AddNetworkString("wsLanternPlace")
 
 -- =============================================================================
--- CAMERA (entities/weapons/ix_camera.lua)
+-- CAMERA (entities/weapons/ws_camera.lua)
 -- =============================================================================
 util.AddNetworkString("wsCameraRequestPhoto")
 util.AddNetworkString("wsCameraApprovePhoto")
@@ -138,13 +124,11 @@ util.AddNetworkString("wsRadioVoiceStop")     -- Client->Server: stopped transmi
 util.AddNetworkString("wsVoiceAmplitude")     -- Client->Server: voice amplitude update
 
 -- =============================================================================
--- STATIONARY RADIO (entities/entities/ix_stationary_radio/)
+-- STATIONARY RADIO (entities/entities/ws_stationary_radio/)
 -- =============================================================================
 util.AddNetworkString("wsStationaryRadioOpen")      -- Server->Client: open UI for entity
-util.AddNetworkString("wsStationaryRadioClose")     -- Client->Server: client closed UI
-util.AddNetworkString("wsStationaryRadioConfig")    -- Client->Server: channel config change
-util.AddNetworkString("wsStationaryRadioTransmit")  -- Client->Server: text message
-util.AddNetworkString("wsStationaryRadioMic")       -- Client->Server: mic toggle
+-- wsStationaryRadioClose/Config/Transmit/Mic are now registered by ws.action.Register
+-- (session shape) in the entity's init.lua, which owns their AddNetworkString. (session shape)
 
 -- =============================================================================
 -- DOCUMENT SYSTEM (schema/libs/sh_documents.lua, schema/sv_documents.lua)
@@ -157,5 +141,5 @@ util.AddNetworkString("wsDocumentDestroy")     -- Client->Server: destroy paper 
 util.AddNetworkString("wsContainerRename")     -- Client->Server: rename envelope/folder
 util.AddNetworkString("wsSignatureSave")       -- Client->Server: save signature to character
 util.AddNetworkString("wsTypewriterOpen")      -- Server->Client: open typewriter UI
-util.AddNetworkString("wsTypewriterWrite")     -- Client->Server: type content on paper
-util.AddNetworkString("wsTypewriterClose")     -- Client->Server: close typewriter UI
+-- wsTypewriterWrite/Close are now registered by ws.action.Register (session shape) in the
+-- entity's init.lua, which owns their AddNetworkString. (session shape)

@@ -42,7 +42,7 @@ if SERVER then
         local pos = trace.HitPos + trace.HitNormal * 5
 
         -- Create the stationary radio entity
-        local ent = ents.Create("ix_stationary_radio")
+        local ent = ents.Create("ws_stationary_radio")
 
         if not IsValid(ent) then
             return -- Allow default behavior as fallback
@@ -64,7 +64,7 @@ if SERVER then
             inventory:Remove(self:GetID())
         end
 
-        return false -- Prevent default ix_item spawn
+        return false -- Prevent default ws_item spawn
     end
 end
 

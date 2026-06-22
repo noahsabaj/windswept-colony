@@ -21,7 +21,7 @@ ITEM.width = 4
 ITEM.height = 4
 ITEM.category = "Doors"
 ITEM.noBusiness = true
-ITEM.class = "ix_door"
+ITEM.class = "ws_door"
 ITEM.weaponCategory = "door"
 
 -- Door type stats (override in derived items)
@@ -152,8 +152,8 @@ ITEM.functions.Equip = {
         end
 
         -- Strip existing door SWEP if any
-        if client:HasWeapon("ix_door") then
-            client:StripWeapon("ix_door")
+        if client:HasWeapon("ws_door") then
+            client:StripWeapon("ws_door")
         end
 
         -- Set these BEFORE Give() so hooks see them
@@ -161,10 +161,10 @@ ITEM.functions.Equip = {
         item:SetData("equipped", true)
 
         -- Give the SWEP
-        local weapon = client:Give("ix_door")
+        local weapon = client:Give("ws_door")
         if IsValid(weapon) then
             weapon.wsItem = item
-            client:SelectWeapon("ix_door")
+            client:SelectWeapon("ws_door")
         end
 
         client:EmitSound("physics/wood/wood_plank_impact_hard3.wav", 50)
@@ -186,8 +186,8 @@ ITEM.functions.Unequip = {
     OnRun = function(item)
         local client = item.player
 
-        if client:HasWeapon("ix_door") then
-            client:StripWeapon("ix_door")
+        if client:HasWeapon("ws_door") then
+            client:StripWeapon("ws_door")
         end
 
         client.wsDoorItem = nil
@@ -210,8 +210,8 @@ function ITEM.postHooks.drop(item, result)
     if item:GetData("equipped") then
         local client = item:GetOwner()
         if IsValid(client) then
-            if client:HasWeapon("ix_door") then
-                client:StripWeapon("ix_door")
+            if client:HasWeapon("ws_door") then
+                client:StripWeapon("ws_door")
             end
             client.wsDoorItem = nil
         end
@@ -223,8 +223,8 @@ function ITEM:OnTransferred(oldInventory, newInventory)
     if self:GetData("equipped") then
         local oldOwner = oldInventory and oldInventory.GetOwner and oldInventory:GetOwner()
         if IsValid(oldOwner) then
-            if oldOwner:HasWeapon("ix_door") then
-                oldOwner:StripWeapon("ix_door")
+            if oldOwner:HasWeapon("ws_door") then
+                oldOwner:StripWeapon("ws_door")
             end
             oldOwner.wsDoorItem = nil
         end
@@ -248,7 +248,7 @@ function ITEM:OnLoadout()
         local client = self.player
         if not IsValid(client) then return end
 
-        local weapon = client:Give("ix_door", true)
+        local weapon = client:Give("ws_door", true)
         if IsValid(weapon) then
             weapon.wsItem = self
             client.wsDoorItem = self

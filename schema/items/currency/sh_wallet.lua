@@ -60,14 +60,14 @@ end
 -- COMBINE (drag items onto wallet)
 -- ============================================================================
 
--- Custom combine: allows cash, coins, and personal_id (not a single type)
+-- Custom combine: allows cash and coins (not a single type)
 ITEM.functions.combine = {
     OnRun = function(item, data)
         local targetItem = ws.item.instances[data[1]]
         if not targetItem then return false end
 
-        -- Only allow cash, coins, and personal_id
-        if targetItem.uniqueID ~= "cash" and targetItem.uniqueID ~= "coins" and targetItem.uniqueID ~= "personal_id" then
+        -- Only allow cash and coins
+        if targetItem.uniqueID ~= "cash" and targetItem.uniqueID ~= "coins" then
             if item.player then
                 item.player:NotifyLocalized("walletOnlyCurrency")
             end
@@ -398,26 +398,44 @@ ITEM.functions.Give = {
 }
 
 -- ============================================================================
--- WALLET RESTRICTION (custom - allows cash, coins, personal_id + designation)
+-- WALLET RESTRICTION (custom - allows cash, coins + designation)
 -- ============================================================================
+
+-- Resolve the wallet item that owns a given inventory without scanning every item
+-- instance on each transfer. We memoize the inventoryID -> walletItem mapping on
+-- the inventory's own vars and only fall back to a single scan on a cache miss or
+-- if the cached item became stale. (sc-items-currency-battery-4)
+local function GetWalletItemFor(inventory)
+    local invID = inventory:GetID()
+    local cached = inventory.vars and inventory.vars.walletItem
+
+    if cached and cached.uniqueID == "wallet" and ws.item.instances[cached:GetID()] == cached
+        and cached:GetData("id") == invID then
+        return cached
+    end
+
+    for _, item in pairs(ws.item.instances) do
+        if item.uniqueID == "wallet" and item:GetData("id") == invID then
+            inventory.vars = inventory.vars or {}
+            inventory.vars.walletItem = item
+            return item
+        end
+    end
+
+    return nil
+end
 
 hook.Add("CanTransferItem", "wsWalletRestriction", function(transferItem, curInv, inventory)
     if inventory and inventory.vars and inventory.vars.isWallet then
-        -- Only allow cash, coins, and personal_id
-        if transferItem.uniqueID ~= "cash" and transferItem.uniqueID ~= "coins" and transferItem.uniqueID ~= "personal_id" then
+        -- Only allow cash and coins
+        if transferItem.uniqueID ~= "cash" and transferItem.uniqueID ~= "coins" then
             return false
         end
 
         -- Check wallet designation for money
         if transferItem.isCurrency then
-            -- Find the wallet item that owns this inventory
-            local walletItem = nil
-            for _, item in pairs(ws.item.instances) do
-                if item.uniqueID == "wallet" and item:GetData("id") == inventory:GetID() then
-                    walletItem = item
-                    break
-                end
-            end
+            -- Find the wallet item that owns this inventory (memoized lookup)
+            local walletItem = GetWalletItemFor(inventory)
 
             if walletItem then
                 local designation = walletItem:GetData("designation", "both")

@@ -4,16 +4,16 @@
     Custom derma panels for the physical attribute selection system.
     Used during character creation.
 
-    Note: Labels are handled externally by Helix's character creation system.
+    Note: Labels are handled externally by Windswept's character creation system.
     These panels only contain the controls themselves.
 
-    Pattern follows wsNumSlider from Helix - no nested containers, direct docking.
+    Pattern follows wsNumSlider from Windswept - no nested containers, direct docking.
 ]]--
 
 -- ============================================================================
 -- PHYSICAL SLIDER
 -- A slider with dual-unit display (e.g., height in cm + ft'in")
--- Follows wsNumSlider pattern from Helix
+-- Follows wsNumSlider pattern from Windswept
 -- ============================================================================
 
 local PANEL = {}

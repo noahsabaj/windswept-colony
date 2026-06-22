@@ -105,9 +105,9 @@ end
 -- ============================================================================
 
 if SERVER then
-    ws.weapon.NetReceive("wsKeyStartLock", "ix_key", "StartLock")
-    ws.weapon.NetReceive("wsKeyStartUnlock", "ix_key", "StartUnlock")
-    ws.weapon.NetReceive("wsKeyCancel", "ix_key", "CancelAction")
+    ws.weapon.NetReceive("wsKeyStartLock", "ws_key", "StartLock")
+    ws.weapon.NetReceive("wsKeyStartUnlock", "ws_key", "StartUnlock")
+    ws.weapon.NetReceive("wsKeyCancel", "ws_key", "CancelAction")
 end
 
 -- ============================================================================

@@ -56,12 +56,13 @@ do
     CLASS.color = Color(75, 150, 50)  -- Green
     CLASS.format = "%s radios in: \"%s\""
 
-    -- Helper to get listener's active radio
-    local function GetListenerRadio(listener)
-        local listenerChar = listener:GetCharacter()
-        if not listenerChar then return nil end
+    -- Helper to get a player's active (enabled + operable) radio. The active radio
+    -- item is the single source of truth for that player's frequency. (sc-schema-glue-9)
+    local function GetActiveRadio(ply)
+        local char = ply:GetCharacter()
+        if not char then return nil end
 
-        local inventory = listenerChar:GetInventory()
+        local inventory = char:GetInventory()
         if not inventory then return nil end
 
         local radios = inventory:GetItemsByUniqueID("handheld_radio", true)
@@ -74,33 +75,54 @@ do
         return nil
     end
 
+    -- Expose so the post-send drain loop (below) can reuse the same resolution.
+    CLASS.GetActiveRadio = GetActiveRadio
+
+    -- Pure predicate: decide audibility only, never mutate battery state here.
+    -- ws.chat.Send may evaluate CanHear speculatively / for multiple chat classes,
+    -- so the drain side-effect lives on the delivery path instead. (sc-schema-glue-6)
     function CLASS:CanHear(speaker, listener)
         local listenerChar = listener:GetCharacter()
         if not listenerChar then return false end
 
         -- Quick check: if listener has no active radio, skip everything
-        if not listenerChar:GetData("ixHasActiveRadio") then return false end
+        if not listenerChar:GetData("wsHasActiveRadio") then return false end
 
-        local speakerChar = speaker:GetCharacter()
-        if not speakerChar then return false end
+        -- Get both players' active radios; the radio item is the frequency authority.
+        local listenerRadio = GetActiveRadio(listener)
+        if not listenerRadio then return false end
 
-        -- Check frequencies match
-        local speakerFreq = speakerChar:GetData("frequency", "100.0")
-        local listenerFreq = listenerChar:GetData("frequency", "100.0")
+        local speakerRadio = GetActiveRadio(speaker)
+        if not speakerRadio then return false end
+
+        -- Check frequencies match (read from the authoritative radio items)
+        local speakerFreq = speakerRadio:GetData("frequency", "100.0")
+        local listenerFreq = listenerRadio:GetData("frequency", "100.0")
 
         if speakerFreq ~= listenerFreq then return false end
 
-        -- Get listener's radio and verify it can operate
-        local listenerRadio = GetListenerRadio(listener)
-        if not listenerRadio then return false end
-
-        -- Drain listener's battery for receiving (server-side only)
-        if SERVER and ws.radioMessageLength then
-            local speakingTime = math.max(0.5, ws.radioMessageLength / 15)
-            listenerRadio:DrainActive(speakingTime)
-        end
-
         return true
+    end
+
+    -- Drain each confirmed recipient's battery exactly once, on the delivery path.
+    -- Runs server-side after ws.chat.Send has built the final receiver list. (sc-schema-glue-6)
+    if SERVER then
+        hook.Add("PlayerMessageSend", "wsRadioReceiveDrain", function(speaker, chatType, text, anonymous, receivers)
+            if chatType ~= "radio" then return end
+            if not ws.radioMessageLength then return end
+            if not receivers then return end
+
+            local speakingTime = math.max(0.5, ws.radioMessageLength / 15)
+
+            for _, listener in ipairs(receivers) do
+                if IsValid(listener) and listener ~= speaker then
+                    local radio = GetActiveRadio(listener)
+                    if radio then
+                        radio:DrainActive(speakingTime)
+                    end
+                end
+            end
+        end)
     end
 
     -- Custom OnChatAdd: pass nil chatType so unrecognized speakers show as "Unknown"

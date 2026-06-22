@@ -65,6 +65,33 @@ net.Receive("wsDocumentWrite", function(len, client)
         content = string.sub(content, 1, ws.documents.MAX_CONTENT_LENGTH)
     end
 
+    -- Get or create paper ID
+    local paperID = item:GetPaperID()
+    local isNewDocument = not paperID
+
+    if isNewDocument then
+        paperID = ws.documents.GenerateID()
+    end
+
+    -- Load existing document or create new
+    local docData = ws.documents.Load(paperID) or {
+        content = "",
+        entries = {}
+    }
+
+    -- Cap the TOTAL accumulated document size (not just each write), BEFORE costing, so a
+    -- player can't grow one document file without bound by writing repeatedly. (sc-schema-glue-1)
+    if content ~= "" and #docData.content + #content > ws.documents.MAX_DOCUMENT_LENGTH then
+        local room = ws.documents.MAX_DOCUMENT_LENGTH - #docData.content
+
+        if room <= 0 then
+            client:NotifyLocalized("documentFull")
+            return
+        end
+
+        content = string.sub(content, 1, room)
+    end
+
     -- Calculate resource cost
     local contentCost = #content
     local signatureCost = hasSignature and 50 or 0
@@ -83,25 +110,12 @@ net.Receive("wsDocumentWrite", function(len, client)
         return
     end
 
-    -- Get or create paper ID
-    local paperID = item:GetPaperID()
-    local isNewDocument = not paperID
-
-    if isNewDocument then
-        paperID = ws.documents.GenerateID()
-    end
-
-    -- Load existing document or create new
-    local docData = ws.documents.Load(paperID) or {
-        content = "",
-        entries = {}
-    }
-
     -- Append new content
     if content ~= "" then
-        -- Add entry record with color
+        -- Add entry record with color. Fog-of-war: do NOT record the writer's character
+        -- name. Authorship comes ONLY from a signature or the writer physically typing their
+        -- name into the content; otherwise the document is anonymous. (sc-schema-glue-2)
         table.insert(docData.entries, {
-            author = char:GetName(),
             timestamp = os.time(),
             type = toolType,
             color = strokeColor,
@@ -144,10 +158,10 @@ net.Receive("wsDocumentWrite", function(len, client)
     -- Update item data
     item:SetData("paperID", paperID)
 
-    -- Only set document type on first write
+    -- Only set document type on first write. Fog-of-war: don't store the author's character
+    -- name (anonymous unless signed or self-identified in the content). (sc-schema-glue-2)
     if isNewDocument then
         item:SetData("documentType", toolType)
-        item:SetData("author", char:GetName())
         item:SetData("timestamp", os.time())
     end
 
@@ -160,11 +174,14 @@ net.Receive("wsDocumentWrite", function(len, client)
         item:SetData("signatureCount", #(docData.signatures or {}))
     end
 
-    -- Consume resource from tool
-    if resourceKey == "ink" then
-        toolItem:UseInk(totalCost)
-    else
-        toolItem:UseLead(totalCost)
+    -- Consume resource from tool through the atomic kernel (consistency + never
+    -- mint from nothing). Falls back to the item helper if the key is unknown. (sc-schema-glue-7)
+    if not ws.resource.Consume(toolItem, toolItem.resourceName, totalCost, toolItem.maxResource) then
+        if resourceKey == "ink" then
+            toolItem:UseInk(totalCost)
+        else
+            toolItem:UseLead(totalCost)
+        end
     end
 
     client:NotifyLocalized("documentSaved")
@@ -174,48 +191,51 @@ end)
 -- DOCUMENT READ HANDLER
 -- ============================================================================
 
-net.Receive("wsDocumentRead", function(len, client)
-    local itemID = net.ReadUInt(32)
-    local forEditor = net.ReadBool()
+-- Migrated to ws.action: def.item="paper" performs the accessibility check (main inv or an
+-- owned container) by construction, replacing the hand-rolled net.Receive. (fw-core-security-1 / layer-1)
+ws.action.Register("wsDocumentRead", {
+    item = "paper",
+    read = function() return net.ReadBool() end,  -- forEditor
+    run = function(client, ctx)
+        local item = ctx.item
+        local forEditor = ctx.data
 
-    -- Validate paper item is accessible to the requester (held in their own
-    -- inventory or in a container they own). Prevents reading arbitrary documents
-    -- by enumerating itemIDs.
-    local item = ws.constants.VerifyItemAccessible(client, itemID, "paper")
-    if not item then return end
+        local paperID = item:GetPaperID()
+        if not paperID then return end
 
-    local paperID = item:GetPaperID()
-    if not paperID then return end
+        -- Load document
+        local docData = ws.documents.Load(paperID)
+        if not docData then return end
 
-    -- Load document
-    local docData = ws.documents.Load(paperID)
-    if not docData then return end
+        -- Fog-of-war: the response carries NO author identity. A reader learns who wrote a
+        -- document only from its signatures, or if the writer typed their name into the
+        -- content. (sc-schema-glue-2)
+        local response = {
+            content = docData.content or "",
+            documentType = item:GetDocumentType(),
+            wordCount = item:GetWordCount(),
+            signatures = docData.signatures or {},
+            entries = docData.entries or {}
+        }
 
-    local response = {
-        content = docData.content or "",
-        author = item:GetAuthor(),
-        documentType = item:GetDocumentType(),
-        wordCount = item:GetWordCount(),
-        signatures = docData.signatures or {},
-        entries = docData.entries or {}
-    }
-
-    net.Start("wsDocumentData")
-        net.WriteBool(forEditor)
-        net.WriteString(util.TableToJSON(response))
-    net.Send(client)
-end)
+        net.Start("wsDocumentData")
+            net.WriteBool(forEditor)
+            net.WriteString(util.TableToJSON(response))
+        net.Send(client)
+    end
+})
 
 -- ============================================================================
 -- DOCUMENT ERASE HANDLER
 -- ============================================================================
 
-net.Receive("wsDocumentErase", function(len, client)
-    local itemID = net.ReadUInt(32)
-
-    -- Validate paper item ownership
-    local item = ws.constants.VerifyItemOwnership(client, itemID, "paper")
-    if not item then return end
+-- Migrated to ws.action: def.item="paper" + access="owned" enforces main-inventory ownership
+-- by construction. (fw-core-security-1 / layer-1)
+ws.action.Register("wsDocumentErase", {
+    item = "paper",
+    access = "owned",
+    run = function(client, ctx)
+    local item = ctx.item
 
     -- Check if document is erasable (pencil only)
     if item:GetDocumentType() ~= "pencil" then
@@ -260,8 +280,10 @@ net.Receive("wsDocumentErase", function(len, client)
             return
         end
 
-        -- Consume durability
-        eraserItem:UseDurability(contentLength)
+        -- Consume durability through the atomic kernel for consistency. (sc-schema-glue-7)
+        if not ws.resource.Consume(eraserItem, "durability", contentLength, eraserItem.maxDurability) then
+            eraserItem:UseDurability(contentLength)
+        end
     end
     -- Pencil with eraser has unlimited erasing (no durability cost)
 
@@ -279,7 +301,8 @@ net.Receive("wsDocumentErase", function(len, client)
     item:SetData("lastEdited", nil)
 
     client:NotifyLocalized("documentErased")
-end)
+    end
+})
 
 -- ============================================================================
 -- PEN REFILL HANDLER
@@ -289,31 +312,36 @@ end)
 -- DOCUMENT DESTROY HANDLER
 -- ============================================================================
 
-net.Receive("wsDocumentDestroy", function(len, client)
-    local itemID = net.ReadUInt(32)
+-- Migrated to ws.action: item="paper" + access="owned" enforces ownership by construction.
+-- (fw-core-security-1 / layer-1)
+ws.action.Register("wsDocumentDestroy", {
+    item = "paper",
+    access = "owned",
+    run = function(client, ctx)
+        local item = ctx.item
 
-    -- Validate character
-    -- Validate paper item ownership
-    local item = ws.constants.VerifyItemOwnership(client, itemID, "paper")
-    if not item then return end
+        -- Delete document file if exists
+        local paperID = item:GetPaperID()
+        if paperID then
+            ws.documents.Delete(paperID)
+        end
 
-    -- Delete document file if exists
-    local paperID = item:GetPaperID()
-    if paperID then
-        ws.documents.Delete(paperID)
+        -- Remove the item
+        item:Remove()
+
+        client:NotifyLocalized("documentDestroyed")
     end
-
-    -- Remove the item
-    item:Remove()
-
-    client:NotifyLocalized("documentDestroyed")
-end)
+})
 
 -- ============================================================================
 -- CONTAINER RENAME HANDLER (envelopes, folders)
 -- ============================================================================
 
 net.Receive("wsContainerRename", function(len, client)
+    -- Per-client rate limit so relabeling can't spam notifications. (sc-schema-glue-12)
+    if (client.wsNextRename or 0) > CurTime() then return end
+    client.wsNextRename = CurTime() + 1
+
     local itemID = net.ReadUInt(32)
     local newName = net.ReadString()
 

@@ -19,7 +19,7 @@ ITEM.noBusiness = true
 
 -- Battery device configuration
 ITEM.maxBatteries = 1
-ITEM.weaponClass = "ix_flashlight"
+ITEM.weaponClass = "ws_flashlight"
 ITEM.playerItemKey = "wsFlashlightItem"
 ITEM.equipSound = "items/flashlight1.wav"
 ITEM.notifyPrefix = "flashlight"

@@ -1,7 +1,7 @@
 --[[
     Base Windswept SWEP
 
-    Universal defaults shared by all Windswept SWEPs (except ix_flashlight which
+    Universal defaults shared by all Windswept SWEPs (except ws_flashlight which
     inherits from shaky_flashlight). Child SWEPs only need to set their unique
     properties and override methods as needed.
 

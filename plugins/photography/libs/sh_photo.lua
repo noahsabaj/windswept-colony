@@ -16,7 +16,7 @@ ws.photo = ws.photo or {}
 if SERVER then
     -- Storage directory + hard size cap for a single photo (matches the client's
     -- ~60KB adaptive-quality cap, with a little headroom).
-    ws.photo.DIR = "ix_photos"
+    ws.photo.DIR = "ws_photos"
     ws.photo.MAX_PHOTO_BYTES = 65536
 
     --- Verify that a client owns an item in their inventory.
@@ -179,7 +179,7 @@ if CLIENT then
     function ws.photo.LoadMaterial(imageData, identifier)
         if not imageData or #imageData == 0 then return nil, nil end
 
-        local tempPath = "ixphoto_" .. (identifier or SysTime()) .. ".jpg"
+        local tempPath = "wsphoto_" .. (identifier or SysTime()) .. ".jpg"
         file.Write(tempPath, imageData)
 
         return Material("../data/" .. tempPath, "smooth"), tempPath

@@ -16,6 +16,7 @@
 
 ws.doors = ws.doors or {}
 ws.doors.frames = ws.doors.frames or {}
+ws.doors.dirty = ws.doors.dirty or false  -- (sc-doors-access-9)
 
 -- Door type configurations (for health/damage, not models)
 ws.doors.typeConfig = {
@@ -335,6 +336,10 @@ if SERVER then
                 mapDoor:Fire("unlock")  -- Prevent "locked door" sounds
                 mapDoor:Fire("open")    -- Ensure door is open (no collision)
             end
+
+            -- mapEntity is never read again after hiding; drop the hard reference
+            -- so we don't pin the map door entity for the whole map. (sc-doors-access-12)
+            frameData.mapEntity = nil
         end
 
     end
@@ -594,7 +599,7 @@ if SERVER then
         local config = ws.doors.GetTypeConfig(door)
 
         -- Check if fist damage (and if allowed)
-        local isFist = IsValid(inflictor) and inflictor:GetClass() == "ix_hands"
+        local isFist = IsValid(inflictor) and inflictor:GetClass() == "ws_hands"
         if isFist then
             if not config.fistDamageable then
                 if IsValid(attacker) and attacker:IsPlayer() then
@@ -607,7 +612,7 @@ if SERVER then
         end
 
         -- Check if battering ram
-        local isBatteringRam = IsValid(inflictor) and inflictor:GetClass() == "ix_batteringram"
+        local isBatteringRam = IsValid(inflictor) and inflictor:GetClass() == "ws_batteringram"
         if isBatteringRam then
             damage = damage * config.ramResistance
         end
@@ -870,10 +875,17 @@ if SERVER then
         return true
     end
 
-    -- Repair a lock to full durability
-    function ws.doors.RepairLock(door)
+    -- Repair a lock to full durability (syncs to partner like DamageLock). (sc-doors-access-8)
+    function ws.doors.RepairLock(door, bIgnorePartner)
         if not IsValid(door) or not door.wsLockData then return false end
         door.wsLockData.durability = 100
+
+        -- Sync durability to partner door (double doors share the same lock)
+        local partner = door:GetDoorPartner()
+        if IsValid(partner) and partner.wsLockData and not bIgnorePartner then
+            partner.wsLockData.durability = 100
+        end
+
         ws.doors.Save()
         return true
     end
@@ -900,14 +912,18 @@ if SERVER then
     -- PERSISTENCE
     -- ============================================================================
 
-    local SAVE_PATH = "helix/doors/"
+    local SAVE_PATH = "windswept/doors/"
 
     function ws.doors.GetSavePath()
         local mapName = game.GetMap()
         return SAVE_PATH .. mapName .. ".json"
     end
 
-    function ws.doors.Save()
+    -- Write the full door state to disk immediately. Most callers should use
+    -- ws.doors.Save() (debounced) instead of calling this directly. (sc-doors-access-9)
+    function ws.doors.Flush()
+        ws.doors.dirty = false
+
         local data = {
             frames = {},
             doors = {}
@@ -940,8 +956,21 @@ if SERVER then
         -- Save to file
         local json = util.TableToJSON(data, true)
         file.Write(ws.doors.GetSavePath(), json)
-
     end
+
+    -- Debounced save: mark the state dirty instead of rewriting the whole JSON on
+    -- every door mutation. A periodic flush timer writes at most once per interval,
+    -- which removes the per-change disk-write hot path. (sc-doors-access-9)
+    function ws.doors.Save()
+        ws.doors.dirty = true
+    end
+
+    -- Frequent flush of pending changes (only writes when dirty).
+    timer.Create("wsDoorsDirtyFlush", 5, 0, function()
+        if ws.doors.dirty then
+            ws.doors.Flush()
+        end
+    end)
 
     function ws.doors.Load()
         local path = ws.doors.GetSavePath()
@@ -1037,11 +1066,16 @@ if SERVER then
             end
         end
 
-        -- Second pass: Proximity-based linking for doors without partners
-        -- Two doors are considered a double-door pair if:
-        -- 1. They are within 100 units of each other
-        -- 2. They use the same model
-        local PROXIMITY_THRESHOLD = 100 * 100  -- DistToSqr comparison
+        -- Second pass: Proximity-based linking for doors without partners.
+        -- wsPartner is consumed by the lock/unlock/breach paths (via GetDoorPartner),
+        -- so a sloppy heuristic would let an unrelated same-model door share lock state.
+        -- Two doors are only treated as a double-door pair if ALL hold: (sc-doors-access-7)
+        --   1. Same model
+        --   2. Hung in the same frame (within 48 units) - real double doors share a frame
+        --   3. Yaw aligned to ~0deg or ~180deg (leaves in one frame are parallel/mirrored)
+        -- We also pick the CLOSEST qualifying candidate, never just the first found.
+        local PROXIMITY_THRESHOLD = 48 * 48  -- DistToSqr comparison (was 100^2)
+        local YAW_TOLERANCE = 10             -- degrees; leaves must be parallel or mirrored
 
         local allDoors = {}
         for mapID, frameData in pairs(ws.doors.frames) do
@@ -1050,6 +1084,7 @@ if SERVER then
                 table.insert(allDoors, {
                     door = door,
                     pos = door:GetPos(),
+                    yaw = door:GetAngles().yaw,
                     model = door:GetModel()
                 })
             end
@@ -1060,6 +1095,8 @@ if SERVER then
 
             -- Skip if already linked
             if door1.wsPartner then continue end
+
+            local bestData, bestDist
 
             for j, data2 in ipairs(allDoors) do
                 if i == j then continue end
@@ -1072,16 +1109,30 @@ if SERVER then
                 -- Check same model
                 if data2.model ~= data1.model then continue end
 
-                -- Check proximity
+                -- Check tight proximity (same frame)
                 local distSqr = data1.pos:DistToSqr(data2.pos)
                 if distSqr > PROXIMITY_THRESHOLD then continue end
 
+                -- Check yaw alignment: parallel (~0deg) or mirrored (~180deg).
+                -- AngleDifference wraps into [-180, 180].
+                local yawDelta = math.abs(math.AngleDifference(data1.yaw, data2.yaw))
+                local alignedParallel = yawDelta <= YAW_TOLERANCE
+                local alignedMirrored = math.abs(yawDelta - 180) <= YAW_TOLERANCE
+                if not alignedParallel and not alignedMirrored then continue end
+
+                -- Track the closest qualifying candidate
+                if not bestDist or distSqr < bestDist then
+                    bestData = data2
+                    bestDist = distSqr
+                end
+            end
+
+            if bestData then
                 -- These are double doors!
-                door1.wsPartner = door2
-                door2.wsPartner = door1
+                door1.wsPartner = bestData.door
+                bestData.door.wsPartner = door1
                 linkedCount = linkedCount + 1
                 linkedByProximity = linkedByProximity + 1
-                break  -- Move to next door1
             end
         end
     end
@@ -1107,15 +1158,16 @@ if SERVER then
         end)
     end)
 
-    -- Save on map cleanup
+    -- Save on map cleanup (force an immediate flush so nothing is lost). (sc-doors-access-9)
     hook.Add("ShutDown", "wsDoorsSave", function()
-        ws.doors.Save()
+        ws.doors.Flush()
         timer.Remove("wsDoorsAutosave")
+        timer.Remove("wsDoorsDirtyFlush")
     end)
 
-    -- Periodic autosave
+    -- Periodic autosave (force flush as a safety net even if the dirty flush missed)
     timer.Create("wsDoorsAutosave", 300, 0, function()
-        ws.doors.Save()
+        ws.doors.Flush()
     end)
 
     -- ============================================================================
@@ -1247,7 +1299,7 @@ if CLIENT then
         local weapon = ply:GetActiveWeapon()
 
         if not IsValid(weapon) then return end
-        if weapon:GetClass() ~= "ix_door" then return end
+        if weapon:GetClass() ~= "ws_door" then return end
 
         -- Animate pulse
         framePulseTime = framePulseTime + FrameTime() * 3

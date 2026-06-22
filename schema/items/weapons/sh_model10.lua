@@ -46,11 +46,16 @@ ITEM.functions.LoadAmmo = {
             return false
         end
 
-        -- Remove the ammo item from inventory
-        ammoItem:Remove()
+        -- Derive the round count from the ammo item instead of hardcoding it: prefer an
+        -- ammoAmount field on the item, then any per-instance quantity, defaulting to a
+        -- single 12-round pack. 357ammo defines no stack/quantity, so one item == one pack.
+        -- (sc-items-currency-battery-5)
+        local roundsPerPack = ammoItem.ammoAmount or 12
+        local rounds = roundsPerPack * ammoItem:GetData("quantity", 1)
 
-        -- Give 12 rounds to player's reserve ammo
-        client:GiveAmmo(12, "357")
+        -- Credit ammo before consuming the item so a failure can't destroy the pack.
+        client:GiveAmmo(rounds, "357")
+        ammoItem:Remove()
         client:EmitSound("items/ammo_pickup.wav", 80)
 
         return false

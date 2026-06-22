@@ -111,7 +111,7 @@ end
 function ITEM.postHooks.drop(item, result)
     local index = item:GetData("id")
 
-    local query = mysql:Update("ix_inventories")
+    local query = mysql:Update("ws_inventories")
         query:Update("character_id", 0)
         query:Where("inventory_id", index)
     query:Execute()
@@ -138,11 +138,11 @@ function ITEM:OnRemoved()
             end
         end
 
-        local query = mysql:Delete("ix_items")
+        local query = mysql:Delete("ws_items")
             query:Where("inventory_id", index)
         query:Execute()
 
-        query = mysql:Delete("ix_inventories")
+        query = mysql:Delete("ws_inventories")
             query:Where("inventory_id", index)
         query:Execute()
     end
@@ -215,7 +215,7 @@ function ITEM:OnRegistered()
 end
 
 -- ============================================================================
--- VIEW FUNCTION (Helix auto-bag-open)
+-- VIEW FUNCTION (Windswept auto-bag-open)
 -- ============================================================================
 
 ITEM.functions.View = {

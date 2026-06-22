@@ -102,7 +102,7 @@ end
 
 function PANEL:SetPaper(paperItem)
     -- Guard against a stale/removed item (e.g. dropped or transferred between the
-    -- click and the panel build). Helix items aren't entities, so check the table.
+    -- click and the panel build). Windswept items aren't entities, so check the table.
     if not paperItem or not paperItem.GetID or not ws.item.instances[paperItem:GetID()] then
         self:Remove()
         return
@@ -121,10 +121,7 @@ function PANEL:SetPaper(paperItem)
         -- Store reference for callback
         ws.gui.documentEditor = self
 
-        net.Start("wsDocumentRead")
-            net.WriteUInt(paperItem:GetID(), 32)
-            net.WriteBool(true)  -- For editor
-        net.SendToServer()
+        ws.action.Send("wsDocumentRead", paperItem:GetID(), nil, function() net.WriteBool(true) end)  -- for editor
     end
 end
 

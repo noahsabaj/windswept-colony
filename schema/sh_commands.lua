@@ -39,7 +39,7 @@ do
 
             -- Block transmission if hands up (can still receive)
             local wep = client:GetActiveWeapon()
-            if IsValid(wep) and wep:GetClass() == "ix_handsup" then
+            if IsValid(wep) and wep:GetClass() == "ws_handsup" then
                 return "@radioHandsUp"
             end
 
@@ -79,11 +79,22 @@ do
         local character, inventory = ws.constants.GetCharacterInventory(client)
         if not character or not inventory then return end
 
-        local radio = inventory:HasItem("handheld_radio")
+        -- Prefer the currently enabled radio (the one actually transmitting/receiving),
+        -- falling back to the first radio found. Tuning the active radio keeps the
+        -- character 'frequency' in sync with what's really on air. (sc-items-currency-battery-7)
+        local radios = inventory:GetItemsByUniqueID("handheld_radio", true)
+        local radio
+        for _, candidate in ipairs(radios) do
+            if candidate:GetData("enabled") then
+                radio = candidate
+                break
+            end
+        end
+        radio = radio or radios[1]
 
         if radio then
-            -- Validate frequency format (###.#)
-            if string.match(frequency, "^%d%d%d%.%d$") then
+            -- Validate against the single radio source of truth (format + range). (sc-schema-glue-5)
+            if ws.radio.ValidateFrequency(frequency) then
                 character:SetData("frequency", frequency)
                 radio:SetData("frequency", frequency)
                 client:Notify("Radio frequency set to " .. frequency)

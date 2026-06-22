@@ -57,7 +57,7 @@ end
 -- Intercept lethal damage and convert to knockout
 -- EntityTakeDamage allows us to modify/cancel damage before it's applied
 function PLUGIN:EntityTakeDamage(entity, dmgInfo)
-    -- Forward damage from prop_ragdoll to its linked ix_knocked entity
+    -- Forward damage from prop_ragdoll to its linked ws_knocked entity
     if entity:GetClass() == "prop_ragdoll" and IsValid(entity.wsKnockedEntity) then
         entity.wsKnockedEntity:OnTakeDamage(dmgInfo)
         return
@@ -94,18 +94,21 @@ function PLUGIN:EntityTakeDamage(entity, dmgInfo)
     -- Scale damage to 0 to prevent death
     dmgInfo:ScaleDamage(0)
 
-    -- Check for headshot - configurable chance of instant permadeath
-    if self:IsHeadshot(client) then
+    -- Check for headshot - configurable chance of instant permadeath.
+    -- Require bullet damage: wsLastHitGroup is only updated by ScalePlayerDamage (the bullet
+    -- path) and is never cleared, so non-bullet lethal damage (fall/fire/explosion) must not
+    -- inherit a stale head hitgroup. (sc-permadeath-4)
+    if dmgInfo:IsBulletDamage() and self:IsHeadshot(client) then
         local headshotChance = ws.config.Get("permadeathHeadshotChance", 50) / 100
         if math.random() < headshotChance then
             -- Lost the coin flip - instant permadeath
             -- Create the knocked entity first so there's a body to leave behind
             local pos = client:GetPos()
             local ang = Angle(0, client:EyeAngles().y, 0)
-            local entity = self:CreateKnockedEntity(client, character, pos, ang, 0)
+            local knockedEntity = self:CreateKnockedEntity(client, character, pos, ang, 0)  -- (sc-permadeath-8)
 
-            if entity then
-                self:HideKnockedPlayer(client, entity)
+            if knockedEntity then
+                self:HideKnockedPlayer(client, knockedEntity)
             end
 
             self:ApplyPermadeath(client, character, "headshot_execution")
@@ -117,6 +120,24 @@ function PLUGIN:EntityTakeDamage(entity, dmgInfo)
     -- Create knockout state instead of death
     self:CreateKnockout(client, character, dmgInfo)
     client.wsProcessingLethalDamage = nil
+end
+
+-- ============================================================================
+-- COMMUNICATION ISOLATION (server-side enforcement)
+-- ============================================================================
+-- The cl_plugin chat/voice blocks are cosmetic and bypassable by a modified client;
+-- enforce knockout isolation on the server too. (sc-permadeath-1)
+
+function PLUGIN:PlayerCanHearPlayersVoice(listener, speaker)
+    if IsValid(speaker.wsKnockedEntity) or IsValid(listener.wsKnockedEntity) then
+        return false
+    end
+end
+
+function PLUGIN:PlayerSay(client, text)
+    if IsValid(client.wsKnockedEntity) then
+        return ""
+    end
 end
 
 -- Block normal respawn for knocked players
@@ -131,8 +152,8 @@ function PLUGIN:PlayerDeathThink(client)
     end
 end
 
--- Prevent Helix from creating competing ragdolls when player has knockout entity
--- Helix's DoPlayerDeath checks this hook before calling client:CreateRagdoll()
+-- Prevent Windswept from creating competing ragdolls when player has knockout entity
+-- Windswept's DoPlayerDeath checks this hook before calling client:CreateRagdoll()
 function PLUGIN:ShouldSpawnClientRagdoll(client)
     if IsValid(client.wsKnockedEntity) then
         return false
@@ -183,11 +204,11 @@ function PLUGIN:IsPlayerOnFire(client)
     return client:IsOnFire()
 end
 
--- Create and configure an ix_knocked entity
+-- Create and configure an ws_knocked entity
 function PLUGIN:CreateKnockedEntity(client, character, pos, ang, duration)
-    local entity = ents.Create("ix_knocked")
+    local entity = ents.Create("ws_knocked")
     if not IsValid(entity) then
-        ErrorNoHalt("[Permadeath] Failed to create ix_knocked entity!\n")
+        ErrorNoHalt("[Permadeath] Failed to create ws_knocked entity!\n")
         return nil
     end
 
@@ -256,12 +277,12 @@ end
 -- Validate a knocked body interaction (loot, revive, etc.)
 -- Returns entity if valid and in range, nil otherwise
 function PLUGIN:ValidateKnockedInteraction(client, entity)
-    if not IsValid(entity) or entity:GetClass() ~= "ix_knocked" then
+    if not IsValid(entity) or entity:GetClass() ~= "ws_knocked" then
         return nil
     end
 
-    -- Check distance to ragdoll (the visible/draggable body), not ix_knocked entity
-    -- The ix_knocked entity stays at the original knockout position, but the ragdoll can be dragged
+    -- Check distance to ragdoll (the visible/draggable body), not ws_knocked entity
+    -- The ws_knocked entity stays at the original knockout position, but the ragdoll can be dragged
     local checkPos = IsValid(entity.wsRagdoll) and entity.wsRagdoll:GetPos() or entity:GetPos()
     if client:GetPos():Distance(checkPos) > 96 then
         return nil
@@ -297,7 +318,7 @@ function PLUGIN:CreateKnockout(client, character, dmgInfo)
     local activeWeapon = client:GetActiveWeapon()
     if IsValid(activeWeapon) then
         local class = activeWeapon:GetClass()
-        local protected = {["ix_hands"] = true, ["ix_handsup"] = true}
+        local protected = {["ws_hands"] = true, ["ws_handsup"] = true}
 
         if not protected[class] and activeWeapon.wsItem then
             local item = activeWeapon.wsItem
@@ -355,8 +376,8 @@ function PLUGIN:AttemptRevival(reviver, knockedEntity)
     -- Start the revival progress
     reviver:SetAction("@reviving", duration)
 
-    -- IMPORTANT: Pass the ragdoll to DoStaredAction, not the ix_knocked entity
-    -- The ix_knocked entity is invisible and hidden - player is looking at the ragdoll
+    -- IMPORTANT: Pass the ragdoll to DoStaredAction, not the ws_knocked entity
+    -- The ws_knocked entity is invisible and hidden - player is looking at the ragdoll
     local stareTarget = IsValid(knockedEntity.wsRagdoll) and knockedEntity.wsRagdoll or knockedEntity
 
     -- Use DoStaredAction for progress-based revival (must look at target)
@@ -446,8 +467,8 @@ function PLUGIN:RevivePlayer(knockedEntity, reviver, usedDefib, defibItem)
         owner:SetDSP(0)
 
         -- Give hands weapon back
-        owner:Give("ix_hands")
-        owner:SelectWeapon("ix_hands")
+        owner:Give("ws_hands")
+        owner:SelectWeapon("ws_hands")
 
         -- Notify the revived player
         net.Start("wsKnockoutEnd")
@@ -495,7 +516,7 @@ end
 -- PERMADEATH
 -- ============================================================================
 
--- Delete a character from the database (replicates Helix's deletion logic)
+-- Delete a character from the database (replicates Windswept's deletion logic)
 function PLUGIN:DeleteCharacter(client, character)
     local id = character:GetID()
     local steamID = client:SteamID64()
@@ -520,13 +541,13 @@ function PLUGIN:DeleteCharacter(client, character)
     net.Broadcast()
 
     -- Delete character from database
-    local query = mysql:Delete("ix_characters")
+    local query = mysql:Delete("ws_characters")
         query:Where("id", id)
         query:Where("steamid", steamID)
     query:Execute()
 
     -- NOTE: We intentionally do NOT delete the inventory here!
-    -- The dead body (ix_knocked entity) needs the inventory for looting.
+    -- The dead body (ws_knocked entity) needs the inventory for looting.
     -- The inventory will be cleaned up when the body is removed.
 
     -- Run post-delete hook
@@ -535,7 +556,7 @@ function PLUGIN:DeleteCharacter(client, character)
 end
 
 -- Delete a character when the player is offline (database only)
-function PLUGIN:DeleteCharacterOffline(charID)
+function PLUGIN:DeleteCharacterOffline(charID, steamID)
     -- Remove from loaded characters if still there
     ws.char.loaded[charID] = nil
 
@@ -544,24 +565,17 @@ function PLUGIN:DeleteCharacterOffline(charID)
         net.WriteUInt(charID, 32)
     net.Broadcast()
 
-    -- Delete character from database
-    local query = mysql:Delete("ix_characters")
+    -- Delete character from database, scoped to the owning steamid the same way
+    -- DeleteCharacter does (the knocked entity stores wsSteamID64). (sc-permadeath-6)
+    local query = mysql:Delete("ws_characters")
         query:Where("id", charID)
+        if steamID then query:Where("steamid", steamID) end
     query:Execute()
 
     -- NOTE: We intentionally do NOT delete the inventory here!
-    -- The dead body (ix_knocked entity) needs the inventory for looting.
+    -- The dead body (ws_knocked entity) needs the inventory for looting.
     -- The inventory will be cleaned up when the body is removed.
 
-end
-
--- Find a character's Personal ID item from their inventory
-function PLUGIN:FindPersonalID(character)
-    local inventory = character:GetInventory()
-    if not inventory then return nil end
-
-    local items = inventory:GetItemsByUniqueID("personal_id", false)
-    return items[1] or nil
 end
 
 function PLUGIN:ApplyPermadeath(client, character, reason)
@@ -603,8 +617,8 @@ function PLUGIN:ApplyPermadeath(client, character, reason)
         -- Gather memorial data BEFORE deleting character
         local charName = character:GetName()
         local model = character:GetModel()
-        local personalID = self:FindPersonalID(character)
-        local physical = personalID and personalID:GetData("physical", {}) or {}
+        -- Physical descriptors live on the character (the removed ID card only ever copied them).
+        local physical = character:GetData("physical", {})
 
         local birthMonth = physical.birthMonth or 1
         local birthDay = physical.birthDay or 1
@@ -666,7 +680,7 @@ function PLUGIN:FinishMemorial(client)
     -- Cancel the timeout timer (harmless no-op when the timeout itself is firing)
     timer.Remove("wsPermadeathTimeout_" .. client:SteamID64())
 
-    -- Properly kick to character menu (replicating Helix's character:Kick() logic)
+    -- Properly kick to character menu (replicating Windswept's character:Kick() logic)
     client:Freeze(false)
     client:KillSilent()
 
@@ -711,10 +725,11 @@ function PLUGIN:OnKnockoutExpired(knockedEntity)
         self:ApplyPermadeath(owner, character, "timer_expired")
     else
         -- Player offline - apply permadeath and delete character
+        local steamID = knockedEntity.wsSteamID64
         knockedEntity.wsOwner = nil
 
-        -- Delete the character from database
-        self:DeleteCharacterOffline(charID)
+        -- Delete the character from database (scoped to its owning steamid). (sc-permadeath-6)
+        self:DeleteCharacterOffline(charID, steamID)
     end
 end
 
@@ -748,14 +763,19 @@ function PLUGIN:ConsumeDefibCharge(item, client)
 
     local character, inventory = ws.constants.GetCharacterInventory(client)
 
-    -- Auto-eject: remove non-full batteries if enabled (0up and partial)
+    -- Auto-eject: remove non-full batteries if enabled (0up and partial).
+    -- Transactional: only drop the slot from the array once the inventory Add has
+    -- actually succeeded, so a full inventory / hook veto can't destroy the battery
+    -- (room-before-remove, then verify Add). (sc-permadeath-5)
     if inventory and ws.option.Get(client, "batteryAutoEject", true) then
         for i = #batteries, 1, -1 do
             if batteries[i] < 100 then  -- Eject anything that's not full
                 if inventory:FindEmptySlot(1, 1) then
-                    inventory:Add("battery", 1, {charge = batteries[i]})
-                    table.remove(batteries, i)
-                    client:NotifyLocalized("flashlightBatteryEjected")
+                    local added = inventory:Add("battery", 1, {charge = batteries[i]})
+                    if added ~= false then
+                        table.remove(batteries, i)
+                        client:NotifyLocalized("flashlightBatteryEjected")
+                    end
                 end
             end
         end
@@ -980,6 +1000,14 @@ net.Receive("wsKnockoutGiveUp", function(len, client)
         entity:SetTimerStart(CurTime())
         entity:SetTimerDuration(10)
 
+        -- Persist the shortened deadline in the same (os.time) timebase the entity
+        -- timer uses for live countdown, so a reconnect cannot resurrect the longer
+        -- original timer from stale knockoutExpires. (sc-permadeath-9)
+        local character = client:GetCharacter()
+        if character then
+            character:SetData("knockoutExpires", os.time() + 10)
+        end
+
         -- Sync to client
         net.Start("wsKnockoutTimerSync")
             net.WriteFloat(10)
@@ -1004,8 +1032,9 @@ net.Receive("wsKnockoutLoot", function(len, client)
     local entity = plugin:ValidateKnockedInteraction(client, net.ReadEntity())
     if not entity then return end
 
-    -- Block searching while actively performing CPR on this body
-    if entity:GetCurrentReviver() == client then
+    -- Block searching while CPR is in progress on this body, by anyone -- looting a
+    -- patient mid-revival is not intended regardless of who the reviver is. (sc-permadeath-7)
+    if IsValid(entity:GetCurrentReviver()) then
         client:NotifyLocalized("cprCannotSearchDuring")
         return
     end

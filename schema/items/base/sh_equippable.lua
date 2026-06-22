@@ -5,7 +5,7 @@
     Provides standard Equip/Unequip functionality, transfer blocking, and persistence.
 
     Configuration (child items must set these):
-        ITEM.equipWeaponClass   - The SWEP class to give (e.g., "ix_binoculars")
+        ITEM.equipWeaponClass   - The SWEP class to give (e.g., "ws_binoculars")
         ITEM.equipPlayerKey     - Key to store item reference on player (e.g., "wsBinocularsItem")
         ITEM.equipNotifyKey     - Localization key for "unequip first" message (e.g., "binocularsEquipped")
 
@@ -24,7 +24,7 @@
         ITEM.model = "models/weapons/w_binocularsbp.mdl"
         ITEM.base = "base_equippable"
 
-        ITEM.equipWeaponClass = "ix_binoculars"
+        ITEM.equipWeaponClass = "ws_binoculars"
         ITEM.equipPlayerKey = "wsBinocularsItem"
         ITEM.equipNotifyKey = "binocularsEquipped"
 ]]--

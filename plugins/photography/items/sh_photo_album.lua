@@ -68,9 +68,7 @@ ITEM.functions.Browse = {
         return false
     end,
     OnClick = function(item)
-        net.Start("wsPhotoAlbumView")
-            net.WriteUInt(item:GetID(), 32)
-        net.SendToServer()
+        ws.action.Send("wsPhotoAlbumView", item:GetID())
 
         return false
     end,
@@ -105,10 +103,9 @@ ITEM.functions.Rename = {
             currentTitle,
             function(text)
                 if text then
-                    net.Start("wsPhotoAlbumRename")
-                        net.WriteUInt(item:GetID(), 32)
+                    ws.action.Send("wsPhotoAlbumRename", item:GetID(), nil, function()
                         net.WriteString(string.sub(text, 1, 64))
-                    net.SendToServer()
+                    end)
                 end
             end,
             function() end,
@@ -158,44 +155,48 @@ end
 -- ============================================================================
 
 if SERVER then
-    net.Receive("wsPhotoAlbumRename", function(len, client)
-        local itemID = net.ReadUInt(32)
-        local title = net.ReadString()
+    -- Albums can legitimately live inside an owned bag, so resolve via
+    -- VerifyItemAccessible (main inventory OR an owned container) rather than the
+    -- main-inventory-only VerifyOwnership. (sc-photography-5)
+    ws.action.Register("wsPhotoAlbumRename", {
+        item = "photo_album",
+        read = function() return net.ReadString() end,
+        run = function(client, ctx)
+            local item = ctx.item
+            local title = string.sub(ctx.data, 1, 64)
 
-        local item = ws.photo.VerifyOwnership(client, itemID, "photo_album")
-        if not item then return end
+            item:SetData("title", title)
 
-        title = string.sub(title, 1, 64)
-        item:SetData("title", title)
-
-        client:NotifyLocalized("albumRenamed", title)
-    end)
-
-    net.Receive("wsPhotoAlbumView", function(len, client)
-        local itemID = net.ReadUInt(32)
-
-        local item = ws.photo.VerifyOwnership(client, itemID, "photo_album")
-        if not item then return end
-
-        local photos = item:GetPhotos()
-        local title = item:GetName()
-
-        -- Grant short-lived access so the client can fetch these photos' images.
-        local ids = {}
-        for _, photo in ipairs(photos) do
-            ids[#ids + 1] = photo:GetData("photoID", "")
+            client:NotifyLocalized("albumRenamed", title)
         end
-        ws.photo.GrantPhotoAccess(client, ids)
+    })
 
-        net.Start("wsPhotoAlbumViewData")
-            net.WriteString(title)
-            net.WriteUInt(#photos, 8)
+    -- Accessible (main inventory OR owned bag), matching Rename. (sc-photography-5)
+    ws.action.Register("wsPhotoAlbumView", {
+        item = "photo_album",
+        run = function(client, ctx)
+            local item = ctx.item
+
+            local photos = item:GetPhotos()
+            local title = item:GetName()
+
+            -- Grant short-lived access so the client can fetch these photos' images.
+            local ids = {}
             for _, photo in ipairs(photos) do
-                net.WriteString(photo:GetData("photoID", ""))
-                net.WriteString(photo:GetData("title", ""))
+                ids[#ids + 1] = photo:GetData("photoID", "")
             end
-        net.Send(client)
-    end)
+            ws.photo.GrantPhotoAccess(client, ids)
+
+            net.Start("wsPhotoAlbumViewData")
+                net.WriteString(title)
+                net.WriteUInt(#photos, 8)
+                for _, photo in ipairs(photos) do
+                    net.WriteString(photo:GetData("photoID", ""))
+                    net.WriteString(photo:GetData("title", ""))
+                end
+            net.Send(client)
+        end
+    })
 end
 
 -- ============================================================================
@@ -239,9 +240,9 @@ if CLIENT then
 
         ws.albumPhotoLoading[photoID] = true
 
-        net.Start("wsPhotoRequest")
+        ws.action.Send("wsPhotoRequest", nil, nil, function()
             net.WriteString(photoID)
-        net.SendToServer()
+        end)
     end
 
     function PANEL:GoToPhoto(index)
@@ -325,7 +326,7 @@ if CLIENT then
 
     function PANEL:OnCleanup()
         for photoID, _ in pairs(ws.albumPhotoCache) do
-            ws.photo.CleanupTempFile("ixphoto_album_" .. photoID .. ".jpg")
+            ws.photo.CleanupTempFile("wsphoto_album_" .. photoID .. ".jpg")
         end
 
         ws.albumPhotoCache = {}

@@ -18,7 +18,7 @@ ITEM.category = "Equipment"
 ITEM.noBusiness = true
 
 -- Weapon configuration
-ITEM.weaponClass = "ix_camera"
+ITEM.weaponClass = "ws_camera"
 ITEM.equipSound = "items/flashlight1.wav"
 ITEM.unequipSound = "items/flashlight1.wav"
 ITEM.notifyPrefix = "camera"
@@ -198,8 +198,14 @@ ITEM.functions.LoadFilm = {
 
         if not filmID then return false end
 
-        local filmItem = ws.item.instances[filmID]
-        if not filmItem or filmItem.uniqueID ~= "film" then
+        -- filmID comes from the attacker-controlled net payload; verify the caller actually
+        -- has access to that film (main inventory or an owned bag), exactly as LoadBattery
+        -- does. Without this a crafted ID could load/consume another player's or a dropped
+        -- film. (sc-photography-1)
+        if not IsValid(client) then return false end
+
+        local filmItem = ws.access.VerifyItemAccessible(client, filmID, "film")
+        if not filmItem then
             return false
         end
 
@@ -208,7 +214,8 @@ ITEM.functions.LoadFilm = {
             return false
         end
 
-        local shots = filmItem:GetData("shots", 10)
+        -- Clamp shots: the value is copied from item data and must not be trusted blindly.
+        local shots = math.Clamp(math.floor(tonumber(filmItem:GetData("shots", 10)) or 0), 0, 100)
         item:SetFilm({shots = shots})
         filmItem:Remove()
 

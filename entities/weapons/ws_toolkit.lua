@@ -174,9 +174,9 @@ end
 -- ============================================================================
 
 if SERVER then
-    ws.weapon.NetReceive("wsToolkitStartRemove", "ix_toolkit", "StartRemove")
-    ws.weapon.NetReceive("wsToolkitStartRepair", "ix_toolkit", "StartRepair")
-    ws.weapon.NetReceive("wsToolkitCancel", "ix_toolkit", "CancelWork")
+    ws.weapon.NetReceive("wsToolkitStartRemove", "ws_toolkit", "StartRemove")
+    ws.weapon.NetReceive("wsToolkitStartRepair", "ws_toolkit", "StartRepair")
+    ws.weapon.NetReceive("wsToolkitCancel", "ws_toolkit", "CancelWork")
 end
 
 -- ============================================================================
@@ -487,9 +487,12 @@ function SWEP:CompleteRepairDoor(owner, door, item)
         return
     end
 
-    -- Consume repair material
-    local materialItem = self.repairMaterial
-    if not materialItem or not ws.item.instances[materialItem:GetID()] then
+    -- Re-resolve and re-verify the material at completion (TOCTOU): the cached item
+    -- may have been moved/traded/consumed during the multi-second work window, so
+    -- confirm it is still accessible to the owner before decrementing. (sc-weapons-tools-4)
+    local cached = self.repairMaterial
+    local materialItem = cached and ws.access.VerifyItemAccessible(owner, cached:GetID(), cached.uniqueID)
+    if not materialItem then
         owner:NotifyLocalized("toolkitNoMaterial")
         self:CancelWork()
         return
@@ -528,9 +531,12 @@ function SWEP:CompleteRepairLock(owner, door, item)
         return
     end
 
-    -- Consume repair material (metal)
-    local materialItem = self.repairMaterial
-    if not materialItem or not ws.item.instances[materialItem:GetID()] then
+    -- Re-resolve and re-verify the material at completion (TOCTOU): the cached item
+    -- may have been moved/traded/consumed during the multi-second work window, so
+    -- confirm it is still accessible to the owner before decrementing. (sc-weapons-tools-4)
+    local cached = self.repairMaterial
+    local materialItem = cached and ws.access.VerifyItemAccessible(owner, cached:GetID(), cached.uniqueID)
+    if not materialItem then
         owner:NotifyLocalized("toolkitNoMaterial")
         self:CancelWork()
         return

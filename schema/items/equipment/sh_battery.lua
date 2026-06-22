@@ -4,10 +4,8 @@
     A rechargeable power cell that can be loaded into devices.
     Charge: 0-100up (units of power)
 
-    Stacking rules:
-    - Full batteries (100up) stack with full
-    - Empty batteries (0up) stack with empty
-    - Partial batteries (1-99up) occupy individual slots
+    Stacking: batteries do NOT stack - each battery (regardless of charge level)
+    occupies its own slot, since charge is per-instance data. (sc-items-currency-battery-9)
 ]]--
 
 ITEM.name = "Battery"

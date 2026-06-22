@@ -16,6 +16,9 @@ end)
 -- Source Engine's slavename linking doesn't work for dynamically spawned doors
 -- ============================================================================
 
+-- Monotonic counter so concurrent activators get unique names within the 0.1s window. (sc-schema-glue-11)
+local doorActivatorCounter = 0
+
 -- Handle double door sync by taking full control of door usage
 -- This fires BEFORE the native door use, so we can handle both doors simultaneously
 function Schema:CanPlayerUseDoor(client, door)
@@ -39,8 +42,9 @@ function Schema:CanPlayerUseDoor(client, door)
 		-- Both doors closed - open both away from player
 		local tempTarget = ents.Create("info_target")
 		if IsValid(tempTarget) then
+			doorActivatorCounter = doorActivatorCounter + 1 -- (sc-schema-glue-11)
 			tempTarget:SetPos(client:GetPos())
-			tempTarget:SetName("ix_door_activator_" .. client:EntIndex())
+			tempTarget:SetName("ws_door_activator_" .. client:EntIndex() .. "_" .. doorActivatorCounter)
 			tempTarget:Spawn()
 
 			-- Fire OpenAwayFrom on BOTH doors simultaneously
@@ -172,7 +176,7 @@ function Schema:AdjustCreationPayload(client, payload, newPayload)
     local facialHair = payload.physFacialHair or "None"
 
     -- Get the model path for gender detection
-    -- Helix's model OnAdjust already sets newPayload.model to the actual path
+    -- Windswept's model OnAdjust already sets newPayload.model to the actual path
     local modelPath = newPayload.model
 
     -- Calculate build from height and weight
@@ -251,8 +255,8 @@ Schema.radioTransmitters = Schema.radioTransmitters or {}
 
 Schema.entityCache = Schema.entityCache or {
     ragdolls = {},           -- prop_ragdoll entities
-    knockedBodies = {},      -- ix_knocked entities
-    stationaryRadios = {},   -- ix_stationary_radio entities
+    knockedBodies = {},      -- ws_knocked entities
+    stationaryRadios = {},   -- ws_stationary_radio entities
 }
 
 -- Helper to add entity to cache
@@ -269,16 +273,22 @@ end
 hook.Add("OnEntityCreated", "wsRadioEntityCache", function(ent)
     if not IsValid(ent) then return end
 
+    -- Only the 3 relevant classes are worth deferring; skip the timer churn for
+    -- every other entity created on the map. (sc-schema-glue-3)
+    local class = ent:GetClass()
+    if (class ~= "prop_ragdoll" and class ~= "ws_knocked" and class ~= "ws_stationary_radio") then
+        return
+    end
+
     -- Delay slightly to ensure entity is fully initialized
     timer.Simple(0, function()
         if not IsValid(ent) then return end
 
-        local class = ent:GetClass()
         if class == "prop_ragdoll" then
             CacheEntity(ent, Schema.entityCache.ragdolls)
-        elseif class == "ix_knocked" then
+        elseif class == "ws_knocked" then
             CacheEntity(ent, Schema.entityCache.knockedBodies)
-        elseif class == "ix_stationary_radio" then
+        elseif class == "ws_stationary_radio" then
             CacheEntity(ent, Schema.entityCache.stationaryRadios)
         end
     end)
@@ -304,10 +314,10 @@ hook.Add("PostCleanupMap", "wsRadioEntityCacheRebuild", function()
     for _, ent in ipairs(ents.FindByClass("prop_ragdoll")) do
         CacheEntity(ent, Schema.entityCache.ragdolls)
     end
-    for _, ent in ipairs(ents.FindByClass("ix_knocked")) do
+    for _, ent in ipairs(ents.FindByClass("ws_knocked")) do
         CacheEntity(ent, Schema.entityCache.knockedBodies)
     end
-    for _, ent in ipairs(ents.FindByClass("ix_stationary_radio")) do
+    for _, ent in ipairs(ents.FindByClass("ws_stationary_radio")) do
         CacheEntity(ent, Schema.entityCache.stationaryRadios)
     end
 end)
@@ -318,10 +328,10 @@ hook.Add("InitPostEntity", "wsRadioEntityCacheInit", function()
         for _, ent in ipairs(ents.FindByClass("prop_ragdoll")) do
             CacheEntity(ent, Schema.entityCache.ragdolls)
         end
-        for _, ent in ipairs(ents.FindByClass("ix_knocked")) do
+        for _, ent in ipairs(ents.FindByClass("ws_knocked")) do
             CacheEntity(ent, Schema.entityCache.knockedBodies)
         end
-        for _, ent in ipairs(ents.FindByClass("ix_stationary_radio")) do
+        for _, ent in ipairs(ents.FindByClass("ws_stationary_radio")) do
             CacheEntity(ent, Schema.entityCache.stationaryRadios)
         end
     end)
@@ -335,7 +345,7 @@ local function GetActiveRadio(client)
     if not character then return nil end
 
     -- Quick check using cached flag
-    if not character:GetData("ixHasActiveRadio") then return nil end
+    if not character:GetData("wsHasActiveRadio") then return nil end
 
     local inventory = character:GetInventory()
     if not inventory then return nil end
@@ -354,7 +364,7 @@ end
 local function GetRagdollRadio(ragdoll)
     if not IsValid(ragdoll) then return nil end
 
-    -- Check if this is a Helix ragdoll with inventory
+    -- Check if this is a Windswept ragdoll with inventory
     local charID = ragdoll.wsCharID
     if not charID then return nil end
 
@@ -435,6 +445,11 @@ end)
 -- Clean up transmitter on disconnect
 hook.Add("PlayerDisconnected", "wsRadioTransmitCleanup", function(client)
     Schema.radioTransmitters[client] = nil
+
+    -- Drop stale voice-amplitude entry so the table doesn't leak keys. (sc-schema-glue-4)
+    if (Schema.voiceAmplitudes) then
+        Schema.voiceAmplitudes[client] = nil
+    end
 end)
 
 -- Drain battery for voice receivers (runs every second while transmissions are active)
@@ -487,6 +502,10 @@ end)
 -- Receive amplitude from client (VoiceVolume() is CLIENT-only)
 net.Receive("wsVoiceAmplitude", function(len, client)
     if not IsValid(client) then return end
+
+    -- Per-client min-interval to harden against amplitude spam. (sc-schema-glue-8)
+    if ((client.wsNextVoiceAmp or 0) > CurTime()) then return end
+    client.wsNextVoiceAmp = CurTime() + 0.1
 
     local amp = net.ReadFloat()
     -- Clamp to valid range
@@ -624,7 +643,7 @@ function Schema:PlayerCanHearPlayersVoice(listener, speaker)
             end
         end
 
-        -- Check ix_knocked entities - uses cached entities
+        -- Check ws_knocked entities - uses cached entities
         for ent, _ in pairs(Schema.entityCache.knockedBodies) do
             if IsValid(ent) and ent.GetInventory then
                 local inv = ent:GetInventory()

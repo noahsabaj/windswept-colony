@@ -110,13 +110,25 @@ end
 -- ============================================================================
 
 if SERVER then
-    ws.weapon.NetReceive("wsKeyringCycle", "ix_keyring", "DoCycle")
-    ws.weapon.NetReceive("wsKeyringLock", "ix_keyring", "DoLock")
-    ws.weapon.NetReceive("wsKeyringUnlock", "ix_keyring", "DoUnlock")
+    ws.weapon.NetReceive("wsKeyringCycle", "ws_keyring", "DoCycle")
+    ws.weapon.NetReceive("wsKeyringLock", "ws_keyring", "DoLock")
+    ws.weapon.NetReceive("wsKeyringUnlock", "ws_keyring", "DoUnlock")
+end
+
+-- Server-side per-weapon throttle. The client's self.next*Attempt gates are
+-- cosmetic only; never trust them for rate limiting. (sc-doors-access-4) (sc-weapons-tools-5)
+function SWEP:ServerRateLimited(interval)
+    if self.svNextAttempt and self.svNextAttempt > CurTime() then
+        return true
+    end
+
+    self.svNextAttempt = CurTime() + (interval or 1)
+    return false
 end
 
 function SWEP:DoCycle()
     if CLIENT then return end
+    if self:ServerRateLimited(0.3) then return end
 
     local item = self:GetItem()
     if not item then return end
@@ -130,6 +142,7 @@ end
 
 function SWEP:DoLock()
     if CLIENT then return end
+    if self:ServerRateLimited(1) then return end
 
     local owner = self:GetOwner()
     local door = self:GetTargetDoor()
@@ -169,6 +182,7 @@ end
 
 function SWEP:DoUnlock()
     if CLIENT then return end
+    if self:ServerRateLimited(1) then return end
 
     local owner = self:GetOwner()
     local door = self:GetTargetDoor()

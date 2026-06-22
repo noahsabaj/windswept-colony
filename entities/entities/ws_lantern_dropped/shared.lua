@@ -75,7 +75,7 @@ if SERVER then
         if self.usePlayer == activator then
             local holdTime = CurTime() - self.useStartTime
 
-            -- Hold for 0.5 seconds to pick up (matches Helix itemPickupTime)
+            -- Hold for 0.5 seconds to pick up (matches Windswept itemPickupTime)
             if holdTime >= 0.5 then
                 self:PickUp(activator)
                 return
@@ -168,7 +168,7 @@ if SERVER then
         timer.Simple(0.1, function()
             if not IsValid(activator) then return end
 
-            local weapon = activator:Give("ix_lantern")
+            local weapon = activator:Give("ws_lantern")
             if IsValid(weapon) then
                 -- Find the item we just added
                 for _, item in pairs(inventory:GetItems()) do
@@ -180,7 +180,7 @@ if SERVER then
                     end
                 end
 
-                activator:SelectWeapon("ix_lantern")
+                activator:SelectWeapon("ws_lantern")
             end
         end)
 

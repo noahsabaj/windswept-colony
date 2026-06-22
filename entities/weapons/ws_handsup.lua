@@ -78,6 +78,10 @@ end
 
 -- Override player animation when hands are up
 hook.Add("CalcMainActivity", "wsHandsUpAnimation", function(ply, velocity)
+    -- Registered at weapon-scan time, so this can fire before networking defines GetNetVar
+    -- (and ply may be NULL during the boot/spawn window); bail until both are ready.
+    if not (IsValid(ply) and ply.GetNetVar) then return end
+
     if ply:GetNetVar("handsUp") then
         -- Try to use the cower sequence directly (hands up defensive pose)
         local seq = ply:LookupSequence("seq_cower") or ply:LookupSequence("cower")

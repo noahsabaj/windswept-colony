@@ -62,7 +62,10 @@ function SWEP:Deploy()
         self:EmitSound("defibl/deploy.wav", 60)
     end
 
-    local vm = self:GetOwner():GetViewModel()
+    local owner = self:GetOwner()
+    if not IsValid(owner) then return true end -- (sc-weapons-tools-7)
+
+    local vm = owner:GetViewModel()
     if IsValid(vm) then
         vm:SendViewModelMatchingSequence(vm:LookupSequence("deploy"))
     end
@@ -309,13 +312,13 @@ if SERVER then
             return
         end
 
-        -- Handle knocked entity (ix_knocked) - direct hit
-        if target:GetClass() == "ix_knocked" then
+        -- Handle knocked entity (ws_knocked) - direct hit
+        if target:GetClass() == "ws_knocked" then
             self:ShockKnockedPlayer(target)
             return
         end
 
-        -- Handle prop_ragdoll linked to ix_knocked (the visible body)
+        -- Handle prop_ragdoll linked to ws_knocked (the visible body)
         if target:GetClass() == "prop_ragdoll" and IsValid(target.wsKnockedEntity) then
             self:ShockKnockedPlayer(target.wsKnockedEntity)
             return
@@ -375,6 +378,14 @@ if SERVER then
 
         local character = target:GetCharacter()
         if not character then return end
+
+        -- Per-target cooldown: prevent instantly re-KOing the same living player in
+        -- rapid succession (the charge/battery cycle already rate-limits the attacker). (sc-permadeath-11)
+        if target.wsNextDefibKO and target.wsNextDefibKO > CurTime() then
+            owner:NotifyLocalized("defibMissed")
+            return
+        end
+        target.wsNextDefibKO = CurTime() + 10
 
         -- Create knockout state on the alive player
         -- We need a damage info for the knockout system
@@ -490,6 +501,6 @@ end
 -- HOOKS
 -- ============================================================================
 
-ws.weapon.RegisterCleanupHooks("ix_defibrillator", "wsDefib", function(weapon)
+ws.weapon.RegisterCleanupHooks("ws_defibrillator", "wsDefib", function(weapon)
     if weapon.ExitAllStates then weapon:ExitAllStates() end
 end)

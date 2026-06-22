@@ -105,11 +105,19 @@ end
 -- ============================================================================
 
 if SERVER then
-    ws.weapon.NetReceive("wsLockpickStart", "ix_lockpick", "StartPicking")
+    ws.weapon.NetReceive("wsLockpickStart", "ws_lockpick", "StartPicking")
 
-    net.Receive("wsLockpickAttempt", function(len, ply)
-        local weapon = ply:GetActiveWeapon()
-        if not IsValid(weapon) or weapon:GetClass() ~= "ix_lockpick" then return end
+    -- ws.weapon.NetReceive supplies the active-weapon class check + reads the click time; the
+    -- ticker-based anti-cheat timing (server-side rate limit + sweet-spot recompute) is NOT a
+    -- simple rate limit, so it stays in NetAttempt. (sc-doors-access-1 / sc-weapons-tools-1)
+    ws.weapon.NetReceive("wsLockpickAttempt", "ws_lockpick", "NetAttempt", {
+        read = function() return net.ReadFloat() end,
+    })
+
+    function SWEP:NetAttempt(clientTime)
+        local weapon = self
+        local ply = self:GetOwner()
+
         if not weapon:IsPicking() then return end
 
         -- Server-side rate limit. Hit detection is necessarily client-side (the
@@ -124,10 +132,25 @@ if SERVER then
         -- Defensive: no attempts remaining (IsPicking is normally already cleared)
         if weapon:GetAttemptsLeft() <= 0 then return end
 
-        local hit = net.ReadBool()
+        now = CurTime()
 
         -- Do damage to lock regardless
         weapon:DoAttempt()
+
+        -- Server-authoritative hit detection. GetTickerPosition is a pure function of the
+        -- shared CurTime() and TickerSpeed, so instead of trusting a client 'hit' bool we
+        -- recompute the ticker position at the client's claimed click time and test it
+        -- against the sweet spot. The timestamp must be recent, which bounds replay and
+        -- picking a favorable far-off time. Full timing-cheat protection still relies on
+        -- external anticheat. (sc-doors-access-1 / sc-weapons-tools-1)
+        local hit = false
+
+        if (isnumber(clientTime) and clientTime <= now + 0.05 and clientTime >= now - 0.5) then
+            local tickerPos = weapon:GetTickerPosition(clientTime)
+            local sweetStart = weapon:GetSweetSpotStart()
+            local sweetSize = weapon:GetSweetSpotSize()
+            hit = tickerPos >= sweetStart and tickerPos <= (sweetStart + sweetSize)
+        end
 
         if hit then
             local currentHits = weapon:GetCurrentHits() + 1
@@ -147,9 +170,9 @@ if SERVER then
         else
             weapon:OnPickFail()
         end
-    end)
+    end
 
-    ws.weapon.NetReceive("wsLockpickCancel", "ix_lockpick", "CancelPicking")
+    ws.weapon.NetReceive("wsLockpickCancel", "ws_lockpick", "CancelPicking")
 end
 
 function SWEP:StartPicking()
@@ -289,7 +312,7 @@ function SWEP:OnPickFail()
             inventory:Remove(item:GetID())
         end
 
-        owner:StripWeapon("ix_lockpick")
+        owner:StripWeapon("ws_lockpick")
         owner.wsLockpickItem = nil
         self:SetPicking(false)
         self.targetDoor = nil
@@ -338,13 +361,10 @@ function SWEP:Think()
         end
 
         if lmb and self:IsPicking() then
-            local tickerPos = self:GetTickerPosition()
-            local sweetStart = self:GetSweetSpotStart()
-            local sweetSize = self:GetSweetSpotSize()
-            local hit = tickerPos >= sweetStart and tickerPos <= (sweetStart + sweetSize)
-
+            -- Send the click time; the server recomputes the ticker position from the shared
+            -- clock and decides the hit authoritatively (no client 'hit' bool to trust). (sc-doors-access-1)
             net.Start("wsLockpickAttempt")
-            net.WriteBool(hit)
+            net.WriteFloat(CurTime())
             net.SendToServer()
         end
     end
@@ -363,9 +383,10 @@ function SWEP:Think()
     end
 end
 
-function SWEP:GetTickerPosition()
-    -- Oscillate between 0 and 1
-    local time = CurTime() * self.TickerSpeed
+function SWEP:GetTickerPosition(time)
+    -- Oscillate between 0 and 1. Accepts an explicit time so the SERVER can recompute the
+    -- position at the client's claimed click time (shared CurTime + TickerSpeed). (sc-doors-access-1)
+    time = (time or CurTime()) * self.TickerSpeed
     return (math.sin(time * math.pi) + 1) / 2
 end
 

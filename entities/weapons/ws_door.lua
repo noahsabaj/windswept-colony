@@ -84,7 +84,7 @@ function SWEP:GetTargetFrame()
 
     -- Check if we hit an empty frame
     -- Frames are stored in ws.doors.frames
-    if not ix or not ws.doors or not ws.doors.frames then return nil end
+    if not ws or not ws.doors or not ws.doors.frames then return nil end
 
     local hitPos = tr.HitPos
 
@@ -132,8 +132,8 @@ end
 -- ============================================================================
 
 if SERVER then
-    ws.weapon.NetReceive("wsDoorInstall", "ix_door", "StartInstall")
-    ws.weapon.NetReceive("wsDoorCancel", "ix_door", "CancelInstall")
+    ws.weapon.NetReceive("wsDoorInstall", "ws_door", "StartInstall")
+    ws.weapon.NetReceive("wsDoorCancel", "ws_door", "CancelInstall")
 end
 
 function SWEP:StartInstall()
@@ -215,7 +215,7 @@ function SWEP:CompleteInstall()
     end
 
     -- Strip weapon and clean up
-    owner:StripWeapon("ix_door")
+    owner:StripWeapon("ws_door")
     owner.wsDoorItem = nil
 
     owner:EmitSound("physics/wood/wood_plank_impact_hard1.wav", 70)

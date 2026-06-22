@@ -7,10 +7,10 @@
 local PLUGIN = PLUGIN
 
 -- ============================================================================
--- 3D2D DOOR INFO (Override Helix default)
+-- 3D2D DOOR INFO (Override Windswept default)
 -- ============================================================================
 
--- Disable Helix's default door info rendering
+-- Disable Windswept's default door info rendering
 hook.Add("PostDrawTranslucentRenderables", "wsWindsweptDoorInfo", function(_, bSkybox)
     if bSkybox then return end
 
@@ -44,7 +44,7 @@ hook.Add("PostDrawTranslucentRenderables", "wsWindsweptFramePulse", function(_, 
     local weapon = client:GetActiveWeapon()
 
     -- Only show when holding door SWEP
-    if not IsValid(weapon) or weapon:GetClass() ~= "ix_door" then return end
+    if not IsValid(weapon) or weapon:GetClass() ~= "ws_door" then return end
 
     -- Animate pulse
     framePulseAlpha = framePulseAlpha + framePulseDir * FrameTime() * 200
@@ -79,19 +79,19 @@ hook.Add("HUDPaint", "wsWindsweptDoorHints", function()
     local weaponClass = weapon:GetClass()
     local hints = {}
 
-    if weaponClass == "ix_key" then
+    if weaponClass == "ws_key" then
         hints = {"LMB: Lock door", "RMB: Unlock door"}
-    elseif weaponClass == "ix_keyring" then
+    elseif weaponClass == "ws_keyring" then
         hints = {"R: Cycle keys", "LMB: Lock", "RMB: Unlock"}
-    elseif weaponClass == "ix_lock" then
+    elseif weaponClass == "ws_lock" then
         hints = {"RMB on door: Install lock"}
-    elseif weaponClass == "ix_door" then
+    elseif weaponClass == "ws_door" then
         hints = {"RMB on frame: Install door"}
-    elseif weaponClass == "ix_toolkit" then
+    elseif weaponClass == "ws_toolkit" then
         hints = {"RMB on door/lock: Remove", "LMB: Repair"}
-    elseif weaponClass == "ix_lockpick" then
+    elseif weaponClass == "ws_lockpick" then
         hints = {"RMB on locked door: Pick lock"}
-    elseif weaponClass == "ix_lockbreaker" then
+    elseif weaponClass == "ws_lockbreaker" then
         hints = {"RMB on lock: Destroy lock"}
     end
 
@@ -111,7 +111,7 @@ end)
 -- DOOR MENU OVERRIDE
 -- ============================================================================
 
--- Prevent Helix's door menu from opening
+-- Prevent Windswept's door menu from opening
 hook.Add("ShowHelp", "wsWindsweptDoorMenu", function()
     local client = LocalPlayer()
     local data = {}
@@ -120,14 +120,14 @@ hook.Add("ShowHelp", "wsWindsweptDoorMenu", function()
         data.filter = client
     local entity = util.TraceLine(data).Entity
 
-    -- If looking at a managed door or hidden map door, don't show Helix menu
+    -- If looking at a managed door or hidden map door, don't show Windswept menu
     if IsValid(entity) then
         if entity.wsIsWindsweptDoor then
-            return true  -- Block Helix menu for our managed doors
+            return true  -- Block Windswept menu for our managed doors
         end
 
         if entity:IsDoor() and entity:GetNoDraw() then
-            return true  -- Block Helix menu for hidden doors
+            return true  -- Block Windswept menu for hidden doors
         end
     end
 end)

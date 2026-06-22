@@ -39,15 +39,15 @@ hook.Add("EntityTakeDamage", "wsWindsweptDoorDamage", function(target, dmgInfo)
     local attacker = dmgInfo:GetAttacker()
 
     -- Check if it's a battering ram
-    if IsValid(inflictor) and inflictor:GetClass() == "ix_batteringram" then
+    if IsValid(inflictor) and inflictor:GetClass() == "ws_batteringram" then
         -- Handle damage via our system
         local damage = dmgInfo:GetDamage()
         ws.doors.DamageDoor(target, damage, attacker, inflictor)
         return true  -- Block default damage
     end
 
-    -- Check if it's fists (ix_hands)
-    if IsValid(inflictor) and inflictor:GetClass() == "ix_hands" then
+    -- Check if it's fists (ws_hands)
+    if IsValid(inflictor) and inflictor:GetClass() == "ws_hands" then
         -- Handle damage via our system (will check if fist damage is allowed)
         ws.doors.DamageDoor(target, 1, attacker, inflictor)
         return true  -- Block default damage
@@ -64,7 +64,7 @@ end)
 -- Save doors when a player disconnects (in case they were editing)
 hook.Add("PlayerDisconnected", "wsWindsweptDoorSave", function(client)
     -- Close any locksmith machines they were using
-    for _, ent in ipairs(ents.FindByClass("ix_auto_locksmith")) do
+    for _, ent in ipairs(ents.FindByClass("ws_auto_locksmith")) do
         if ent:GetUser() == client then
             ent:CloseForUser(client)
         end

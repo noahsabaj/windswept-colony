@@ -8,14 +8,14 @@
 ITEM.name = "Battering Ram"
 ITEM.description = "A heavy steel breaching tool used to force entry through locked doors. Standard issue for Security personnel executing warrants."
 ITEM.model = "models/props_c17/tools/toolbox01.mdl"
-ITEM.class = "ix_batteringram"
+ITEM.class = "ws_batteringram"
 ITEM.width = 2
 ITEM.height = 1
 ITEM.category = "Equipment"
 ITEM.base = "base_equippable"
 
 -- Equippable configuration
-ITEM.equipWeaponClass = "ix_batteringram"
+ITEM.equipWeaponClass = "ws_batteringram"
 ITEM.equipPlayerKey = "wsBatteringRamItem"
 ITEM.equipNotifyKey = "batteringRamEquipped"
 ITEM.equipTip = "Hold the battering ram in your hands."
