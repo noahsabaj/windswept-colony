@@ -17,7 +17,6 @@ wsCameraFlashEffect
 wsCameraFlashToggled
 wsCameraPhotoData
 wsCurrencySplit
-wsDocumentData
 wsDoorsSync
 wsKnockoutEnd
 wsKnockoutGiveUp
@@ -34,7 +33,6 @@ wsPhotoViewFromGround
 wsRadioVoiceStart
 wsRadioVoiceStop
 wsRadioVolume
-wsSignatureSave
 wsStationaryRadioOpen
 wsSuicideExecute
 wsTypewriterOpen
