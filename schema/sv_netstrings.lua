@@ -112,9 +112,8 @@ util.AddNetworkString("wsCameraFlashEffect")
 -- RADIO SYSTEM (schema/items/equipment/sh_handheld_radio.lua)
 -- =============================================================================
 util.AddNetworkString("wsRadioVolume")        -- Server->Client: open volume slider
-util.AddNetworkString("wsRadioVoiceStart")    -- Client->Server: started transmitting
-util.AddNetworkString("wsRadioVoiceStop")     -- Client->Server: stopped transmitting
-util.AddNetworkString("wsVoiceAmplitude")     -- Client->Server: voice amplitude update
+-- wsRadioVoiceStart / wsRadioVoiceStop / wsVoiceAmplitude are registered by the
+-- framework radio plugin now (it owns the voice engine).
 
 -- =============================================================================
 -- STATIONARY RADIO (entities/entities/ws_stationary_radio/)

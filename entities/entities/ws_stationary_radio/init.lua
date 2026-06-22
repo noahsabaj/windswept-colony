@@ -166,7 +166,7 @@ function ENT:CloseForUser(client, reason)
 end
 
 function ENT:RegisterTransmitter()
-    Schema.radioTransmitters = Schema.radioTransmitters or {}
+    ws.radio.transmitters = ws.radio.transmitters or {}
 
     local txFreqs = self:GetTXFrequencies()
     if table.IsEmpty(txFreqs) then
@@ -174,7 +174,7 @@ function ENT:RegisterTransmitter()
         return
     end
 
-    Schema.radioTransmitters[self] = {
+    ws.radio.transmitters[self] = {
         frequencies = txFreqs,
         entity = self,
         isStationary = true,
@@ -183,8 +183,8 @@ function ENT:RegisterTransmitter()
 end
 
 function ENT:UnregisterTransmitter()
-    Schema.radioTransmitters = Schema.radioTransmitters or {}
-    Schema.radioTransmitters[self] = nil
+    ws.radio.transmitters = ws.radio.transmitters or {}
+    ws.radio.transmitters[self] = nil
 end
 
 function ENT:OnRemove()
