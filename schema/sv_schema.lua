@@ -65,73 +65,77 @@ local function ValidateGiveTarget(client, target)
     return targetChar
 end
 
--- Wallet give handler
-net.Receive("wsWalletGive", function(len, client)
-    local walletItemID = net.ReadUInt(32)
-    local cents = net.ReadUInt(32)
-    local target = net.ReadEntity()
+-- Wallet give handler. Migrated to ws.action: item = "wallet" + access = "owned" reproduces the
+-- wallet-in-main-inventory ownership check; target + range = "none" + ValidateGiveTarget (which
+-- carries its own per-failure notifications) reproduce the give-target validation; read() carries
+-- the cents amount. Wire order is item, target, then cents (ws.action's fixed argument order).
+ws.action.Register("wsWalletGive", {
+    item = "wallet",
+    access = "owned",
+    target = true,
+    range = "none",  -- ValidateGiveTarget does the CanInteract range check (with a "targetTooFar" notify)
+    read = function() return net.ReadUInt(32) end,  -- cents
+    onValidate = function(client, ctx)
+        -- ValidateGiveTarget reproduces every target guard (player/range/alive/character/
+        -- knocked/restrained) along with its per-failure notifications.
+        local targetChar = ValidateGiveTarget(client, ctx.target)
+        if not targetChar then return false end
 
-    -- Validate wallet item
-    local walletItem = ws.item.instances[walletItemID]
-    if not walletItem or walletItem.uniqueID ~= "wallet" then return end
+        -- Wallet inner inventory must resolve.
+        local walletInvID = ctx.item:GetData("id")
+        if not walletInvID then return false end
+        local walletInv = ws.item.inventories[walletInvID]
+        if not walletInv then return false end
 
-    -- Validate ownership
-    local character, inventory = ws.constants.GetCharacterInventory(client)
-    if not character or not inventory then return end
+        ctx.targetChar = targetChar
+        ctx.walletInv = walletInv
+        return true
+    end,
+    run = function(client, ctx)
+        local target = ctx.target
+        local targetChar = ctx.targetChar
+        local walletInv = ctx.walletInv
 
-    -- Check wallet is in player's main inventory
-    if walletItem.invID ~= inventory:GetID() then return end
+        -- Calculate available money in wallet
+        local available = ws.wallet and ws.wallet.GetWalletMoney and ws.wallet.GetWalletMoney(walletInv) or 0
+        local cents = math.min(ctx.data, available)
 
-    -- Get wallet inventory
-    local walletInvID = walletItem:GetData("id")
-    if not walletInvID then return end
+        if cents <= 0 then
+            client:NotifyLocalized("walletEmpty")
+            return
+        end
 
-    local walletInv = ws.item.inventories[walletInvID]
-    if not walletInv then return end
+        -- Remove from wallet
+        if not ws.currency.RemoveFromInventory(walletInv, cents) then
+            client:NotifyLocalized("walletEmpty")
+            return
+        end
 
-    -- Validate target
-    local targetChar = ValidateGiveTarget(client, target)
-    if not targetChar then return end
+        -- Give to target (using wallet routing if available)
+        local success
+        if ws.currency.AddToInventoryWithWallet then
+            success = ws.currency.AddToInventoryWithWallet(target, cents)
+        else
+            local targetInv = targetChar:GetInventory()
+            success = targetInv and ws.currency.AddToInventory(targetInv, cents)
+        end
 
-    -- Calculate available money in wallet
-    local available = ws.wallet and ws.wallet.GetWalletMoney and ws.wallet.GetWalletMoney(walletInv) or 0
-    cents = math.min(cents, available)
+        if not success then
+            -- Refund if target can't receive
+            ws.currency.AddToInventory(walletInv, cents)
+            client:NotifyLocalized("targetInventoryFull")
+            return
+        end
 
-    if cents <= 0 then
-        client:NotifyLocalized("walletEmpty")
-        return
+        -- Notify both parties
+        local dollars = math.floor(cents / 100)
+        local remainingCents = cents % 100
+        local moneyStr = string.format("$%d.%02d", dollars, remainingCents)
+
+        client:NotifyLocalized("gaveMoneyTo", moneyStr, target:Nick())
+        target:NotifyLocalized("receivedMoneyFrom", moneyStr, client:Nick())
     end
-
-    -- Remove from wallet
-    if not ws.currency.RemoveFromInventory(walletInv, cents) then
-        client:NotifyLocalized("walletEmpty")
-        return
-    end
-
-    -- Give to target (using wallet routing if available)
-    local success
-    if ws.currency.AddToInventoryWithWallet then
-        success = ws.currency.AddToInventoryWithWallet(target, cents)
-    else
-        local targetInv = targetChar:GetInventory()
-        success = targetInv and ws.currency.AddToInventory(targetInv, cents)
-    end
-
-    if not success then
-        -- Refund if target can't receive
-        ws.currency.AddToInventory(walletInv, cents)
-        client:NotifyLocalized("targetInventoryFull")
-        return
-    end
-
-    -- Notify both parties
-    local dollars = math.floor(cents / 100)
-    local remainingCents = cents % 100
-    local moneyStr = string.format("$%d.%02d", dollars, remainingCents)
-
-    client:NotifyLocalized("gaveMoneyTo", moneyStr, target:Nick())
-    target:NotifyLocalized("receivedMoneyFrom", moneyStr, client:Nick())
-end)
+})
 
 -- Disable faction whitelist requirements
 -- All factions are open for transfer without needing /PlyWhitelist first

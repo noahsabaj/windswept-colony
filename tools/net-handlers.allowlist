@@ -16,15 +16,11 @@ wsCameraApprovePhoto
 wsCameraFlashEffect
 wsCameraFlashToggled
 wsCameraPhotoData
-wsContainerRename
 wsCurrencySplit
 wsDocumentData
-wsDocumentWrite
 wsDoorsSync
 wsKnockoutEnd
 wsKnockoutGiveUp
-wsKnockoutLoot
-wsKnockoutRevive
 wsKnockoutStart
 wsKnockoutTimerSync
 wsLocksmithOpen
@@ -38,11 +34,9 @@ wsPhotoViewFromGround
 wsRadioVoiceStart
 wsRadioVoiceStop
 wsRadioVolume
-wsRadioVolumeSet
 wsSignatureSave
 wsStationaryRadioOpen
 wsSuicideExecute
 wsTypewriterOpen
 wsVoiceAmplitude
-wsWalletGive
 wsZipTieUse
