@@ -1,69 +1,17 @@
 --[[
-    Windswept Doors Plugin - Server
+    Windswept Doors (Colony bridge) - Server
 
-    Server-side door management.
+    Colony-only door glue: locksmith cleanup and admin/test commands. The door-use and
+    damage routing now live in the framework door plugin (via the damage-source registry
+    this bridge populates in sh_plugin.lua).
 ]]--
-
-local PLUGIN = PLUGIN
-
--- ============================================================================
--- DOOR USE HANDLING
--- ============================================================================
-
--- Hook to handle E key on physical doors
-hook.Add("PlayerUse", "wsWindsweptDoorUse", function(client, entity)
-    if not IsValid(entity) then return end
-
-    -- Handle our managed doors (prop_door_rotating with wsIsWindsweptDoor marker)
-    if entity.wsIsWindsweptDoor then
-        -- Native prop_door_rotating handles Use automatically
-        return true
-    end
-
-    -- Prevent using hidden map doors
-    if entity:IsDoor() and entity:GetNoDraw() then
-        return false
-    end
-end)
-
--- ============================================================================
--- BATTERING RAM INTEGRATION
--- ============================================================================
-
--- Hook for battering ram and fist damage to managed doors
-hook.Add("EntityTakeDamage", "wsWindsweptDoorDamage", function(target, dmgInfo)
-    -- Only handle our managed doors
-    if not target.wsIsWindsweptDoor then return end
-
-    local inflictor = dmgInfo:GetInflictor()
-    local attacker = dmgInfo:GetAttacker()
-
-    -- Check if it's a battering ram
-    if IsValid(inflictor) and inflictor:GetClass() == "ws_batteringram" then
-        -- Handle damage via our system
-        local damage = dmgInfo:GetDamage()
-        ws.doors.DamageDoor(target, damage, attacker, inflictor)
-        return true  -- Block default damage
-    end
-
-    -- Check if it's fists (ws_hands)
-    if IsValid(inflictor) and inflictor:GetClass() == "ws_hands" then
-        -- Handle damage via our system (will check if fist damage is allowed)
-        ws.doors.DamageDoor(target, 1, attacker, inflictor)
-        return true  -- Block default damage
-    end
-
-    -- Block other damage types (prop_door_rotating shouldn't take random damage)
-    return true
-end)
 
 -- ============================================================================
 -- CLEANUP
 -- ============================================================================
 
--- Save doors when a player disconnects (in case they were editing)
+-- Close any locksmith machine a disconnecting player was using.
 hook.Add("PlayerDisconnected", "wsWindsweptDoorSave", function(client)
-    -- Close any locksmith machines they were using
     for _, ent in ipairs(ents.FindByClass("ws_auto_locksmith")) do
         if ent:GetUser() == client then
             ent:CloseForUser(client)
