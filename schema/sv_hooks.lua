@@ -3,6 +3,28 @@
 ]]--
 
 -- ============================================================================
+-- VENDOR CONSERVATION (conservation of matter)
+-- ============================================================================
+-- Vendors must not mint money or items. A vendor may only BUY from a player out of a real,
+-- finite money pool, and only SELL items it has finite stock of. When an admin hasn't backed
+-- the vendor (money == nil = "infinite money", or an item has no max stock), block the trade
+-- rather than letting cash/items appear from nowhere -- the admin must configure finite money
+-- and per-item max stock for that vendor to participate in the economy. The framework vendor
+-- stays generic (infinite is a valid admin-shop mode for other schemas); this is Colony policy,
+-- enforced through the framework's CanPlayerTradeWithVendor veto hook.
+hook.Add("CanPlayerTradeWithVendor", "wsVendorConservation", function(client, vendor, uniqueID, isSellingToVendor)
+	if (isSellingToVendor) then
+		-- Buying from the player out of an infinite pool would mint cash from nowhere.
+		if (vendor.money == nil) then
+			return false
+		end
+	elseif (vendor:GetStock(uniqueID) == nil) then
+		-- Selling an item with no configured max stock would spawn it from nothing.
+		return false
+	end
+end)
+
+-- ============================================================================
 -- LOG TYPES
 -- ============================================================================
 
