@@ -7,7 +7,7 @@
     GMod has a 4096 string limit across all addons.
     Centralizing makes it easy to audit and prevent duplicates.
 
-    NOTE: Third-party libs (netstream2) and plugins (permadeath, factions, prisoner)
+    NOTE: Third-party libs (netstream2) and plugins (permadeath, prisoner)
     register their own strings for modularity.
 ]]--
 

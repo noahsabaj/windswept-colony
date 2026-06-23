@@ -134,15 +134,5 @@ ws.action.Register("wsWalletGive", {
     end
 })
 
--- Disable faction whitelist requirements
--- All factions are open for transfer without needing /PlyWhitelist first
--- Players start factionless (no faction) and admins use /PlyTransfer to assign factions
-local playerMeta = FindMetaTable("Player")
-
-function playerMeta:HasWhitelist(faction)
-    -- Always return true - no whitelist restrictions
-    return true
-end
-
 -- (The Personal ID card was removed; new characters no longer receive one. Their physical
 -- descriptors live on the character itself via GetData("physical"), set during creation.)
