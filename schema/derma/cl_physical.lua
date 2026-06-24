@@ -265,3 +265,98 @@ function PANEL:GetBuild()
 end
 
 vgui.Register("wsPhysicalBuildDisplay", PANEL, "Panel")
+
+-- ============================================================================
+-- BIRTH DATE PICKER
+-- Month + day dropdowns. The valid day range follows the month and the
+-- character's age (Feb 29 only in a leap birth year). month/day are tracked as
+-- plain numeric fields so GetMonth/GetDay are immune to dropdown-rebuild timing.
+-- Consumed by the appearance plugin's physBirthMonth var (sh_appearance_vars.lua).
+-- ============================================================================
+
+PANEL = {}
+
+function PANEL:Init()
+    self.month = 1
+    self.day = 1
+    self.age = 25
+
+    surface.SetFont("wsMenuButtonFont")
+    local _, fontHeight = surface.GetTextSize("W@")
+    self:SetTall(fontHeight)
+
+    -- Day (right)
+    self.dayDropdown = self:Add("wsPhysicalDropdown")
+    self.dayDropdown:Dock(RIGHT)
+    self.dayDropdown:SetWide(80)
+    self.dayDropdown.OnValueChanged = function()
+        self.day = tonumber(self.dayDropdown:GetValue()) or 1
+        self:OnValueChanged()
+    end
+
+    local dayOptions = {}
+    for i = 1, 31 do
+        dayOptions[i] = tostring(i)
+    end
+    self.dayDropdown:SetOptions(dayOptions)
+
+    -- Spacer
+    local spacer = self:Add("Panel")
+    spacer:Dock(RIGHT)
+    spacer:SetWide(8)
+
+    -- Month (fills remaining space). Handler set before SetOptions so the initial
+    -- selection seeds self.month and rebuilds the day list.
+    self.monthDropdown = self:Add("wsPhysicalDropdown")
+    self.monthDropdown:Dock(FILL)
+    self.monthDropdown.OnValueChanged = function()
+        for i, name in ipairs(ws.birthdata.months) do
+            if (name == self.monthDropdown:GetValue()) then
+                self.month = i
+
+                break
+            end
+        end
+
+        self:UpdateDayOptions()
+        self:OnValueChanged()
+    end
+
+    self.monthDropdown:SetOptions(ws.birthdata.months)
+end
+
+-- Rebuild the day list for the current month/age, clamping the selected day.
+function PANEL:UpdateDayOptions()
+    local maxDay = ws.birthdata.GetMaxDay(self.month, self.age)
+
+    local dayOptions = {}
+    for i = 1, maxDay do
+        dayOptions[i] = tostring(i)
+    end
+
+    self.dayDropdown:SetOptions(dayOptions)
+
+    if (self.day > maxDay) then
+        self.day = maxDay
+    end
+
+    self.dayDropdown:SetValue(tostring(self.day))
+end
+
+function PANEL:SetAge(age)
+    self.age = tonumber(age) or 25
+    self:UpdateDayOptions()
+end
+
+function PANEL:GetMonth()
+    return self.month
+end
+
+function PANEL:GetDay()
+    return self.day
+end
+
+function PANEL:OnValueChanged()
+end
+
+vgui.Register("wsBirthDatePicker", PANEL, "Panel")
