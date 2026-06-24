@@ -215,8 +215,6 @@ function SWEP:StartRemove()
 end
 
 function SWEP:StartRemoveDoor(door)
-    local owner = self:GetOwner()
-
     local workTime = self.BaseDoorRemoveTime * self:GetTimeMultiplier("removeDoor")
     self:SetWorking(true)
     self:SetWorkStartTime(CurTime())
@@ -228,8 +226,6 @@ function SWEP:StartRemoveDoor(door)
 end
 
 function SWEP:StartRemoveLock(door)
-    local owner = self:GetOwner()
-
     local workTime = self.BaseLockRemoveTime * self:GetTimeMultiplier("removeLock")
     self:SetWorking(true)
     self:SetWorkStartTime(CurTime())

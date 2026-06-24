@@ -74,7 +74,7 @@ function PANEL:Init()
     self.charCounter:SetTextColor(ws.constants.COLOR_UI_NEUTRAL)
 
     -- Button panel
-    local btnPanel, btns = ws.constants.CreateButtonBar(bottomPanel, {
+    local _, btns = ws.constants.CreateButtonBar(bottomPanel, {
         {"Cancel", 80, RIGHT, function() self:Close() end},
         {"Type", 80, RIGHT, function() self:TypeDocument() end},
     })

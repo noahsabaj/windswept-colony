@@ -39,8 +39,6 @@ end
 function ENT:Use(activator, caller)
     if not IsValid(activator) or not activator:IsPlayer() then return end
 
-    local currentUser = self:GetUser()
-
     -- Track hold E for pickup
     if not self.holdEStart[activator] then
         self.holdEStart[activator] = CurTime()
