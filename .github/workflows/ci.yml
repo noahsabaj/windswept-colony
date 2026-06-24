@@ -36,3 +36,15 @@ jobs:
     - name: Net-handler guard gate
       working-directory: windswept-colony
       run: bash tools/check-net-handlers.sh
+
+    # Cross-repo guard: every custom ws* panel the schema or framework instantiates must be
+    # registered somewhere across the co-loaded repos. Catches the wsBirthDatePicker class of
+    # crash (a referenced panel no loaded repo defines) -- which luacheck can't see (plain string).
+    - name: Pull framework (for cross-repo panel check)
+      uses: actions/checkout@v7
+      with:
+        repository: noahsabaj/windswept
+        path: windswept
+
+    - name: Unregistered-panel guard
+      run: bash windswept-colony/tools/check-panels.sh windswept windswept-colony
