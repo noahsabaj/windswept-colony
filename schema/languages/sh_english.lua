@@ -119,10 +119,6 @@ LANGUAGE = {
     invalidAge = "Age must be between 18 and 128.",
     invalidHeight = "Height must be between 147cm and 198cm.",
     invalidWeight = "Weight must be between 90lbs and 350lbs.",
-    invalidSkinTone = "Please select a valid skin tone.",
-    invalidHairColor = "Please select a valid hair color.",
-    invalidHairType = "Please select a valid hair type.",
-    invalidHairLength = "Please select a valid hair length.",
     invalidEyeColor = "Please select a valid eye color.",
     invalidFacialHair = "Please select a valid facial hair option.",
 
