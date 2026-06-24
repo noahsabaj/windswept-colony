@@ -285,7 +285,6 @@ if CLIENT then
         end
 
         local instructionText = "R to cycle keys"
-        local instructionW, instructionH = surface.GetTextSize(instructionText)
 
         -- Calculate box dimensions based on content
         local boxW = math.max(nameW, keyingW) + (padding * 2)

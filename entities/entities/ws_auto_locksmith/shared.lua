@@ -32,7 +32,7 @@ end
 -- Generate a random keying ID
 function ENT:GenerateKeying()
     local keying = ""
-    for i = 1, self.KeyingLength do
+    for _ = 1, self.KeyingLength do
         local idx = math.random(1, #self.KeyingChars)
         keying = keying .. string.sub(self.KeyingChars, idx, idx)
     end

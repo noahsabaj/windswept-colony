@@ -91,7 +91,7 @@ net.Receive("wsLocksmithResult", function()
     if resultType == "viewKeyings" then
         local count = net.ReadUInt(8)
         local keyings = {}
-        for i = 1, count do
+        for _ = 1, count do
             table.insert(keyings, net.ReadString())
         end
 

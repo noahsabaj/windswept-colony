@@ -29,11 +29,11 @@ function PANEL:Init()
     local digitTextW, digitTextH = surface.GetTextSize("0")
 
     surface.SetFont("wsMediumFont")
-    local arrowTextW, arrowTextH = surface.GetTextSize("▲")
-    local headerTextW, headerTextH = surface.GetTextSize("Set Frequency")
+    local _, arrowTextH = surface.GetTextSize("▲")
+    local _, headerTextH = surface.GetTextSize("Set Frequency")
 
     surface.SetFont("wsSmallFont")
-    local buttonTextW, buttonTextH = surface.GetTextSize("Confirm")
+    local _, buttonTextH = surface.GetTextSize("Confirm")
 
     -- Store computed sizes
     self.digitSize = math.max(digitTextW, digitTextH) + ScreenScale(12)  -- Digit box size with padding

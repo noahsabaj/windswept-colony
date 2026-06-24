@@ -70,7 +70,7 @@ hook.Add("HUDPaint", "wsWindsweptDoorHints", function()
     local scrW, scrH = ScrW(), ScrH()
     local y = scrH - 100
 
-    for i, hint in ipairs(hints) do
+    for _, hint in ipairs(hints) do
         draw.SimpleText(hint, "wsSmallFont", scrW - 20, y, Color(200, 200, 200, 200), TEXT_ALIGN_RIGHT)
         y = y + 30
     end
