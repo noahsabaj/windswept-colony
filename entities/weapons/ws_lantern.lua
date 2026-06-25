@@ -325,13 +325,13 @@ end
 -- ============================================================================
 
 function SWEP:DrawWorldModel()
-    if not IsValid(self.Owner) then
+    if not IsValid(self:GetOwner()) then
         return self:DrawModel()
     end
 
-    self.Hand2 = self.Hand2 or self.Owner:LookupAttachment("anim_attachment_rh")
+    self.Hand2 = self.Hand2 or self:GetOwner():LookupAttachment("anim_attachment_rh")
 
-    local hand = self.Owner:GetAttachment(self.Hand2)
+    local hand = self:GetOwner():GetAttachment(self.Hand2)
 
     if not hand then
         return self:DrawModel()
